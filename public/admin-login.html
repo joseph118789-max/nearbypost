@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nearbypost Admin - Login</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      background: linear-gradient(135deg, #0f3b2c 0%, #1a5a4a 100%); 
+      min-height: 100vh; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      font-family: 'Inter', system-ui, sans-serif;
+    }
+    .login-card { 
+      background: white; 
+      border-radius: 24px; 
+      padding: 48px 40px; 
+      width: 100%; 
+      max-width: 420px; 
+      box-shadow: 0 25px 50px rgba(0,0,0,0.25); 
+    }
+    .logo { 
+      font-size: 1.5rem; 
+      font-weight: 700; 
+      color: #0f3b2c; 
+      text-align: center; 
+      margin-bottom: 8px; 
+    }
+    .subtitle { 
+      text-align: center; 
+      color: #6b8498; 
+      margin-bottom: 32px; 
+      font-size: 0.9rem; 
+    }
+    .form-group { margin-bottom: 20px; }
+    label { 
+      display: block; 
+      font-weight: 600; 
+      margin-bottom: 8px; 
+      color: #1d4e6e; 
+      font-size: 0.85rem; 
+    }
+    input { 
+      width: 100%; 
+      padding: 14px 18px; 
+      border: 2px solid #e2edf6; 
+      border-radius: 14px; 
+      font-size: 1rem; 
+      transition: border-color 0.2s;
+    }
+    input:focus { 
+      outline: none; 
+      border-color: #0f3b2c; 
+    }
+    .btn { 
+      width: 100%; 
+      padding: 16px; 
+      border: none; 
+      border-radius: 14px; 
+      font-size: 1rem; 
+      font-weight: 600; 
+      cursor: pointer; 
+      transition: background 0.2s;
+    }
+    .btn-primary { 
+      background: #0f3b2c; 
+      color: white; 
+    }
+    .btn-primary:hover { 
+      background: #1a5a4a; 
+    }
+    .error { 
+      background: #fff3f0; 
+      color: #bc4e2c; 
+      padding: 12px 16px; 
+      border-radius: 12px; 
+      margin-bottom: 20px; 
+      font-size: 0.9rem; 
+      display: none; 
+    }
+    .error.show { display: block; }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <div class="logo">🔒 Nearbypost Admin</div>
+    <div class="subtitle">Sign in to access the admin panel</div>
+    <div id="error" class="error">Invalid username or password</div>
+    <form id="loginForm">
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="username" name="username" required autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="password" name="password" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-primary">Sign In</button>
+    </form>
+  </div>
+  <script>
+    // Simple auth check
+    const AUTH_COOKIE = 'nearbypost_admin_logged_in';
+    const CREDENTIALS = {
+      // Username: admin, Password: nearbypost2026
+      username: 'admin',
+      // Password hash verification done client-side for simplicity
+      password: 'nearbypost2026'
+    };
+    
+    // Check if already logged in
+    if (document.cookie.includes(AUTH_COOKIE + '=true')) {
+      window.location.href = '/admin.html';
+    }
+    
+    document.getElementById('loginForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      
+      if (username === CREDENTIALS.username && password === CREDENTIALS.password) {
+        // Set cookie for 7 days
+        const expiry = new Date();
+        expiry.setDate(expiry.getDate() + 7);
+        document.cookie = AUTH_COOKIE + '=true; path=/; expires=' + expiry.toUTCString();
+        window.location.href = '/admin.html';
+      } else {
+        document.getElementById('error').classList.add('show');
+      }
+    });
+  </script>
+</body>
+</html>

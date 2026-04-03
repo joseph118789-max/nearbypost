@@ -1,0 +1,920 @@
+{{-- resources/views/admin/dashboard.blade.php --}}
+@extends('layouts.admin')
+
+@section('title', 'ProHub Admin Dashboard')
+
+@section('tab-content')
+{{-- News Tab --}}
+<div id="newsTab" class="tab-content active">
+  <div class="header-section">
+    <div class="title-row"><h1>📰 News Management</h1><button id="addRowBtn" class="btn btn-primary">➕ Add News</button></div>
+    <div class="filter-bar">
+      <select id="primaryCategoryFilter" class="filter-input"></select>
+      <select id="subCategoryFilter" class="filter-input"></select>
+      <button id="clearNewsFilterBtn" class="btn">Clear</button>
+    </div>
+  </div>
+  <div class="table-wrapper">
+    <table class="news-table">
+      <thead><tr><th>Date</th><th>Headline</th><th>Summary</th><th>Primary</th><th>Sub</th><th>Status</th><th>Mode</th><th>Precision</th><th>Location</th><th>Source</th><th>Clicks</th></tr></thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+  <div class="pagination-area">
+    <div id="newsPaginationControls"></div>
+    <div id="newsPaginationInfo"></div>
+  </div>
+</div>
+
+{{-- Subscribers Tab --}}
+<div id="subscriberTab" class="tab-content">
+  <div class="header-section">
+    <div class="title-row"><h1>👥 Subscribers</h1><button id="addSubscriberBtn" class="btn btn-primary">➕ Add</button></div>
+    <div id="groupStatsContainer" class="group-stats-container"></div>
+    <div class="filter-row">
+      <input type="text" id="filterUserCode" class="filter-input" placeholder="User Code">
+      <input type="text" id="filterMobile" class="filter-input" placeholder="Mobile">
+      <select id="filterWAGroup" class="filter-input"></select>
+      <select id="filterInterestSub" class="filter-input"></select>
+      <select id="filterStatus" class="filter-input"><option value="all">All Status</option><option value="active">Active</option><option value="inactive">Inactive</option></select>
+      <input type="text" id="filterDateRange" class="filter-input" placeholder="Join Date Range">
+      <button id="clearSubFiltersBtn" class="btn">Clear</button>
+    </div>
+  </div>
+  <div class="table-wrapper">
+    <table class="subscriber-table">
+      <thead><tr><th>Join Date</th><th>User Code</th><th>Mobile</th><th>WA Group</th><th>Interest</th><th>Status</th><th>Location</th></tr></thead>
+      <tbody id="subscriberBody"></tbody>
+    </table>
+  </div>
+  <div class="pagination-area">
+    <div id="subPaginationControls"></div>
+    <div id="subPaginationInfo"></div>
+  </div>
+</div>
+
+{{-- Intel Analytics Tab --}}
+<div id="intelTab" class="tab-content">
+  <div class="intel-dashboard">
+    <div class="intel-toolbar">
+      <div class="intel-toolbar-left">
+        <div class="intel-chip"><strong>Time Period</strong></div>
+        <select id="intelRangePreset" class="filter-input" style="min-width:170px;">
+          <option value="24h">Last 24 Hours</option>
+          <option value="7d" selected>Last 7 Days</option>
+          <option value="30d">Last 30 Days</option>
+          <option value="6m">Last 6 Months</option>
+          <option value="1y">Last 1 Year</option>
+          <option value="all">All Time</option>
+          <option value="custom">Custom Range</option>
+        </select>
+        <input type="text" id="intelCustomRange" class="filter-input" placeholder="Select custom range" style="display:none; min-width:220px;">
+        <select id="intelGranularity" class="filter-input" style="min-width:160px;">
+          <option value="auto" selected>Time Analysis: Auto</option>
+          <option value="hour">Time Analysis: By Hour</option>
+          <option value="day">Time Analysis: By Day</option>
+          <option value="month">Time Analysis: By Month</option>
+        </select>
+      </div>
+      <div class="intel-toolbar-right">
+        <div id="intelRangeSummary" class="intel-chip"><strong>Loading period</strong></div>
+        <button id="intelResetRangeBtn" class="btn">Reset</button>
+      </div>
+    </div>
+
+    <div class="stats-grid" id="intelStatsGrid"></div>
+
+    <div class="intel-grid-2">
+      <div class="intel-block">
+        <div class="intel-block-header">
+          <h3>📍 Location Analytics</h3>
+          <div class="intel-detail-actions">
+            <button class="btn" data-intel-detail="locations">View Details</button>
+          </div>
+        </div>
+        <div id="locationTableContainer"></div>
+        <div class="intel-note">Readable location summary only. Use the detail popup for deeper breakdown.</div>
+      </div>
+
+      <div class="intel-block">
+        <div class="intel-block-header">
+          <h3>🏷️ Category Distribution</h3>
+          <div class="intel-detail-actions">
+            <button class="btn" data-intel-detail="categories">View Full Distribution</button>
+          </div>
+        </div>
+        <div id="categoryTableContainer"></div>
+        <div class="intel-note">Uses backend-style fields: primary_category and secondary_category.</div>
+      </div>
+    </div>
+
+    <div class="intel-grid-2">
+      <div class="intel-block">
+        <div class="intel-block-header">
+          <h3>🖱️ Top News</h3>
+          <div class="intel-detail-actions">
+            <button class="btn" data-intel-detail="top_news">View All Top News</button>
+          </div>
+        </div>
+        <div id="topNewsTableContainer"></div>
+        <div class="intel-note">Top news is filtered by the time period selected above.</div>
+      </div>
+
+      <div class="intel-block">
+        <div class="intel-block-header">
+          <h3>⏱️ Time Analysis</h3>
+          <div class="intel-detail-actions">
+            <button class="btn" data-intel-detail="activity">Open Time Detail</button>
+          </div>
+        </div>
+        <div class="intel-summary-bar" id="intelTimeMeta"></div>
+        <div class="chart-wrap"><canvas id="activityChart"></canvas></div>
+        <div class="intel-note">Change the time period and time-analysis mode above.</div>
+      </div>
+    </div>
+  </div>
+</div>
+@endsection
+
+@section('modals')
+{{-- Intel Detail Modal --}}
+<div id="intelDetailModal" class="modal-overlay">
+  <div class="modal-card detail-card">
+    <div class="settings-header">
+      <h2 id="intelDetailTitle">Intel Details</h2>
+      <button id="closeIntelDetailBtn" class="close-settings-btn">✕</button>
+    </div>
+    <div class="detail-modal-body">
+      <div class="detail-toolbar">
+        <div class="left">
+          <input type="text" id="intelDetailSearch" class="filter-input" placeholder="Search within details" style="min-width:280px;">
+        </div>
+        <div class="right">
+          <div id="intelDetailSummary" class="intel-chip"><strong>0 rows</strong></div>
+        </div>
+      </div>
+      <div class="detail-advanced-filters">
+        <div class="filter-stack">
+          <label>Primary Categories</label>
+          <select id="intelDetailPrimaryMulti" class="detail-filter-multi" multiple></select>
+        </div>
+        <div class="filter-stack">
+          <label>Secondary Category</label>
+          <select id="intelDetailSecondaryFilter" class="filter-input">
+            <option value="all">All Secondary Categories</option>
+          </select>
+        </div>
+        <div class="filter-stack">
+          <label>Sort By</label>
+          <select id="intelDetailSort" class="filter-input">
+            <option value="clicks_desc">Clicks: High to Low</option>
+            <option value="clicks_asc">Clicks: Low to High</option>
+            <option value="title_asc">Title: A to Z</option>
+            <option value="title_desc">Title: Z to A</option>
+          </select>
+        </div>
+        <div class="filter-stack">
+          <label>Minimum Clicks</label>
+          <input type="number" id="intelDetailMinClicks" class="filter-input" placeholder="0" min="0">
+        </div>
+      </div>
+      <div class="detail-kpis" id="intelDetailKpis"></div>
+      <div id="intelDetailTableWrap"></div>
+    </div>
+  </div>
+</div>
+
+{{-- Settings Modal --}}
+<div id="adminModal" class="modal-overlay">
+  <div class="modal-card full-height">
+    <div class="settings-header">
+      <h2>⚙️ System Configuration</h2>
+      <button id="closeAdminBtn" class="close-settings-btn">✕</button>
+    </div>
+    <div class="settings-tabs">
+      <button class="settings-tab-btn active" data-settings-tab="categories">📂 Categories</button>
+      <button class="settings-tab-btn" data-settings-tab="wagroups">💬 WhatsApp Groups</button>
+    </div>
+    <div class="settings-panel-wrapper">
+      <div id="settingsCategories" class="settings-panel active-panel">
+        <div class="category-grid">
+          <div class="primary-panel">
+            <h4>📁 Primary Categories</h4>
+            <div id="primaryCatList" class="cat-list"></div>
+            <div class="inline-add">
+              <input type="text" id="newPrimaryCat" placeholder="New category">
+              <button id="addPrimaryCatBtn" class="btn btn-primary">+ Add</button>
+              <button id="deletePrimaryCatBtn" class="btn btn-danger">Delete Selected</button>
+            </div>
+          </div>
+          <div class="sub-panel">
+            <h4>🔖 Sub-Categories <span id="selectedPrimaryName" style="font-size:0.7rem;"></span></h4>
+            <select id="subPrimarySelect" class="filter-input" style="width:100%;"></select>
+            <div id="subCatList" class="cat-list"></div>
+            <div class="inline-add">
+              <input type="text" id="newSubCat" placeholder="New sub-category">
+              <button id="addSubCatBtn" class="btn btn-primary">+ Add</button>
+              <button id="deleteSubCatBtn" class="btn btn-danger">Delete Selected</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="settingsWAGroups" class="settings-panel">
+        <div style="height:100%; display:flex; flex-direction:column;">
+          <h4>💬 WhatsApp Broadcast Groups</h4>
+          <div id="waGroupList" class="wa-group-list" style="flex:1; overflow-y:auto; margin:16px 0;"></div>
+          <div class="inline-add">
+            <input type="text" id="newWAGroupName" placeholder="New group name">
+            <button id="addWAGroupBtn" class="btn btn-primary">+ Add Group</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{{-- News Modal --}}
+<div id="newsModal" class="modal-overlay">
+  <div class="modal-card">
+    <h3 id="newsModalTitle">Add News</h3>
+    <input type="hidden" id="editNewsId">
+    <div class="form-group"><label>Date & Time</label><input type="text" id="newsDatetime"></div>
+    <div class="form-group"><label>Headline</label><textarea id="newsHeadline" rows="2"></textarea></div>
+    <div class="form-group"><label>Summary</label><textarea id="newsSummary" rows="2"></textarea></div>
+    <div class="form-group"><label>Primary Category</label><select id="newsPrimaryCat"></select></div>
+    <div class="form-group"><label>Sub-Category</label><select id="newsSubCat"></select></div>
+    <div class="form-group"><label>Status</label><select id="newsStatus"><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
+    <div class="form-group"><label>Relevance Mode</label><select id="newsRelevanceMode"><option value="hybrid">Hybrid</option><option value="location_only">Location Only</option><option value="category_only">Category Only</option></select></div>
+    <div class="form-group"><label>Precision Type</label><select id="newsPrecisionType"><option value="exact_area">Exact Area</option><option value="approximate_area">Approximate Area</option><option value="state_center">State Center</option><option value="region">Region</option><option value="country">Country</option><option value="national">National</option><option value="unresolved">Unresolved</option></select></div>
+    <div class="form-group"><label>Location Name</label><input type="text" id="newsMainPlaceText"></div>
+    <div class="form-group"><label>OpenStreetMap Pin</label><div class="leaflet-map-wrap"><div id="newsMap"></div></div></div>
+    <div class="form-group"><label>Coordinates</label><div class="coords-box"><span id="coordDisplay">3.13900, 101.68690</span><button type="button" id="resetMapPin" class="btn">Reset</button></div></div>
+    <div class="form-inline-two">
+      <div class="form-group"><label>Latitude</label><input type="number" step="0.000001" id="newsLat"></div>
+      <div class="form-group"><label>Longitude</label><input type="number" step="0.000001" id="newsLng"></div>
+    </div>
+    <div class="form-group"><label>Source Name</label><input type="text" id="newsSourceName"></div>
+    <div class="form-group"><label>Source URL</label><input type="url" id="newsSource"></div>
+    <div class="form-actions">
+      <button id="cancelNewsBtn" class="btn">Cancel</button>
+      <button id="saveNewsBtn" class="btn btn-primary">Save</button>
+    </div>
+    <div id="deleteNewsSection" style="display:none; margin-top: 10px;">
+      <button id="deleteNewsBtn" class="btn btn-danger">Delete</button>
+    </div>
+  </div>
+</div>
+
+{{-- Subscriber Modal --}}
+<div id="subscriberModal" class="modal-overlay">
+  <div class="modal-card">
+    <h3 id="subModalTitle">Subscriber</h3>
+    <input type="hidden" id="editSubId">
+    <div class="form-group"><label>Join Date</label><input type="text" id="subJoinDate"></div>
+    <div class="form-group"><label>User Code</label><input type="text" id="subUserCode"></div>
+    <div class="form-group"><label>Mobile</label><input type="text" id="subMobile"></div>
+    <div class="form-group"><label>WA Group</label><select id="subWAGroup"></select></div>
+    <div class="form-group"><label>Interest</label><select id="subInterestCat"></select></div>
+    <div class="form-group"><label>Status</label><select id="subStatus"><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
+    <div class="form-group"><label>Location</label><input type="text" id="subLocationName"></div>
+    <div class="form-actions">
+      <button id="cancelSubBtn" class="btn">Cancel</button>
+      <button id="saveSubBtn" class="btn btn-primary">Save</button>
+    </div>
+    <div id="deleteSubSection" style="display:none; margin-top: 10px;">
+      <button id="deleteSubBtn" class="btn btn-danger">Delete</button>
+    </div>
+  </div>
+</div>
+@endsection
+
+@push('scripts')
+<script>
+const REQUIRED_PRIMARIES = ["property","transport","crime","sports","business","government","education","health","lifestyle","community","environment","technology","entertainment","jobs","others"];
+let primaryCategories = [...REQUIRED_PRIMARIES];
+let subCategoriesMap = {};
+let waBroadcastGroups = ["Main Group", "Premium Alerts", "Regional News", "VIP Updates"];
+for (const p of primaryCategories) subCategoriesMap[p] = p === "sports" ? ["badminton","football","basketball"] : [`${p}_news`, `${p}_analysis`, `${p}_updates`];
+
+let allNews = [];
+let allSubscribers = [];
+let userEvents = [];
+let nextNewsId = 1;
+let nextSubId = 1;
+let newsCurrentPage = 1, newsPerPage = 5, newsFilterPrimary = "all", newsFilterSub = "all";
+let subCurrentPage = 1, subPerPage = 5;
+let subFilters = { userCode: "", mobile: "", waGroup: "all", interestSub: "all", status: "all", dateRange: null };
+let currentSelectedPrimary = "property", selectedPrimaryCategory = "property", selectedSubCategory = null;
+let currentNewsId = null;
+let activityChart = null;
+let intelDetailState = { type: "", rows: [] };
+let newsMap = null;
+let newsMarker = null;
+const DEFAULT_MAP_COORDS = { lat: 3.1390, lng: 101.6869 };
+
+const esc = str => (str == null ? "" : String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])));
+const fmt = d => { const x = new Date(d); return isNaN(x) ? "" : `${x.getMonth()+1}/${x.getDate()}/${x.getFullYear()} ${String(x.getHours()).padStart(2,'0')}:${String(x.getMinutes()).padStart(2,'0')}`; };
+const parseUiDateTime = v => { const d = new Date(v); return isNaN(d) ? new Date() : d; };
+
+// API endpoints - update these to match your Laravel routes
+const API_BASE = '/api/admin';
+
+async function fetchApi(url, options = {}) {
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+      ...options.headers,
+    },
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+function persistAll() {
+  localStorage.setItem('prohub_newsData', JSON.stringify(allNews));
+  localStorage.setItem('prohub_nextNewsId', nextNewsId);
+  localStorage.setItem('prohub_primaryCats', JSON.stringify(primaryCategories));
+  localStorage.setItem('prohub_subCatsMap', JSON.stringify(subCategoriesMap));
+  localStorage.setItem('prohub_subscribers', JSON.stringify(allSubscribers));
+  localStorage.setItem('prohub_nextSubId', nextSubId);
+  localStorage.setItem('prohub_waGroups', JSON.stringify(waBroadcastGroups));
+  localStorage.setItem('prohub_userEvents', JSON.stringify(userEvents));
+}
+
+function ensureCategoryIntegrity() {
+  primaryCategories = [...new Set([...REQUIRED_PRIMARIES, ...primaryCategories])];
+  primaryCategories.forEach(p => { if (!subCategoriesMap[p] || subCategoriesMap[p].length === 0) subCategoriesMap[p] = [`${p}_news`]; });
+  Object.keys(subCategoriesMap).forEach(k => { if (!primaryCategories.includes(k)) delete subCategoriesMap[k]; });
+  if (!primaryCategories.includes(currentSelectedPrimary)) currentSelectedPrimary = primaryCategories[0];
+}
+
+function generateRichDummyData() {
+  const newsSeed = [
+    ['property','property_news','Singapore Property Market Hits All-Time High','Private home prices surge 8.2% in Q1 2026','Singapore'],
+    ['property','property_analysis','Johor condo launches face slower absorption','Developers offer rebates as supply increases','Johor Bahru'],
+    ['property','property_updates','Klang Valley rental demand rises near MRT stations','Transit-oriented units seeing stronger enquiries','Petaling Jaya'],
+    ['sports','football','Malaysia Wins SEA Games Football Gold','Historic victory after 20-year drought','Kuala Lumpur'],
+    ['sports','badminton','National shuttlers sweep regional finals','Crowd turnout lifts tournament buzz','Bukit Jalil'],
+    ['sports','basketball','Regional basketball league expands to Penang','New teams expected next season','Penang'],
+    ['transport','transport_news',"Bangkok's New MRT Purple Line Opens",'Connects 15 districts, reduces traffic by 30%','Bangkok'],
+    ['transport','transport_updates','Major road closure planned for PJ this weekend','Detours announced for drainage upgrading works','Petaling Jaya'],
+    ['transport','transport_analysis','EV charging usage spikes during holiday travel','Highway fast chargers report full occupancy peaks','Seremban'],
+    ['technology','technology_news','Indonesian Fintech Startup Raises $75M','AI-powered lending platform expands across SEA','Jakarta'],
+    ['technology','technology_analysis','Cybersecurity hiring jumps across regional banks','Demand remains strongest in digital-risk teams','Kuala Lumpur'],
+    ['health','health_news','Free Health Screening for Seniors','Program covers 500,000 elderly citizens','Penang'],
+    ['health','health_updates','Dengue monitoring intensified in urban districts','More hotspot inspections scheduled this month','Shah Alam'],
+    ['business','business_news','Regional logistics firms invest in warehouse automation','Capex focused on same-day fulfilment capacity','Port Klang'],
+    ['business','business_updates','Retail spending climbs ahead of festive season','Malls report stronger weekend footfall','Kuala Lumpur'],
+    ['education','education_news','Technical colleges add more AI and data courses','Industry-driven modules launch next intake','Cyberjaya'],
+    ['government','government_updates','City council tightens licensing checks on roadside traders','Enforcement to begin in phases','Subang Jaya'],
+    ['community','community_news','Weekend volunteer clean-up draws record turnout','Residents and schools join riverbank effort','Kepong'],
+    ['environment','environment_news','Flash flood mitigation work accelerated in low-lying zones','Drainage upgrades prioritised before monsoon','Klang'],
+    ['entertainment','entertainment_news','Concert ticket demand pushes dynamic pricing debate','Fans call for more transparent seat release','Kuala Lumpur'],
+    ['jobs','jobs_updates','Regional hiring improves for operations and sales roles','SMEs resume replacement hiring in April','Johor Bahru'],
+    ['lifestyle','lifestyle_news','Night market expansion approved near township hub','Operators expect higher weekend visitor traffic','Puchong'],
+    ['crime','crime_updates','Commercial scam losses rise despite awareness campaigns','Authorities warn of new impersonation patterns','Petaling Jaya'],
+    ['others','others_news','Regional consumer mood turns cautiously positive','Households remain selective on discretionary spending','Ipoh']
+  ];
+  const coords = {
+    'Singapore':[1.3521,103.8198],'Johor Bahru':[1.4927,103.7414],'Petaling Jaya':[3.1073,101.6067],
+    'Kuala Lumpur':[3.1390,101.6869],'Bukit Jalil':[3.0535,101.6900],'Penang':[5.4141,100.3288],
+    'Bangkok':[13.7563,100.5018],'Seremban':[2.7297,101.9381],'Jakarta':[-6.2088,106.8456],
+    'Shah Alam':[3.0738,101.5183],'Port Klang':[3.0000,101.4000],'Cyberjaya':[2.9225,101.6500],
+    'Subang Jaya':[3.0433,101.5810],'Kepong':[3.2143,101.6356],'Klang':[3.0449,101.4456],
+    'Puchong':[3.0327,101.6188],'Ipoh':[4.5975,101.0901]
+  };
+  const sourceNames = ['The Star','Malay Mail','Business Times','Bangkok Post','Channel News Asia','Tech in Asia','The Edge','Bernama'];
+  allNews = newsSeed.map((row, idx) => {
+    const [primaryCat, subCat, headline, summary, place] = row;
+    const [lat,lng] = coords[place] || [DEFAULT_MAP_COORDS.lat, DEFAULT_MAP_COORDS.lng];
+    const dt = new Date(2026, 3, 1, 8, 0);
+    dt.setDate(dt.getDate() - (idx % 18));
+    dt.setHours(7 + (idx * 2) % 14, (idx * 11) % 60, 0, 0);
+    const relevanceMode = primaryCat === 'technology' ? 'category_only' : (idx % 4 === 0 ? 'location_only' : 'hybrid');
+    const precisionType = relevanceMode === 'category_only' ? 'national' : (idx % 3 === 0 ? 'exact_area' : 'approximate_area');
+    return { id: idx + 1, datetime: dt.toISOString(), headline, summary, primaryCat, subCat, status: 'active', relevanceMode, precisionType, mainPlaceText: place, lat, lng, sourceName: sourceNames[idx % sourceNames.length], source: `https://example.com/news/${idx + 1}`, clickCount: 0 };
+  });
+  nextNewsId = allNews.length + 1;
+  allSubscribers = [
+    { id: 1, joinDate: new Date(2026,2,10).toISOString(), userCode: 'SGP_ALEX', mobile: '+65 9123 4567', waGroup: 'Main Group', interestSubCat: 'property_news', status: 'active', locationName: 'Singapore' },
+    { id: 2, joinDate: new Date(2026,2,12).toISOString(), userCode: 'KUL_MAYA', mobile: '+60 12 345 6789', waGroup: 'Premium Alerts', interestSubCat: 'football', status: 'active', locationName: 'Kuala Lumpur' },
+    { id: 3, joinDate: new Date(2026,2,15).toISOString(), userCode: 'BKK_SOMCHAI', mobile: '+66 89 123 4567', waGroup: 'Regional News', interestSubCat: 'transport_news', status: 'active', locationName: 'Bangkok' },
+    { id: 4, joinDate: new Date(2026,2,18).toISOString(), userCode: 'JKT_BUDI', mobile: '+62 812 3456 7890', waGroup: 'Main Group', interestSubCat: 'technology_news', status: 'active', locationName: 'Jakarta' },
+    { id: 5, joinDate: new Date(2026,2,20).toISOString(), userCode: 'JHB_WEI', mobile: '+60 18 765 4321', waGroup: 'Premium Alerts', interestSubCat: 'property_updates', status: 'inactive', locationName: 'Johor Bahru' },
+    { id: 6, joinDate: new Date(2026,2,22).toISOString(), userCode: 'SGP_JASMINE', mobile: '+65 9876 5432', waGroup: 'VIP Updates', interestSubCat: 'health_news', status: 'active', locationName: 'Singapore' },
+    { id: 7, joinDate: new Date(2026,2,25).toISOString(), userCode: 'HCMC_LAN', mobile: '+84 90 123 4567', waGroup: 'Regional News', interestSubCat: 'transport_updates', status: 'active', locationName: 'Ho Chi Minh City' },
+    { id: 8, joinDate: new Date(2026,2,26).toISOString(), userCode: 'PJ_DANIEL', mobile: '+60 17 222 8899', waGroup: 'Main Group', interestSubCat: 'crime_updates', status: 'active', locationName: 'Petaling Jaya' },
+    { id: 9, joinDate: new Date(2026,2,27).toISOString(), userCode: 'PNG_MEI', mobile: '+60 12 998 3311', waGroup: 'VIP Updates', interestSubCat: 'health_updates', status: 'active', locationName: 'Penang' },
+    { id: 10, joinDate: new Date(2026,2,28).toISOString(), userCode: 'KLG_IRFAN', mobile: '+60 19 876 1212', waGroup: 'Premium Alerts', interestSubCat: 'environment_news', status: 'active', locationName: 'Klang' }
+  ];
+  nextSubId = allSubscribers.length + 1;
+  userEvents = [];
+  const weightedNews = allNews.flatMap((n, idx) => Array.from({ length: 2 + ((allNews.length - idx) % 5) }, () => n));
+  for (let i = 0; i < 1400; i++) {
+    const user = allSubscribers[Math.floor(Math.random() * allSubscribers.length)];
+    const news = weightedNews[Math.floor(Math.random() * weightedNews.length)];
+    const d = new Date();
+    d.setDate(d.getDate() - Math.floor(Math.random() * 365));
+    d.setHours(7 + Math.floor(Math.random() * 16), Math.floor(Math.random() * 60), 0, 0);
+    userEvents.push({ event_type: 'click_news', session_id: `sess_${user.id}_${i}`, user_id: user.id, news_item_id: news.id, title: news.headline, primary_category: news.primaryCat, secondary_category: news.subCat, location_name: user.locationName, created_at: d.toISOString() });
+  }
+  userEvents.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+  allNews.forEach(n => n.clickCount = 0);
+  userEvents.forEach(ev => { const item = allNews.find(n => n.id === ev.news_item_id); if (item) item.clickCount += 1; });
+}
+
+function loadData() {
+  const storedNews = localStorage.getItem('prohub_newsData');
+  const storedSubs = localStorage.getItem('prohub_subscribers');
+  const storedEvents = localStorage.getItem('prohub_userEvents');
+  const storedPrimaries = localStorage.getItem('prohub_primaryCats');
+  const storedMap = localStorage.getItem('prohub_subCatsMap');
+  const storedGroups = localStorage.getItem('prohub_waGroups');
+  if (storedPrimaries) primaryCategories = [...new Set([...REQUIRED_PRIMARIES, ...JSON.parse(storedPrimaries)])];
+  if (storedMap) subCategoriesMap = JSON.parse(storedMap);
+  if (storedGroups) waBroadcastGroups = JSON.parse(storedGroups);
+  if (storedNews) allNews = JSON.parse(storedNews);
+  if (storedSubs) allSubscribers = JSON.parse(storedSubs);
+  if (storedEvents) userEvents = JSON.parse(storedEvents);
+  nextNewsId = parseInt(localStorage.getItem('prohub_nextNewsId') || '1', 10);
+  nextSubId = parseInt(localStorage.getItem('prohub_nextSubId') || '1', 10);
+  ensureCategoryIntegrity();
+  if (!allNews.length || !allSubscribers.length || !userEvents.length || allNews.length < 15 || userEvents.length < 800) generateRichDummyData();
+}
+
+function getIntelRangeConfig() {
+  const preset = document.getElementById('intelRangePreset')?.value || '7d';
+  const customValue = document.getElementById('intelCustomRange')?.value || '';
+  const now = new Date();
+  let start = null, end = new Date(now), label = 'All Time';
+  if (preset === '24h') { start = new Date(now.getTime() - 24*60*60*1000); label = 'Last 24 Hours'; }
+  else if (preset === '7d') { start = new Date(now); start.setDate(start.getDate()-6); start.setHours(0,0,0,0); label = 'Last 7 Days'; }
+  else if (preset === '30d') { start = new Date(now); start.setDate(start.getDate()-29); start.setHours(0,0,0,0); label = 'Last 30 Days'; }
+  else if (preset === '6m') { start = new Date(now); start.setMonth(start.getMonth()-5, 1); start.setHours(0,0,0,0); label = 'Last 6 Months'; }
+  else if (preset === '1y') { start = new Date(now); start.setFullYear(start.getFullYear()-1); label = 'Last 1 Year'; }
+  else if (preset === 'custom') {
+    const parts = customValue.split(' to ').map(x => x.trim()).filter(Boolean);
+    if (parts.length === 2) { start = new Date(parts[0]); end = new Date(parts[1]); end.setHours(23,59,59,999); label = `${fmtDateShort(start)} → ${fmtDateShort(end)}`; }
+    else { label = 'Custom Range'; }
+  }
+  return { preset, start, end, label };
+}
+
+function fmtDateShort(d) { return `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`; }
+
+function getFilteredIntelEvents() {
+  const { start, end } = getIntelRangeConfig();
+  return userEvents.filter(e => {
+    const dt = new Date(e.created_at);
+    if (start && dt < start) return false;
+    if (end && dt > end) return false;
+    return true;
+  });
+}
+
+function chooseGranularity(start, end) {
+  const manual = document.getElementById('intelGranularity')?.value || 'auto';
+  if (manual !== 'auto') return manual;
+  if (!start) return 'month';
+  const diffDays = Math.max(1, Math.ceil((end - start) / 86400000));
+  if (diffDays <= 2) return 'hour';
+  if (diffDays <= 45) return 'day';
+  return 'month';
+}
+
+function buildTimeSeries(events, start, end, granularity) {
+  const buckets = [];
+  const bucketMap = new Map();
+  const cursor = new Date(start || (events.length ? new Date(Math.min(...events.map(e=>new Date(e.created_at)))) : new Date()));
+  const finish = new Date(end || new Date());
+  if (granularity === 'hour') {
+    cursor.setMinutes(0,0,0);
+    while (cursor <= finish) { const key = cursor.toISOString().slice(0,13); buckets.push({ key, label: `${fmtDateShort(cursor)} ${String(cursor.getHours()).padStart(2,'0')}:00`, click_count: 0 }); cursor.setHours(cursor.getHours()+1); }
+    events.forEach(e => { const d=new Date(e.created_at); const key=d.toISOString().slice(0,13); bucketMap.set(key,(bucketMap.get(key)||0)+1); });
+  } else if (granularity === 'day') {
+    cursor.setHours(0,0,0,0);
+    while (cursor <= finish) { const key = cursor.toISOString().slice(0,10); buckets.push({ key, label: fmtDateShort(cursor), click_count: 0 }); cursor.setDate(cursor.getDate()+1); }
+    events.forEach(e => { const d=new Date(e.created_at); const key=d.toISOString().slice(0,10); bucketMap.set(key,(bucketMap.get(key)||0)+1); });
+  } else {
+    cursor.setDate(1); cursor.setHours(0,0,0,0);
+    while (cursor <= finish) { const key = `${cursor.getFullYear()}-${String(cursor.getMonth()+1).padStart(2,'0')}`; buckets.push({ key, label: cursor.toLocaleString('en-US', { month:'short', year:'numeric' }), click_count: 0 }); cursor.setMonth(cursor.getMonth()+1); }
+    events.forEach(e => { const d=new Date(e.created_at); const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; bucketMap.set(key,(bucketMap.get(key)||0)+1); });
+  }
+  buckets.forEach(b => b.click_count = bucketMap.get(b.key) || 0);
+  return buckets;
+}
+
+function buildIntelOverview() {
+  const range = getIntelRangeConfig();
+  const events = getFilteredIntelEvents();
+  const uniqueUsers = new Set(events.map(e => e.user_id));
+  const total_users = uniqueUsers.size;
+  const active_today_cutoff = new Date(); active_today_cutoff.setHours(0,0,0,0);
+  const active_today = new Set(events.filter(e => new Date(e.created_at) >= active_today_cutoff).map(e => e.user_id)).size;
+  const total_clicks = events.length;
+  const categoryCounts = new Map();
+  events.forEach(e => { const key = `${e.primary_category}|||${e.secondary_category || ''}`; categoryCounts.set(key, (categoryCounts.get(key) || 0) + 1); });
+  const sortedCategories = [...categoryCounts.entries()].sort((a,b) => b[1]-a[1]).map(([key, click_count]) => { const [primary_category, secondary_category] = key.split('|||'); return { primary_category, secondary_category, click_count }; });
+  const top_category = sortedCategories[0]?.primary_category || 'N/A';
+  const locationMap = new Map();
+  events.forEach(e => {
+    const name = e.location_name || 'Unknown';
+    const item = locationMap.get(name) || { location_name: name, userSet: new Set(), click_count: 0, top_categories: new Map() };
+    item.userSet.add(e.user_id); item.click_count += 1;
+    item.top_categories.set(e.primary_category, (item.top_categories.get(e.primary_category) || 0) + 1);
+    locationMap.set(name, item);
+  });
+  const locations = [...locationMap.values()].map(v => ({ location_name: v.location_name, user_count: v.userSet.size, click_count: v.click_count, top_category: [...v.top_categories.entries()].sort((a,b)=>b[1]-a[1])[0]?.[0] || '—' })).sort((a,b) => b.click_count-a.click_count);
+  const topNewsMap = new Map();
+  events.forEach(e => { const item = topNewsMap.get(e.news_item_id) || { news_item_id: e.news_item_id, title: e.title, click_count: 0, primary_category: e.primary_category, secondary_category: e.secondary_category }; item.click_count += 1; topNewsMap.set(e.news_item_id, item); });
+  const top_news = [...topNewsMap.values()].sort((a,b) => b.click_count-a.click_count);
+  const granularity = chooseGranularity(range.start, range.end || new Date());
+  const activity = buildTimeSeries(events, range.start, range.end || new Date(), granularity);
+  const peakBucket = [...activity].sort((a,b)=>b.click_count-a.click_count)[0];
+  const peak_hour = peakBucket?.label || 'N/A';
+  return { range, summary: { total_users, active_today, total_clicks, top_category, peak_hour }, locations, categories: sortedCategories, top_news, activity, granularity, detail: { event_count: events.length, row_count: events.length } };
+}
+
+function populateIntelDetailFilters(type, intel) {
+  const primarySelect = document.getElementById('intelDetailPrimaryMulti');
+  const secondarySelect = document.getElementById('intelDetailSecondaryFilter');
+  const primaryValues = [...new Set(intel.categories.map(x => x.primary_category))].sort();
+  const secondaryValues = [...new Set(intel.categories.map(x => x.secondary_category).filter(Boolean))].sort();
+  primarySelect.innerHTML = primaryValues.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
+  secondarySelect.innerHTML = '<option value="all">All Secondary Categories</option>' + secondaryValues.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
+  primarySelect.style.display = (type === 'categories' || type === 'top_news') ? 'block' : 'none';
+  secondarySelect.parentElement.style.display = (type === 'categories' || type === 'top_news') ? 'flex' : 'none';
+}
+
+function getSelectedValues(selectEl) { return Array.from(selectEl.selectedOptions || []).map(o => o.value).filter(Boolean); }
+
+function renderIntelDashboard() {
+  const intel = buildIntelOverview();
+  const s = intel.summary;
+  document.getElementById('intelRangeSummary').innerHTML = `<strong>${esc(intel.range.label)}</strong> · ${intel.detail.event_count} tracked clicks`;
+  document.getElementById('intelStatsGrid').innerHTML = `
+    <div class="intel-stat-card"><h4>Total Users</h4><div class="big-number">${s.total_users}</div></div>
+    <div class="intel-stat-card"><h4>Active Today</h4><div class="big-number">${s.active_today}</div></div>
+    <div class="intel-stat-card"><h4>Total Clicks</h4><div class="big-number">${s.total_clicks}</div></div>
+    <div class="intel-stat-card"><h4>Top Category</h4><div class="big-number" style="font-size:1.5rem;">${esc(s.top_category)}</div></div>
+    <div class="intel-stat-card"><h4>Peak ${intel.granularity === 'hour' ? 'Hour' : intel.granularity === 'day' ? 'Day' : 'Month'}</h4><div class="big-number" style="font-size:1.15rem;">${esc(s.peak_hour)}</div></div>`;
+  document.getElementById('locationTableContainer').innerHTML = renderIntelTable(['Location','Users','Clicks','Top Category'], intel.locations.slice(0,10).map(x => [ `<span class="location-badge">📍 ${esc(x.location_name)}</span>`, x.user_count, `<span class="click-count-badge">${x.click_count} clicks</span>`, `<span class="category-badge">${esc(x.top_category)}</span>` ]));
+  document.getElementById('categoryTableContainer').innerHTML = renderIntelTable(['Primary','Secondary','Clicks'], intel.categories.slice(0,10).map(x => [ `<span class="category-badge">${esc(x.primary_category)}</span>`, x.secondary_category ? `<span class="subcat-badge">${esc(x.secondary_category)}</span>` : '—', `<span class="click-count-badge">${x.click_count} clicks</span>` ]));
+  document.getElementById('topNewsTableContainer').innerHTML = renderIntelTable(['News ID','Title','Primary','Clicks'], intel.top_news.slice(0,10).map(x => [ x.news_item_id, `<strong>${esc(x.title)}</strong>`, `<span class="category-badge">${esc(x.primary_category)}</span>`, `<span class="click-count-badge">${x.click_count} clicks</span>` ]));
+  document.getElementById('intelTimeMeta').innerHTML = `<div class="intel-chip"><strong>Range</strong> ${esc(intel.range.label)}</div><div class="intel-chip"><strong>Granularity</strong> ${esc(intel.granularity)}</div><div class="intel-chip"><strong>Visible Buckets</strong> ${intel.activity.length}</div>`;
+  const ctx = document.getElementById('activityChart').getContext('2d');
+  if (activityChart) activityChart.destroy();
+  activityChart = new Chart(ctx, { type: 'bar', data: { labels: intel.activity.map(x => x.label), datasets: [{ label: 'Clicks', data: intel.activity.map(x => x.click_count), backgroundColor: '#1c5a7f', borderRadius: 8 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } }, y: { beginAtZero: true } } } });
+}
+
+function openIntelDetail(type) {
+  const intel = buildIntelOverview();
+  let title = 'Intel Details', rows = [], headers = [], kpis = [];
+  if (type === 'locations') {
+    title = `Location Analytics · ${intel.range.label}`;
+    headers = ['Location','Users','Clicks','Top Category'];
+    rows = intel.locations.map(x => ({ values:[x.location_name, x.user_count, x.click_count, x.top_category], primary_category:x.top_category || '', secondary_category:'', clicks:x.click_count, title:x.location_name }));
+    kpis = [{ label:'Locations', value:intel.locations.length }, { label:'Users', value:intel.summary.total_users }, { label:'Clicks', value:intel.summary.total_clicks }];
+  } else if (type === 'categories') {
+    title = `Category Distribution · ${intel.range.label}`;
+    headers = ['Primary Category','Secondary Category','Clicks'];
+    rows = intel.categories.map(x => ({ values:[x.primary_category, x.secondary_category || '—', x.click_count], primary_category:x.primary_category, secondary_category:x.secondary_category || '', clicks:x.click_count, title:`${x.primary_category} ${x.secondary_category || ''}`.trim() }));
+    kpis = [{ label:'Primary Categories', value:new Set(intel.categories.map(x=>x.primary_category)).size }, { label:'Rows', value:intel.categories.length }, { label:'Top Category', value:intel.summary.top_category }];
+  } else if (type === 'top_news') {
+    title = `Top News · ${intel.range.label}`;
+    headers = ['News ID','Title','Primary Category','Secondary Category','Clicks'];
+    rows = intel.top_news.map(x => ({ values:[x.news_item_id, x.title, x.primary_category, x.secondary_category || '—', x.click_count], primary_category:x.primary_category, secondary_category:x.secondary_category || '', clicks:x.click_count, title:x.title }));
+    kpis = [{ label:'News Rows', value:intel.top_news.length }, { label:'Top Clicks', value:intel.top_news[0]?.click_count || 0 }, { label:'Tracked Clicks', value:intel.summary.total_clicks }];
+  } else if (type === 'activity') {
+    title = `Time Analysis · ${intel.range.label}`;
+    const labelTitle = intel.granularity === 'hour' ? 'Hour' : intel.granularity === 'day' ? 'Day' : 'Month';
+    headers = [labelTitle, 'Clicks'];
+    rows = intel.activity.map(x => ({ values:[x.label, x.click_count], primary_category:'', secondary_category:'', clicks:x.click_count, title:x.label }));
+    kpis = [{ label:'Granularity', value:intel.granularity }, { label:'Buckets', value:intel.activity.length }, { label:'Peak', value:intel.summary.peak_hour }];
+  }
+  intelDetailState = { type, headers, rows, rawIntel: intel };
+  document.getElementById('intelDetailTitle').textContent = title;
+  document.getElementById('intelDetailSearch').value = '';
+  document.getElementById('intelDetailMinClicks').value = '';
+  document.getElementById('intelDetailSort').value = 'clicks_desc';
+  document.getElementById('intelDetailSummary').innerHTML = `<strong>${rows.length} rows</strong>`;
+  document.getElementById('intelDetailKpis').innerHTML = kpis.map(k => `<div class="detail-kpi"><span class="label">${esc(k.label)}</span><span class="value">${esc(k.value)}</span></div>`).join('');
+  populateIntelDetailFilters(type, intel);
+  renderIntelDetailTable();
+  openModal('intelDetailModal');
+}
+
+function renderIntelDetailTable() {
+  const term = (document.getElementById('intelDetailSearch')?.value || '').toLowerCase();
+  const minClicks = Number(document.getElementById('intelDetailMinClicks')?.value || 0);
+  const selectedPrimaries = getSelectedValues(document.getElementById('intelDetailPrimaryMulti'));
+  const secondary = document.getElementById('intelDetailSecondaryFilter')?.value || 'all';
+  const sortBy = document.getElementById('intelDetailSort')?.value || 'clicks_desc';
+  let rows = intelDetailState.rows.filter(r => {
+    const searchOk = !term || r.values.some(c => String(c).toLowerCase().includes(term));
+    const clicksOk = (r.clicks || 0) >= minClicks;
+    const primaryOk = !selectedPrimaries.length || selectedPrimaries.includes(r.primary_category);
+    const secondaryOk = secondary === 'all' || (r.secondary_category || '') === secondary;
+    return searchOk && clicksOk && primaryOk && secondaryOk;
+  });
+  rows.sort((a,b) => {
+    if (sortBy === 'clicks_asc') return (a.clicks||0) - (b.clicks||0);
+    if (sortBy === 'title_asc') return String(a.title||'').localeCompare(String(b.title||''));
+    if (sortBy === 'title_desc') return String(b.title||'').localeCompare(String(a.title||''));
+    return (b.clicks||0) - (a.clicks||0);
+  });
+  document.getElementById('intelDetailSummary').innerHTML = `<strong>${rows.length} rows</strong>`;
+  document.getElementById('intelDetailTableWrap').innerHTML = renderIntelTable(intelDetailState.headers, rows.map(r => r.values));
+}
+
+function renderIntelTable(headers, rows) {
+  if (!rows.length) return '<div class="empty-state">No analytics available for this time period.</div>';
+  return `<div class="table-wrapper" style="margin:0; border:none;"><table class="intel-table"><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+
+function ensureNewsMap() {
+  if (!newsMap) {
+    newsMap = L.map('newsMap');
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(newsMap);
+    newsMarker = L.marker([DEFAULT_MAP_COORDS.lat, DEFAULT_MAP_COORDS.lng], { draggable: true }).addTo(newsMap);
+    newsMarker.on('dragend', () => { const ll = newsMarker.getLatLng(); syncCoordInputs(ll.lat, ll.lng, true); });
+    newsMap.on('click', e => syncCoordInputs(e.latlng.lat, e.latlng.lng, true));
+  }
+}
+
+function syncCoordInputs(lat, lng, updateMap = false) {
+  lat = Number(lat || 0); lng = Number(lng || 0);
+  document.getElementById('newsLat').value = lat.toFixed(6);
+  document.getElementById('newsLng').value = lng.toFixed(6);
+  document.getElementById('coordDisplay').textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  if (newsMarker) { newsMarker.setLatLng([lat, lng]); }
+  if (newsMap && updateMap) { newsMap.setView([lat, lng], newsMap.getZoom() < 8 ? 11 : newsMap.getZoom()); }
+}
+
+function renderNewsTable() {
+  let filtered = allNews.filter(n => (newsFilterPrimary === 'all' || n.primaryCat === newsFilterPrimary) && (newsFilterSub === 'all' || n.subCat === newsFilterSub));
+  let total = filtered.length, pages = Math.max(1, Math.ceil(total / newsPerPage));
+  if (newsCurrentPage > pages) newsCurrentPage = pages;
+  let paginated = filtered.slice((newsCurrentPage - 1) * newsPerPage, newsCurrentPage * newsPerPage);
+  document.getElementById('tableBody').innerHTML = paginated.map(n => `<tr data-news-id="${n.id}"><td>${esc(fmt(n.datetime))}</td><td><strong>${esc(n.headline)}</strong></td><td class="summary-preview">${esc(n.summary || '—')}</td><td><span class="category-badge">${esc(n.primaryCat)}</span></td><td><span class="subcat-badge">${esc(n.subCat)}</span></td><td><span class="status-badge ${n.status === 'active' ? 'status-active' : 'status-inactive'}">${esc(n.status)}</span></td><td><span class="mode-badge">${esc(n.relevanceMode)}</span></td><td><span class="precision-badge">${esc(n.precisionType)}</span></td><td>${esc(n.mainPlaceText || '—')}</td><td>${n.source ? '🔗' : '—'}</td><td><span class="click-count-badge">${n.clickCount || 0}</span></td></tr>`).join('');
+  document.querySelectorAll('#tableBody tr[data-news-id]').forEach(row => row.addEventListener('click', () => openNewsModal(parseInt(row.dataset.newsId, 10))));
+  renderPager('newsPaginationControls', 'newsPaginationInfo', newsCurrentPage, pages, total, newsPerPage, i => { newsCurrentPage = i; renderNewsTable(); });
+}
+
+function renderSubscribers() {
+  let filtered = allSubscribers.filter(s =>
+    (!subFilters.userCode || (s.userCode || '').toLowerCase().includes(subFilters.userCode.toLowerCase())) &&
+    (!subFilters.mobile || (s.mobile || '').includes(subFilters.mobile)) &&
+    (subFilters.waGroup === 'all' || s.waGroup === subFilters.waGroup) &&
+    (subFilters.interestSub === 'all' || s.interestSubCat === subFilters.interestSub) &&
+    (subFilters.status === 'all' || s.status === subFilters.status)
+  );
+  let total = filtered.length, pages = Math.max(1, Math.ceil(total / subPerPage));
+  if (subCurrentPage > pages) subCurrentPage = pages;
+  let paginated = filtered.slice((subCurrentPage - 1) * subPerPage, subCurrentPage * subPerPage);
+  document.getElementById('subscriberBody').innerHTML = paginated.map(s => `<tr data-sub-id="${s.id}"><td>${esc(fmt(s.joinDate))}</td><td>${esc(s.userCode)}</td><td>${esc(s.mobile)}</td><td><span class="category-badge">${esc(s.waGroup)}</span></td><td><span class="interest-badge">${esc(s.interestSubCat || 'None')}</span></td><td><span class="status-badge ${s.status === 'active' ? 'status-active' : 'status-inactive'}">${esc(s.status)}</span></td><td><span class="location-badge">📍 ${esc(s.locationName || 'Unknown')}</span></td></tr>`).join('');
+  document.querySelectorAll('#subscriberBody tr[data-sub-id]').forEach(row => row.addEventListener('click', () => openSubModal(parseInt(row.dataset.subId, 10))));
+  const activeCount = allSubscribers.filter(s => s.status === 'active').length;
+  const stats = {};
+  waBroadcastGroups.forEach(g => stats[g] = allSubscribers.filter(s => s.waGroup === g && s.status === 'active').length);
+  let html = `<div class="stat-card total-card"><h4>Total Active</h4><div class="count">${activeCount}</div></div>`;
+  waBroadcastGroups.forEach(g => html += `<div class="stat-card"><h4>${esc(g)}</h4><div class="count">${stats[g] || 0}</div></div>`);
+  document.getElementById('groupStatsContainer').innerHTML = html;
+  renderPager('subPaginationControls', 'subPaginationInfo', subCurrentPage, pages, total, subPerPage, i => { subCurrentPage = i; renderSubscribers(); });
+}
+
+function renderPager(controlId, infoId, current, pages, total, perPage, onClick) {
+  const container = document.getElementById(controlId);
+  container.innerHTML = '';
+  for (let i = 1; i <= Math.min(pages, 5); i++) { const btn = document.createElement('button'); btn.textContent = i; btn.className = `page-btn ${i === current ? 'active' : ''}`; btn.onclick = () => onClick(i); container.appendChild(btn); }
+  document.getElementById(infoId).textContent = total === 0 ? '0 of 0' : `${Math.min(total, (current-1)*perPage + 1)}-${Math.min(current*perPage, total)} of ${total}`;
+}
+
+function renderPrimaryList() {
+  const container = document.getElementById('primaryCatList');
+  container.innerHTML = primaryCategories.map(cat => {
+    const isSystem = REQUIRED_PRIMARIES.includes(cat);
+    const isSelected = selectedPrimaryCategory === cat;
+    return `<div class="cat-item ${isSelected ? 'selected' : ''}" data-cat="${esc(cat)}"><div><span>📁 ${esc(cat)}</span>${isSystem ? `<span class="system-badge">system</span>` : ''}</div>${isSystem ? `<button disabled style="background:none; opacity:0.5;">✖</button>` : `<button class="danger-icon-btn delete-cat-btn" data-cat="${esc(cat)}">✖</button>`}</div>`;
+  }).join('');
+  document.querySelectorAll('.cat-item').forEach(row => row.addEventListener('click', e => { if (!e.target.classList.contains('delete-cat-btn')) { selectedPrimaryCategory = row.dataset.cat; currentSelectedPrimary = row.dataset.cat; renderPrimaryList(); updatePrimarySelect(); } }));
+  document.querySelectorAll('.delete-cat-btn').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); deletePrimaryCategory(btn.dataset.cat); }));
+}
+
+function updatePrimarySelect() {
+  const select = document.getElementById('subPrimarySelect');
+  select.innerHTML = primaryCategories.map(c => `<option>${esc(c)}</option>`).join('');
+  if (!primaryCategories.includes(currentSelectedPrimary)) currentSelectedPrimary = primaryCategories[0];
+  select.value = currentSelectedPrimary;
+  document.getElementById('selectedPrimaryName').textContent = `(current: ${currentSelectedPrimary})`;
+  select.onchange = () => { currentSelectedPrimary = select.value; selectedPrimaryCategory = select.value; renderPrimaryList(); renderSubList(); };
+  renderSubList();
+}
+
+function renderSubList() {
+  let subs = subCategoriesMap[currentSelectedPrimary] || [];
+  document.getElementById('subCatList').innerHTML = subs.map(sub => `<div class="sub-item ${selectedSubCategory === sub ? 'selected' : ''}" data-sub="${esc(sub)}"><span>🔹 ${esc(sub)}</span><button class="danger-icon-btn delete-sub-btn" data-sub="${esc(sub)}">✖</button></div>`).join('');
+  document.querySelectorAll('.sub-item').forEach(el => el.addEventListener('click', e => { if(!e.target.classList.contains('delete-sub-btn')) { selectedSubCategory = el.dataset.sub; renderSubList(); } }));
+  document.querySelectorAll('.delete-sub-btn').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); deleteSubCategory(btn.dataset.sub); }));
+}
+
+function deletePrimaryCategory(cat) {
+  if (REQUIRED_PRIMARIES.includes(cat)) return alert(`"${cat}" is a system category and cannot be deleted.`);
+  if (!confirm(`Delete "${cat}"?`)) return;
+  allNews = allNews.filter(n => n.primaryCat !== cat);
+  primaryCategories = primaryCategories.filter(c => c !== cat);
+  delete subCategoriesMap[cat];
+  if (currentSelectedPrimary === cat) currentSelectedPrimary = primaryCategories[0];
+  selectedPrimaryCategory = currentSelectedPrimary; persistAll(); updateAllDropdowns(); renderPrimaryList(); updatePrimarySelect(); renderNewsTable(); renderIntelDashboard();
+}
+
+function deleteSubCategory(sub) {
+  if (!sub) return;
+  let arr = subCategoriesMap[currentSelectedPrimary];
+  if (arr.length <= 1) return alert('At least one sub-category must remain.');
+  subCategoriesMap[currentSelectedPrimary] = arr.filter(s => s !== sub);
+  allNews = allNews.map(n => (n.primaryCat === currentSelectedPrimary && n.subCat === sub) ? { ...n, subCat: arr[0] } : n);
+  if (selectedSubCategory === sub) selectedSubCategory = null;
+  persistAll(); renderSubList(); updateAllDropdowns(); renderNewsTable(); renderIntelDashboard();
+}
+
+function renderWAGroups() {
+  document.getElementById('waGroupList').innerHTML = waBroadcastGroups.map((g, idx) => `<div class="wa-group-item"><span>💬 ${esc(g)}</span><div><button class="danger-icon-btn edit-wa-btn" data-idx="${idx}" data-name="${esc(g)}">✏️ Edit</button><button class="danger-icon-btn delete-wa-btn" data-idx="${idx}">🗑️ Delete</button></div></div>`).join('');
+  document.querySelectorAll('.edit-wa-btn').forEach(btn => btn.addEventListener('click', () => { let newName = prompt('Edit group name:', btn.dataset.name); if (newName && newName.trim()) { let old = waBroadcastGroups[btn.dataset.idx]; waBroadcastGroups[btn.dataset.idx] = newName.trim(); allSubscribers = allSubscribers.map(s => s.waGroup === old ? { ...s, waGroup: newName.trim() } : s); persistAll(); renderWAGroups(); updateAllDropdowns(); renderSubscribers(); } }));
+  document.querySelectorAll('.delete-wa-btn').forEach(btn => btn.addEventListener('click', () => { let idx = parseInt(btn.dataset.idx, 10); if (waBroadcastGroups.length <= 1) return alert('At least one group must remain.'); let removed = waBroadcastGroups[idx]; let fallback = waBroadcastGroups[0] === removed ? waBroadcastGroups[1] : waBroadcastGroups[0]; if (confirm(`Delete "${removed}"?`)) { allSubscribers = allSubscribers.map(s => s.waGroup === removed ? { ...s, waGroup: fallback } : s); waBroadcastGroups.splice(idx, 1); persistAll(); renderWAGroups(); updateAllDropdowns(); renderSubscribers(); } }));
+}
+
+function updateAllDropdowns() {
+  ensureCategoryIntegrity();
+  document.getElementById('primaryCategoryFilter').innerHTML = '<option value="all">All Categories</option>' + primaryCategories.map(c => `<option>${esc(c)}</option>`).join('');
+  const allSubs = [...new Set(Object.values(subCategoriesMap).flat())];
+  document.getElementById('subCategoryFilter').innerHTML = '<option value="all">All Sub-Categories</option>' + allSubs.map(s => `<option>${esc(s)}</option>`).join('');
+  document.getElementById('filterInterestSub').innerHTML = '<option value="all">All Interests</option>' + allSubs.map(s => `<option>${esc(s)}</option>`).join('');
+  document.getElementById('filterWAGroup').innerHTML = '<option value="all">All Groups</option>' + waBroadcastGroups.map(g => `<option>${esc(g)}</option>`).join('');
+  document.getElementById('newsPrimaryCat').innerHTML = primaryCategories.map(c => `<option>${esc(c)}</option>`).join('');
+  document.getElementById('newsPrimaryCat').onchange = () => { const subs = subCategoriesMap[document.getElementById('newsPrimaryCat').value] || []; document.getElementById('newsSubCat').innerHTML = subs.map(s => `<option>${esc(s)}</option>`).join(''); if (subs.length) document.getElementById('newsSubCat').value = subs[0]; };
+  document.getElementById('newsPrimaryCat').onchange();
+  document.getElementById('subInterestCat').innerHTML = '<option value="">-- None --</option>' + allSubs.map(s => `<option>${esc(s)}</option>`).join('');
+  document.getElementById('subWAGroup').innerHTML = waBroadcastGroups.map(g => `<option>${esc(g)}</option>`).join('');
+}
+
+function openModal(id) { document.getElementById(id).classList.add('active'); document.body.classList.add('modal-open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); if (!document.querySelector('.modal-overlay.active')) document.body.classList.remove('modal-open'); }
+
+function openNewsModal(id = null) {
+  let isEdit = !!id;
+  document.getElementById('deleteNewsSection').style.display = isEdit ? 'block' : 'none';
+  document.getElementById('newsModalTitle').textContent = isEdit ? 'Edit News' : 'Add News';
+  document.getElementById('editNewsId').value = id || '';
+  currentNewsId = id || null;
+  updateAllDropdowns();
+  if (isEdit) {
+    let n = allNews.find(x => x.id === id);
+    document.getElementById('newsDatetime').value = fmt(n.datetime);
+    document.getElementById('newsHeadline').value = n.headline;
+    document.getElementById('newsSummary').value = n.summary || '';
+    document.getElementById('newsPrimaryCat').value = n.primaryCat;
+    document.getElementById('newsPrimaryCat').onchange();
+    document.getElementById('newsSubCat').value = n.subCat;
+    document.getElementById('newsStatus').value = n.status;
+    document.getElementById('newsRelevanceMode').value = n.relevanceMode;
+    document.getElementById('newsPrecisionType').value = n.precisionType;
+    document.getElementById('newsMainPlaceText').value = n.mainPlaceText || '';
+    document.getElementById('newsSourceName').value = n.sourceName || '';
+    document.getElementById('newsSource').value = n.source || '';
+    syncCoordInputs(n.lat || DEFAULT_MAP_COORDS.lat, n.lng || DEFAULT_MAP_COORDS.lng, true);
+  } else {
+    document.getElementById('newsDatetime').value = fmt(new Date());
+    document.getElementById('newsHeadline').value = '';
+    document.getElementById('newsSummary').value = '';
+    document.getElementById('newsPrimaryCat').value = primaryCategories[0];
+    document.getElementById('newsPrimaryCat').onchange();
+    document.getElementById('newsStatus').value = 'active';
+    document.getElementById('newsRelevanceMode').value = 'hybrid';
+    document.getElementById('newsPrecisionType').value = 'approximate_area';
+    document.getElementById('newsMainPlaceText').value = '';
+    document.getElementById('newsSourceName').value = '';
+    document.getElementById('newsSource').value = '';
+    syncCoordInputs(DEFAULT_MAP_COORDS.lat, DEFAULT_MAP_COORDS.lng, true);
+  }
+  openModal('newsModal');
+  ensureNewsMap();
+  setTimeout(() => { if (newsMap) { newsMap.invalidateSize(); newsMap.setView([Number(document.getElementById('newsLat').value || DEFAULT_MAP_COORDS.lat), Number(document.getElementById('newsLng').value || DEFAULT_MAP_COORDS.lng)], 11); } }, 80);
+  if (window.newsPicker) window.newsPicker.destroy();
+  window.newsPicker = flatpickr('#newsDatetime', { enableTime: true, dateFormat: 'm/d/Y H:i', time_24hr: true });
+}
+
+function saveNews() {
+  const id = document.getElementById('editNewsId').value;
+  const payload = { datetime: parseUiDateTime(document.getElementById('newsDatetime').value).toISOString(), headline: document.getElementById('newsHeadline').value.trim(), summary: document.getElementById('newsSummary').value.trim(), primaryCat: document.getElementById('newsPrimaryCat').value, subCat: document.getElementById('newsSubCat').value, status: document.getElementById('newsStatus').value, relevanceMode: document.getElementById('newsRelevanceMode').value, precisionType: document.getElementById('newsPrecisionType').value, mainPlaceText: document.getElementById('newsMainPlaceText').value.trim(), sourceName: document.getElementById('newsSourceName').value.trim(), source: document.getElementById('newsSource').value.trim(), lat: Number(document.getElementById('newsLat').value || 0), lng: Number(document.getElementById('newsLng').value || 0), clickCount: 0 };
+  if (!payload.headline) return alert('Headline is required');
+  if (id) { const idx = allNews.findIndex(n => n.id === parseInt(id,10)); if (idx !== -1) allNews[idx] = { ...allNews[idx], ...payload, clickCount: allNews[idx].clickCount || 0 }; }
+  else allNews.unshift({ id: nextNewsId++, ...payload });
+  persistAll(); closeModal('newsModal'); renderNewsTable(); renderIntelDashboard();
+}
+
+function deleteNews() { if (currentNewsId && confirm('Delete this news?')) { allNews = allNews.filter(n => n.id !== currentNewsId); userEvents = userEvents.filter(e => e.news_item_id !== currentNewsId); persistAll(); closeModal('newsModal'); renderNewsTable(); renderIntelDashboard(); } }
+
+function openSubModal(id = null) {
+  let isEdit = !!id;
+  document.getElementById('deleteSubSection').style.display = isEdit ? 'block' : 'none';
+  document.getElementById('subModalTitle').textContent = isEdit ? 'Edit Subscriber' : 'Add Subscriber';
+  document.getElementById('editSubId').value = id || '';
+  updateAllDropdowns();
+  if (isEdit) {
+    let s = allSubscribers.find(x => x.id === id);
+    document.getElementById('subJoinDate').value = fmt(s.joinDate);
+    document.getElementById('subUserCode').value = s.userCode;
+    document.getElementById('subMobile').value = s.mobile;
+    document.getElementById('subWAGroup').value = s.waGroup;
+    document.getElementById('subInterestCat').value = s.interestSubCat || '';
+    document.getElementById('subStatus').value = s.status;
+    document.getElementById('subLocationName').value = s.locationName || '';
+  } else {
+    document.getElementById('subJoinDate').value = fmt(new Date());
+    document.getElementById('subUserCode').value = '';
+    document.getElementById('subMobile').value = '';
+    document.getElementById('subWAGroup').value = waBroadcastGroups[0];
+    document.getElementById('subInterestCat').value = '';
+    document.getElementById('subStatus').value = 'active';
+    document.getElementById('subLocationName').value = '';
+  }
+  openModal('subscriberModal');
+  if (window.subPicker) window.subPicker.destroy();
+  window.subPicker = flatpickr('#subJoinDate', { enableTime: true, dateFormat: 'm/d/Y H:i', time_24hr: true });
+}
+
+function saveSubscriber() {
+  const id = document.getElementById('editSubId').value;
+  const payload = { joinDate: parseUiDateTime(document.getElementById('subJoinDate').value).toISOString(), userCode: document.getElementById('subUserCode').value.trim(), mobile: document.getElementById('subMobile').value.trim(), waGroup: document.getElementById('subWAGroup').value, interestSubCat: document.getElementById('subInterestCat').value, status: document.getElementById('subStatus').value, locationName: document.getElementById('subLocationName').value.trim() || 'Unknown' };
+  if (!payload.userCode || !payload.mobile) return alert('User Code and Mobile are required');
+  if (id) { const idx = allSubscribers.findIndex(s => s.id === parseInt(id, 10)); if (idx !== -1) allSubscribers[idx] = { ...allSubscribers[idx], ...payload }; }
+  else allSubscribers.unshift({ id: nextSubId++, ...payload });
+  persistAll(); closeModal('subscriberModal'); renderSubscribers(); renderIntelDashboard();
+}
+
+function deleteSubscriber() { const id = parseInt(document.getElementById('editSubId').value, 10); if (id && confirm('Delete this subscriber?')) { allSubscribers = allSubscribers.filter(s => s.id !== id); userEvents = userEvents.filter(e => e.user_id !== id); persistAll(); closeModal('subscriberModal'); renderSubscribers(); renderIntelDashboard(); } }
+
+function initEvents() {
+  document.getElementById('adminSettingsBtn').addEventListener('click', () => { renderPrimaryList(); updatePrimarySelect(); renderWAGroups(); openModal('adminModal'); });
+  document.getElementById('closeAdminBtn').addEventListener('click', () => closeModal('adminModal'));
+  document.getElementById('addRowBtn').addEventListener('click', () => openNewsModal());
+  document.getElementById('addSubscriberBtn').addEventListener('click', () => openSubModal());
+  document.getElementById('cancelNewsBtn').addEventListener('click', () => closeModal('newsModal'));
+  document.getElementById('cancelSubBtn').addEventListener('click', () => closeModal('subscriberModal'));
+  document.getElementById('saveNewsBtn').addEventListener('click', saveNews);
+  document.getElementById('saveSubBtn').addEventListener('click', saveSubscriber);
+  document.getElementById('deleteNewsBtn').addEventListener('click', deleteNews);
+  document.getElementById('deleteSubBtn').addEventListener('click', deleteSubscriber);
+  document.getElementById('addPrimaryCatBtn').addEventListener('click', () => { let val = document.getElementById('newPrimaryCat').value.trim().toLowerCase(); if(val && !primaryCategories.includes(val)) { primaryCategories.push(val); subCategoriesMap[val] = ['general']; currentSelectedPrimary = val; selectedPrimaryCategory = val; persistAll(); renderPrimaryList(); updatePrimarySelect(); updateAllDropdowns(); renderNewsTable(); document.getElementById('newPrimaryCat').value = ''; } else alert('Invalid or duplicate category'); });
+  document.getElementById('addSubCatBtn').addEventListener('click', () => { let newSub = document.getElementById('newSubCat').value.trim(); if(newSub && !subCategoriesMap[currentSelectedPrimary].includes(newSub)) { subCategoriesMap[currentSelectedPrimary].push(newSub); selectedSubCategory = newSub; persistAll(); renderSubList(); updateAllDropdowns(); renderNewsTable(); document.getElementById('newSubCat').value = ''; } });
+  document.getElementById('deleteSubCatBtn').addEventListener('click', () => { if(selectedSubCategory) deleteSubCategory(selectedSubCategory); else alert('Select a sub-category first'); });
+  document.getElementById('deletePrimaryCatBtn').addEventListener('click', () => { if(selectedPrimaryCategory) deletePrimaryCategory(selectedPrimaryCategory); else alert('Select a primary category first'); });
+  document.getElementById('addWAGroupBtn').addEventListener('click', () => { let val = document.getElementById('newWAGroupName').value.trim(); if(val && !waBroadcastGroups.includes(val)) { waBroadcastGroups.push(val); persistAll(); renderWAGroups(); updateAllDropdowns(); renderSubscribers(); document.getElementById('newWAGroupName').value = ''; } else alert('Invalid group name'); });
+  document.getElementById('resetMapPin').addEventListener('click', () => syncCoordInputs(DEFAULT_MAP_COORDS.lat, DEFAULT_MAP_COORDS.lng, true));
+  document.getElementById('closeIntelDetailBtn').addEventListener('click', () => closeModal('intelDetailModal'));
+  document.getElementById('intelRangePreset').addEventListener('change', e => { const isCustom = e.target.value === 'custom'; document.getElementById('intelCustomRange').style.display = isCustom ? 'inline-flex' : 'none'; renderIntelDashboard(); });
+  document.getElementById('intelGranularity').addEventListener('change', renderIntelDashboard);
+  document.getElementById('intelResetRangeBtn').addEventListener('click', () => { document.getElementById('intelRangePreset').value = '7d'; document.getElementById('intelCustomRange').value = ''; document.getElementById('intelCustomRange').style.display = 'none'; document.getElementById('intelGranularity').value = 'auto'; renderIntelDashboard(); });
+  document.getElementById('intelDetailSearch').addEventListener('input', renderIntelDetailTable);
+  document.getElementById('intelDetailPrimaryMulti').addEventListener('change', renderIntelDetailTable);
+  document.getElementById('intelDetailSecondaryFilter').addEventListener('change', renderIntelDetailTable);
+  document.getElementById('intelDetailSort').addEventListener('change', renderIntelDetailTable);
+  document.getElementById('intelDetailMinClicks').addEventListener('input', renderIntelDetailTable);
+  document.querySelectorAll('[data-intel-detail]').forEach(btn => btn.addEventListener('click', () => openIntelDetail(btn.dataset.intelDetail)));
+  document.getElementById('newsLat').addEventListener('input', () => syncCoordInputs(document.getElementById('newsLat').value || 0, document.getElementById('newsLng').value || 0));
+  document.getElementById('newsLng').addEventListener('input', () => syncCoordInputs(document.getElementById('newsLat').value || 0, document.getElementById('newsLng').value || 0));
+  document.getElementById('primaryCategoryFilter').addEventListener('change', e => { newsFilterPrimary = e.target.value; newsCurrentPage = 1; renderNewsTable(); });
+  document.getElementById('subCategoryFilter').addEventListener('change', e => { newsFilterSub = e.target.value; newsCurrentPage = 1; renderNewsTable(); });
+  document.getElementById('clearNewsFilterBtn').addEventListener('click', () => { document.getElementById('primaryCategoryFilter').value = 'all'; document.getElementById('subCategoryFilter').value = 'all'; newsFilterPrimary = 'all'; newsFilterSub = 'all'; newsCurrentPage = 1; renderNewsTable(); });
+  document.getElementById('filterUserCode').addEventListener('input', e => { subFilters.userCode = e.target.value; subCurrentPage = 1; renderSubscribers(); });
+  document.getElementById('filterMobile').addEventListener('input', e => { subFilters.mobile = e.target.value; subCurrentPage = 1; renderSubscribers(); });
+  document.getElementById('filterWAGroup').addEventListener('change', e => { subFilters.waGroup = e.target.value; subCurrentPage = 1; renderSubscribers(); });
+  document.getElementById('filterInterestSub').addEventListener('change', e => { subFilters.interestSub = e.target.value; subCurrentPage = 1; renderSubscribers(); });
+  document.getElementById('filterStatus').addEventListener('change', e => { subFilters.status = e.target.value; subCurrentPage = 1; renderSubscribers(); });
+  document.getElementById('clearSubFiltersBtn').addEventListener('click', () => { document.getElementById('filterUserCode').value = ''; document.getElementById('filterMobile').value = ''; document.getElementById('filterWAGroup').value = 'all'; document.getElementById('filterInterestSub').value = 'all'; document.getElementById('filterStatus').value = 'all'; document.getElementById('filterDateRange').value = ''; subFilters = { userCode:'', mobile:'', waGroup:'all', interestSub:'all', status:'all', dateRange:null }; subCurrentPage = 1; renderSubscribers(); });
+  flatpickr('#filterDateRange', { mode: 'range', dateFormat: 'm/d/Y' });
+  flatpickr('#intelCustomRange', { mode: 'range', dateFormat: 'Y-m-d', onClose: renderIntelDashboard });
+  document.querySelectorAll('.settings-tab-btn').forEach(btn => btn.addEventListener('click', () => { document.querySelectorAll('.settings-tab-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); document.getElementById('settingsCategories').style.display = btn.dataset.settingsTab === 'categories' ? 'block' : 'none'; document.getElementById('settingsWAGroups').style.display = btn.dataset.settingsTab === 'wagroups' ? 'block' : 'none'; }));
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => { document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active')); document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); document.getElementById(btn.dataset.tab + 'Tab').classList.add('active'); if (btn.dataset.tab === 'intel') renderIntelDashboard(); if (btn.dataset.tab === 'news') renderNewsTable(); if (btn.dataset.tab === 'subscriber') renderSubscribers(); }));
+  ['adminModal','newsModal','subscriberModal','intelDetailModal'].forEach(id => document.getElementById(id).addEventListener('click', e => { if (e.target === document.getElementById(id)) closeModal(id); }));
+}
+
+loadData();
+initEvents();
+updateAllDropdowns();
+renderPrimaryList();
+updatePrimarySelect();
+renderNewsTable();
+renderSubscribers();
+renderIntelDashboard();
+
+// Logout - make this an AJAX call to Laravel logout endpoint
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  fetch('{{ route('admin.logout') }}', { method: 'POST', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } })
+    .then(() => window.location.href = '{{ route('admin.login') }}');
+});
+</script>
+@endpush
