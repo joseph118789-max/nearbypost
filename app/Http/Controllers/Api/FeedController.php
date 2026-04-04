@@ -16,6 +16,11 @@ class FeedController extends Controller
         return ['id','title','summary','source','published_at','primary_category','secondary_category','url'];
     }
 
+    public function index(): JsonResponse
+    {
+        return $this->default();
+    }
+
     public function default(): JsonResponse
     {
         $items = FeedReadyItem::where('is_active', true)

@@ -17,6 +17,17 @@ class FeedReadyItem extends Model
         'relevance_score',
         'distance_km',
         'calculated_at',
+        'title',
+        'summary',
+        'source',
+        'published_at',
+        'primary_category',
+        'secondary_category',
+        'url',
+        'location_label',
+        'lat',
+        'lng',
+        'is_active',
     ];
 
     protected $casts = [
@@ -24,6 +35,10 @@ class FeedReadyItem extends Model
         'relevance_score' => 'float',
         'distance_km' => 'float',
         'calculated_at' => 'datetime',
+        'published_at' => 'datetime',
+        'lat' => 'float',
+        'lng' => 'float',
+        'is_active' => 'boolean',
     ];
 
     public function newsItem(): BelongsTo

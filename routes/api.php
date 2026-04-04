@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\FeedController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\IngestController;
+use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\Admin\SubscriberController;
 use App\Http\Controllers\Api\Admin\BroadcastGroupController;
 use Illuminate\Support\Facades\Route;
@@ -12,6 +13,9 @@ use Illuminate\Support\Facades\Route;
 | API Routes
 |--------------------------------------------------------------------------
 */
+
+// Health check
+Route::get('/health', [HealthController::class, 'index']);
 
 // Feed endpoints (existing)
 Route::get('/feed', [FeedController::class, 'index']);

@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class RawIngest extends Model
 {
-    protected $table = 'raw_ingests';
+    protected $table = 'raw_ingest';
 
     protected $fillable = [
         'source',
