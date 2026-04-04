@@ -11,6 +11,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             FeedReadyItemSeeder::class,
+            AdminSeeder::class,
         ]);
     }
 }

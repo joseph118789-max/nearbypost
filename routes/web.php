@@ -2,10 +2,9 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\FeedController;
+use App\Http\Controllers\HomeController;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::get('/', [HomeController::class, 'index']);
 
 Route::prefix('feed')->middleware(['throttle:60,1'])->group(function () {
     Route::get('/default', [FeedController::class, 'default'])->name('feed.default');
@@ -13,3 +12,7 @@ Route::prefix('feed')->middleware(['throttle:60,1'])->group(function () {
     Route::get('/nearby', [FeedController::class, 'nearby'])->name('feed.nearby');
     Route::get('/filter', [FeedController::class, 'filter'])->name('feed.filter');
 });
+require __DIR__.'/admin.php';
+
+# Login route alias - fixes Route [login] not defined error
+Route::get("/login", function() { return redirect()->route("admin.login"); })->name("login");

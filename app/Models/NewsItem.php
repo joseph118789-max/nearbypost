@@ -17,7 +17,7 @@ class NewsItem extends Model
         'published_at',
         'primary_category',
         'secondary_category',
-        'location_label',
+        'main_place_text',
         'lat',
         'lng',
         'precision_type',
