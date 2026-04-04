@@ -4,33 +4,25 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Subscriber extends Model
 {
     use HasFactory;
 
-    protected $table = 'users';
-
     protected $fillable = [
-        'user_code',
-        'mobile',
-        'wa_group',
-        'interest_sub_cat',
-        'status',
-        'location_name',
-        'join_date',
         'name',
-        'email',
-        'password',
+        'phone',
+        'status',
+        'group_id',
     ];
 
     protected $casts = [
-        'join_date' => 'datetime',
+        'status' => 'string',
     ];
 
-    public function newsItems(): HasMany
+    public function group(): BelongsTo
     {
-        return $this->hasMany(NewsItem::class, 'subscriber_id');
+        return $this->belongsTo(BroadcastGroup::class, 'group_id');
     }
 }

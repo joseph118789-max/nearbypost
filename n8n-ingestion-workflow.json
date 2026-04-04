@@ -1,0 +1,197 @@
+{
+  "name": "NearByPost News Ingestion",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 1,
+              "triggerAtMinute": 0,
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Cron Trigger",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://feeds.bbci.co.uk/news/world/rss.xml",
+        "options": {}
+      },
+      "id": "bbc-rss",
+      "name": "BBC World RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [320, 100]
+    },
+    {
+      "parameters": {
+        "url": "https://www.reutersagency.com/feed/?best-topics=tech&post_type=best",
+        "options": {}
+      },
+      "id": "reuters-rss",
+      "name": "Reuters Tech RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [320, 220]
+    },
+    {
+      "parameters": {
+        "url": "https://feeds.arstechnica.com/arstechnica/technology-lab",
+        "options": {}
+      },
+      "id": "arstechnica-rss",
+      "name": "Ars Technica RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [320, 340]
+    },
+    {
+      "parameters": {
+        "url": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
+        "options": {}
+      },
+      "id": "nyt-tech-rss",
+      "name": "NYT Tech RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [320, 460]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Normalize RSS item to Laravel ingest format\nconst items = [];\nfor (const item of items_all) {\n  const sourceMap = {\n    'bbc-rss': 'BBC World',\n    'reuters-rss': 'Reuters Tech',\n    'arstechnica-rss': 'Ars Technica',\n    'nyt-tech-rss': 'NYT Tech'\n  };\n  const sourceKey = item._meta?.source || 'unknown';\n  const source = sourceMap[sourceKey] || sourceKey;\n  \n  // Determine category from title/summary\n  let category = 'general';\n  const text = ((item.title || '') + ' ' + (item.summary || '')).toLowerCase();\n  if (text.includes('ai') || text.includes('artificial intelligence') || text.includes('chatgpt') || text.includes('machine learning')) category = 'technology';\n  else if (text.includes('sport') || text.includes('football') || text.includes('basketball') || text.includes('tennis')) category = 'sports';\n  else if (text.includes('politics') || text.includes('election') || text.includes('government')) category = 'politics';\n  else if (text.includes('business') || text.includes('economy') || text.includes('market')) category = 'business';\n  else if (text.includes('science') || text.includes('research')) category = 'science';\n  else if (text.includes('health') || text.includes('medical') || text.includes('virus')) category = 'health';\n  \n  items.push({\n    title: item.title || 'Untitled',\n    url: item.url || item.link || '',\n    source: source,\n    published_at: item.pubDate || item.datePublished || new Date().toISOString(),\n    summary: (item.summary || item.description || '').replace(/<[^>]*>/g, '').substring(0, 500),\n    category: category\n  });\n}\nreturn items;"
+      },
+      "id": "normalize-bbc",
+      "name": "Normalize BBC Items",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [540, 100]
+    },
+    {
+      "parameters": {
+        "functionCode": "const sourceMap = { 'bbc-rss': 'BBC World', 'reuters-rss': 'Reuters Tech', 'arstechnica-rss': 'Ars Technica', 'nyt-tech-rss': 'NYT Tech' };\nconst items = [];\nfor (const item of input.all()) {\n  const src = item.json._meta?.source || 'unknown';\n  const source = sourceMap[src] || src;\n  let category = 'general';\n  const text = ((item.json.title || '') + ' ' + (item.json.summary || '')).toLowerCase();\n  if (text.includes('ai') || text.includes('artificial intelligence') || text.includes('chatgpt') || text.includes('machine learning')) category = 'technology';\n  else if (text.includes('sport') || text.includes('football')) category = 'sports';\n  else if (text.includes('politics') || text.includes('election')) category = 'politics';\n  else if (text.includes('business') || text.includes('economy')) category = 'business';\n  else if (text.includes('science') || text.includes('research')) category = 'science';\n  else if (text.includes('health') || text.includes('medical')) category = 'health';\n  items.push({ json: { title: item.json.title || 'Untitled', url: item.json.url || item.json.link || '', source, published_at: item.json.pubDate || new Date().toISOString(), summary: (item.json.summary || item.json.description || '').replace(/<[^>]*>/g, '').substring(0, 500), category } });\n}\nreturn items;"
+      },
+      "id": "normalize-generic",
+      "name": "Normalize RSS Items",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [540, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://nearbypost.com/api/internal/ingest/news",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "title",
+              "value": "={{ \$json.title }}"
+            },
+            {
+              "name": "url",
+              "value": "={{ \$json.url }}"
+            },
+            {
+              "name": "source",
+              "value": "={{ \$json.source }}"
+            },
+            {
+              "name": "published_at",
+              "value": "={{ \$json.published_at }}"
+            },
+            {
+              "name": "summary",
+              "value": "={{ \$json.summary }}"
+            },
+            {
+              "name": "category",
+              "value": "={{ \$json.category }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "laravel-webhook",
+      "name": "Ingest to Laravel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [760, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Log output\nconst results = input.all();\nconsole.log('Ingestion results:', JSON.stringify(results, null, 2));\nreturn input.all();"
+      },
+      "id": "log-results",
+      "name": "Log Results",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [980, 300]
+    }
+  ],
+  "connections": {
+    "Cron Trigger": {
+      "main": [
+        [
+          { "node": "BBC World RSS", "type": "main", "index": 0 },
+          { "node": "Reuters Tech RSS", "type": "main", "index": 0 },
+          { "node": "Ars Technica RSS", "type": "main", "index": 0 },
+          { "node": "NYT Tech RSS", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "BBC World RSS": {
+      "main": [
+        [{ "node": "Normalize RSS Items", "type": "main", "index": 0 }]
+      ]
+    },
+    "Reuters Tech RSS": {
+      "main": [
+        [{ "node": "Normalize RSS Items", "type": "main", "index": 0 }]
+      ]
+    },
+    "Ars Technica RSS": {
+      "main": [
+        [{ "node": "Normalize RSS Items", "type": "main", "index": 0 }]
+      ]
+    },
+    "NYT Tech RSS": {
+      "main": [
+        [{ "node": "Normalize RSS Items", "type": "main", "index": 0 }]
+      ]
+    },
+    "Normalize RSS Items": {
+      "main": [
+        [{ "node": "Ingest to Laravel", "type": "main", "index": 0 }]
+      ]
+    },
+    "Ingest to Laravel": {
+      "main": [
+        [{ "node": "Log Results", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2026-04-04T06:45:00.000Z",
+  "versionId": "1"
+}

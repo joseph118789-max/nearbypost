@@ -24,17 +24,23 @@ class FeedReadyItem extends Model
         'distance_km',
         'relevance_mode',
         'is_active',
+        // Extended serving fields
+        'canonical_place_name',
+        'geo_confidence_score',
+        'coverage_type',
+        'sort_timestamp',
     ];
 
     protected $casts = [
-        'published_at' => 'datetime',
-        'lat' => 'float',
-        'lng' => 'float',
-        'distance_km' => 'float',
-        'is_active' => 'boolean',
+        'published_at'       => 'datetime',
+        'lat'                => 'float',
+        'lng'                => 'float',
+        'distance_km'        => 'float',
+        'geo_confidence_score'=> 'float',
+        'is_active'          => 'boolean',
     ];
 
-    public const PRECISION_ALLOWED = ['exact_area','approximate_area'];
-    public const PRECISION_EXCLUDED = ['state_center','region','country','national','unresolved'];
-    public const RELEVANCE_NEARBY = ['location_only','hybrid'];
+    public const PRECISION_NEARBY   = ['exact_area', 'approximate_area'];
+    public const PRECISION_EXCLUDED = ['region', 'broad', 'unknown'];
+    public const RELEVANCE_GEO       = ['location_only', 'location_and_category'];
 }
