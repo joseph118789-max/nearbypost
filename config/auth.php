@@ -81,43 +81,43 @@ return [
         'users' => [
         'admins' => [
             'driver' => 'eloquent',
-            'model' => AppModelsAdmin::class,
+            'model' => App\Models\Admin::class,
         ],
             'driver' => 'eloquent',
         'admins' => [
             'driver' => 'eloquent',
-            'model' => AppModelsAdmin::class,
+            'model' => App\Models\Admin::class,
         ],
             'model' => env('AUTH_MODEL', User::class),
         'admins' => [
             'driver' => 'eloquent',
-            'model' => AppModelsAdmin::class,
+            'model' => App\Models\Admin::class,
         ],
         ],
         'admins' => [
             'driver' => 'eloquent',
-            'model' => AppModelsAdmin::class,
+            'model' => App\Models\Admin::class,
         ],
 
         // 'users' => [
         'admins' => [
             'driver' => 'eloquent',
-            'model' => AppModelsAdmin::class,
+            'model' => App\Models\Admin::class,
         ],
         //     'driver' => 'database',
         'admins' => [
             'driver' => 'eloquent',
-            'model' => AppModelsAdmin::class,
+            'model' => App\Models\Admin::class,
         ],
         //     'table' => 'users',
         'admins' => [
             'driver' => 'eloquent',
-            'model' => AppModelsAdmin::class,
+            'model' => App\Models\Admin::class,
         ],
         // ],
         'admins' => [
             'driver' => 'eloquent',
-            'model' => AppModelsAdmin::class,
+            'model' => App\Models\Admin::class,
         ],
     ],
 
@@ -144,32 +144,32 @@ return [
         'users' => [
         'admins' => [
             'driver' => 'eloquent',
-            'model' => AppModelsAdmin::class,
+            'model' => App\Models\Admin::class,
         ],
             'provider' => 'users',
         'admins' => [
             'driver' => 'eloquent',
-            'model' => AppModelsAdmin::class,
+            'model' => App\Models\Admin::class,
         ],
             'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
         'admins' => [
             'driver' => 'eloquent',
-            'model' => AppModelsAdmin::class,
+            'model' => App\Models\Admin::class,
         ],
             'expire' => 60,
         'admins' => [
             'driver' => 'eloquent',
-            'model' => AppModelsAdmin::class,
+            'model' => App\Models\Admin::class,
         ],
             'throttle' => 60,
         'admins' => [
             'driver' => 'eloquent',
-            'model' => AppModelsAdmin::class,
+            'model' => App\Models\Admin::class,
         ],
         ],
         'admins' => [
             'driver' => 'eloquent',
-            'model' => AppModelsAdmin::class,
+            'model' => App\Models\Admin::class,
         ],
     ],
 
