@@ -1,26 +1,46 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\FeedController;
 use App\Http\Controllers\Api\ReportController;
-use App\Http\Controllers\Api\SubscriberController;
-use App\Http\Controllers\Api\BroadcastGroupController;
 use App\Http\Controllers\Api\IngestController;
+use App\Http\Controllers\Api\Admin\SubscriberController;
+use App\Http\Controllers\Api\Admin\BroadcastGroupController;
+use Illuminate\Support\Facades\Route;
 
-Route::prefix('feed')->middleware(['throttle:60,1'])->group(function () {
-    Route::get('/default', [FeedController::class, 'default'])->name('feed.default');
-    Route::get('/category/{slug}', [FeedController::class, 'byCategory'])->name('feed.category');
-    Route::get('/nearby', [FeedController::class, 'nearby'])->name('feed.nearby');
-    Route::get('/filter', [FeedController::class, 'filter'])->name('feed.filter');
-});
+/*
+|--------------------------------------------------------------------------
+| API Routes
+|--------------------------------------------------------------------------
+*/
 
-Route::post('/report-content', [ReportController::class, 'store'])->name('report-content');
+// Feed endpoints (existing)
+Route::get('/feed', [FeedController::class, 'index']);
+Route::get('/feed/{category}', [FeedController::class, 'byCategory']);
 
-Route::prefix('internal')->group(function () {
-    Route::post('/ingest/news', [IngestController::class, 'ingestNews'])->name('ingest.news');
-});
+// Report content endpoint
+Route::post('/report-content', [ReportController::class, 'store']);
 
+// Internal ingestion webhook
+Route::post('/internal/ingest/news', [IngestController::class, 'ingest']);
+
+// Admin API routes
 Route::prefix('admin')->group(function () {
-    Route::resource('subscribers', SubscriberController::class);
-    Route::resource('broadcast-groups', BroadcastGroupController::class);
+    // Subscriber routes
+    Route::get('/subscribers', [SubscriberController::class, 'index']);
+    Route::post('/subscribers', [SubscriberController::class, 'store']);
+    Route::put('/subscribers/{id}', [SubscriberController::class, 'update']);
+    Route::delete('/subscribers/{id}', [SubscriberController::class, 'destroy']);
+    
+    // Subscriber preference management
+    Route::get('/subscribers/{id}/preferences', [SubscriberController::class, 'getPreferences']);
+    Route::put('/subscribers/{id}/preferences', [SubscriberController::class, 'updatePreferences']);
+    
+    // Bulk preference updates
+    Route::post('/subscribers/bulk-update-preferences', [SubscriberController::class, 'bulkUpdatePreferences']);
+    
+    // Broadcast Group routes
+    Route::get('/broadcast-groups', [BroadcastGroupController::class, 'index']);
+    Route::post('/broadcast-groups', [BroadcastGroupController::class, 'store']);
+    Route::put('/broadcast-groups/{id}', [BroadcastGroupController::class, 'update']);
+    Route::delete('/broadcast-groups/{id}', [BroadcastGroupController::class, 'destroy']);
 });

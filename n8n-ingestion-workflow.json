@@ -101,27 +101,27 @@
           "parameters": [
             {
               "name": "title",
-              "value": "={{ \$json.title }}"
+              "value": "={{ $json.title }}"
             },
             {
               "name": "url",
-              "value": "={{ \$json.url }}"
+              "value": "={{ $json.url }}"
             },
             {
               "name": "source",
-              "value": "={{ \$json.source }}"
+              "value": "={{ $json.source }}"
             },
             {
               "name": "published_at",
-              "value": "={{ \$json.published_at }}"
+              "value": "={{ $json.published_at }}"
             },
             {
               "name": "summary",
-              "value": "={{ \$json.summary }}"
+              "value": "={{ $json.summary }}"
             },
             {
               "name": "category",
-              "value": "={{ \$json.category }}"
+              "value": "={{ $json.category }}"
             }
           ]
         },

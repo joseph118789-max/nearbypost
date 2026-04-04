@@ -1,0 +1,52 @@
+server {
+    listen 80;
+    server_name nearbypost.com www.nearbypost.com;
+    return 301 https://;
+}
+
+server {
+    listen 443 ssl;
+    server_name nearbypost.com www.nearbypost.com;
+
+    ssl_certificate /etc/ssl/certs/nearbypost.crt;
+    ssl_certificate_key /etc/ssl/private/nearbypost.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    root /var/www/nearbypost/public;
+    index index.php index.html;
+
+    # PHP files - no auth
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    # Public routes - no auth
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Admin routes only - protected with HTTP Basic Auth
+    location ^~ /admin-login.html {
+        auth_basic "Nearbypost Admin";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+    }
+
+    location ^~ /admin.html {
+        auth_basic "Nearbypost Admin";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+    }
+
+    # API proxy - no auth
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+}

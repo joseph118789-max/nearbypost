@@ -1,205 +1,176 @@
 <?php
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\NewsItem;
 use App\Models\RawIngest;
-use App\Models\FailedIngestion;
+use App\Models\FailedIngest;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
 class IngestController extends Controller
 {
-    public function ingestNews(Request $request)
+    /**
+     * POST /api/internal/ingest/news
+     * 
+     * Receives normalized news from n8n
+     * Input: title, url, source, published_at, summary, category
+     */
+    public function ingest(Request $request): JsonResponse
     {
-        $start = microtime(true);
-        $timestamp = now()->toIso8601String();
-
-        $validator = Validator::make($request->all(), [
-            'title' => 'required|string|max:500',
-            'url' => 'required|url|max:2048',
-            'source' => 'required|string|max:255',
-            'published_at' => 'required|date',
-            'summary' => 'nullable|string',
-            'category' => 'nullable|string|max:100',
+        $requestId = 'ingest_' . uniqid();
+        $startTime = microtime(true);
+        
+        Log::info('ingest.start', [
+            'request_id' => $requestId,
+            'source' => $request->input('source'),
+            'url' => $request->input('url'),
         ]);
-
-        if ($validator->fails()) {
-            $failureReason = 'validation_error';
-            $errorMessage = json_encode($validator->errors()->toArray());
-
-            RawIngest::create([
-                'source' => $request->input('source', 'unknown'),
-                'raw_json_payload' => $request->all(),
-                'received_at' => now(),
-                'processing_status' => 'failed',
-                'error_message' => $errorMessage,
-                'news_item_id' => null,
-            ]);
-
-            FailedIngestion::create([
-                'source' => $request->input('source', 'unknown'),
-                'url' => $request->input('url'),
-                'title' => $request->input('title'),
-                'raw_payload' => $request->all(),
-                'failure_reason' => $failureReason,
-                'retry_count' => 0,
-                'failed_at' => now(),
-            ]);
-
-            Log::info('Ingest event', [
-                'event_name' => 'news_ingest',
-                'source_name' => $request->input('source', 'unknown'),
-                'url' => $request->input('url'),
-                'outcome' => 'failed',
-                'failure_reason' => $failureReason,
-                'timestamp' => $timestamp,
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-                'failure_reason' => $failureReason,
-            ], 422);
-        }
-
+        
         try {
-            $rawIngest = RawIngest::create([
-                'source' => $request->source,
-                'raw_json_payload' => $request->all(),
-                'received_at' => now(),
-                'processing_status' => 'pending',
-                'error_message' => null,
-                'news_item_id' => null,
+            // Validate required fields
+            $validator = Validator::make($request->all(), [
+                'title' => 'required|string|max:500',
+                'url' => 'required|url|max:1000',
+                'source' => 'required|string|max:100',
+                'published_at' => 'nullable|date',
+                'summary' => 'nullable|string',
+                'category' => 'nullable|string|max:100',
             ]);
-
-            $existing = NewsItem::where('url', $request->url)->first();
+            
+            if ($validator->fails()) {
+                $duration = round((microtime(true) - $startTime) * 1000, 2);
+                
+                Log::warning('ingest.validation_failed', [
+                    'request_id' => $requestId,
+                    'errors' => $validator->errors()->toArray(),
+                    'duration_ms' => $duration,
+                ]);
+                
+                // Store failed payload in dead-letter bucket
+                $this->storeFailedIngest($request->all(), 'validation_failed: ' . json_encode($validator->errors()->toArray()), $requestId);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+            
+            $data = $validator->validated();
+            
+            // Check for duplicate by URL
+            $existing = NewsItem::where('url', $data['url'])->first();
             if ($existing) {
-                $rawIngest->update([
-                    'processing_status' => 'processed',
-                    'news_item_id' => $existing->id,
+                $duration = round((microtime(true) - $startTime) * 1000, 2);
+                
+                Log::info('ingest.duplicate', [
+                    'request_id' => $requestId,
+                    'existing_id' => $existing->id,
+                    'duration_ms' => $duration,
                 ]);
-
-                Log::info('Ingest event', [
-                    'event_name' => 'news_ingest',
-                    'source_name' => $request->source,
-                    'url' => $request->url,
-                    'outcome' => 'duplicate',
-                    'failure_reason' => null,
-                    'timestamp' => $timestamp,
-                ]);
-
+                
                 return response()->json([
                     'success' => true,
-                    'message' => 'Already ingested',
-                    'duplicate' => true,
-                    'id' => $existing->id,
+                    'message' => 'Duplicate, already exists',
+                    'existing_id' => $existing->id,
                 ], 200);
             }
-
+            
+            // Store raw incoming payload for traceability
+            $rawIngest = RawIngest::create([
+                'source' => $data['source'],
+                'raw_json_payload' => $data,
+                'received_at' => now(),
+                'processing_status' => 'pending',
+            ]);
+            
+            // Create news item
             $newsItem = NewsItem::create([
-                'title' => $request->title,
-                'url' => $request->url,
-                'source' => $request->source,
-                'summary' => $request->summary ?? null,
-                'published_at' => $request->published_at,
-                'primary_category' => $request->category ?? 'general',
-                'status' => 'pending',
+                'title' => $data['title'],
+                'url' => $data['url'],
+                'source' => $data['source'],
+                'published_at' => $data['published_at'] ?? null,
+                'summary' => $data['summary'] ?? null,
+                'primary_category' => $data['category'] ?? 'others',
+                'status' => 'pending_extraction',
             ]);
-
-            $rawIngest->update([
-                'processing_status' => 'processed',
+            
+            // Update raw ingest status
+            $rawIngest->update(['processing_status' => 'processed']);
+            
+            $duration = round((microtime(true) - $startTime) * 1000, 2);
+            
+            Log::info('ingest.success', [
+                'request_id' => $requestId,
                 'news_item_id' => $newsItem->id,
+                'source' => $data['source'],
+                'duration_ms' => $duration,
             ]);
-
-            Log::info('Ingest event', [
-                'event_name' => 'news_ingest',
-                'source_name' => $newsItem->source,
-                'url' => $newsItem->url,
-                'outcome' => 'created',
-                'failure_reason' => null,
-                'timestamp' => $timestamp,
-            ]);
-
+            
             return response()->json([
                 'success' => true,
-                'message' => 'Ingested',
-                'id' => $newsItem->id,
+                'message' => 'News item ingested',
+                'data' => [
+                    'id' => $newsItem->id,
+                    'title' => $newsItem->title,
+                ],
             ], 201);
+            
         } catch (\Illuminate\Database\QueryException $e) {
-            $failureReason = 'db_error';
-
-            try {
-                if (isset($rawIngest)) {
-                    $rawIngest->update([
-                        'processing_status' => 'failed',
-                        'error_message' => $e->getMessage(),
-                    ]);
-                }
-            } catch (\Exception $e2) {}
-
-            FailedIngestion::create([
-                'source' => $request->source,
-                'url' => $request->url,
-                'title' => $request->title,
-                'raw_payload' => $request->all(),
-                'failure_reason' => $failureReason,
-                'retry_count' => 0,
-                'failed_at' => now(),
+            $duration = round((microtime(true) - $startTime) * 1000, 2);
+            
+            Log::error('ingest.database_error', [
+                'request_id' => $requestId,
+                'error' => $e->getMessage(),
+                'duration_ms' => $duration,
             ]);
-
-            Log::info('Ingest event', [
-                'event_name' => 'news_ingest',
-                'source_name' => $request->source,
-                'url' => $request->url,
-                'outcome' => 'failed',
-                'failure_reason' => $failureReason,
-                'timestamp' => $timestamp,
-            ]);
-
+            
+            $this->storeFailedIngest($request->all(), 'database_error: ' . $e->getMessage(), $requestId);
+            
             return response()->json([
                 'success' => false,
-                'message' => 'Could not ingest item',
-                'failure_reason' => $failureReason,
+                'message' => 'Database error during ingestion',
             ], 500);
+            
         } catch (\Exception $e) {
-            $failureReason = 'unknown_error';
-
-            try {
-                if (isset($rawIngest)) {
-                    $rawIngest->update([
-                        'processing_status' => 'failed',
-                        'error_message' => $e->getMessage(),
-                    ]);
-                }
-            } catch (\Exception $e2) {}
-
-            FailedIngestion::create([
-                'source' => $request->source,
-                'url' => $request->url,
-                'title' => $request->title,
-                'raw_payload' => $request->all(),
-                'failure_reason' => $failureReason,
+            $duration = round((microtime(true) - $startTime) * 1000, 2);
+            
+            Log::error('ingest.unexpected_error', [
+                'request_id' => $requestId,
+                'error' => $e->getMessage(),
+                'duration_ms' => $duration,
+            ]);
+            
+            $this->storeFailedIngest($request->all(), 'unexpected_error: ' . $e->getMessage(), $requestId);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Could not ingest news item',
+            ], 500);
+        }
+    }
+    
+    /**
+     * Store failed ingestion in dead-letter bucket
+     */
+    private function storeFailedIngest(array $payload, string $reason, string $requestId): void
+    {
+        try {
+            FailedIngest::create([
+                'source' => $payload['source'] ?? 'unknown',
+                'url' => $payload['url'] ?? null,
+                'title' => $payload['title'] ?? null,
+                'raw_payload' => $payload,
+                'failure_reason' => $reason,
                 'retry_count' => 0,
                 'failed_at' => now(),
             ]);
-
-            Log::info('Ingest event', [
-                'event_name' => 'news_ingest',
-                'source_name' => $request->source,
-                'url' => $request->url,
-                'outcome' => 'failed',
-                'failure_reason' => $failureReason,
-                'timestamp' => $timestamp,
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Could not ingest item',
-                'failure_reason' => $failureReason,
-            ], 500);
+        } catch (\Exception $e) {
+            Log::error('Failed to store failed ingest record', ['error' => $e->getMessage()]);
         }
     }
 }

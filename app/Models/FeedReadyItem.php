@@ -2,45 +2,32 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FeedReadyItem extends Model
 {
+    use HasFactory;
+
     protected $table = 'feed_ready_items';
 
     protected $fillable = [
         'news_item_id',
-        'title',
-        'summary',
-        'source',
-        'url',
-        'published_at',
-        'primary_category',
-        'secondary_category',
-        'location_label',
-        'lat',
-        'lng',
-        'precision_type',
+        'relevance_score',
         'distance_km',
-        'relevance_mode',
-        'is_active',
-        // Extended serving fields
-        'canonical_place_name',
-        'geo_confidence_score',
-        'coverage_type',
-        'sort_timestamp',
+        'calculated_at',
     ];
 
     protected $casts = [
-        'published_at'       => 'datetime',
-        'lat'                => 'float',
-        'lng'                => 'float',
-        'distance_km'        => 'float',
-        'geo_confidence_score'=> 'float',
-        'is_active'          => 'boolean',
+        'news_item_id' => 'integer',
+        'relevance_score' => 'float',
+        'distance_km' => 'float',
+        'calculated_at' => 'datetime',
     ];
 
-    public const PRECISION_NEARBY   = ['exact_area', 'approximate_area'];
-    public const PRECISION_EXCLUDED = ['region', 'broad', 'unknown'];
-    public const RELEVANCE_GEO       = ['location_only', 'location_and_category'];
+    public function newsItem(): BelongsTo
+    {
+        return $this->belongsTo(NewsItem::class);
+    }
 }

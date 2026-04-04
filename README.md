@@ -1,58 +1,83 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Nearbypost Backend - Setup Complete
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+**Date:** 2026-04-01  
+**Server:** root@187.127.97.175  
+**Location:** /var/www/nearbypost
 
-## About Laravel
+## Completed Tasks
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+### ✅ Task 1: Core DB Schema
+- `news_items` table created with all required fields
+- `feed_ready_items` table created with foreign key relationship
+- Primary/secondary category system implemented
+- Geo fields (lat, lng, precision_type, geo_confidence, relevance_mode) included
+- Migrations run successfully
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+### ✅ Task 2: Laravel Project
+- Laravel project created at /var/www/nearbypost
+- Project boots successfully
+- .env configured
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### ✅ Task 3: PostgreSQL Connection
+- Database: nearbypost
+- User: postgres / nearbypost123
+- Connection verified
+- Tables created and verified
 
-## Learning Laravel
+### ✅ Task 4: Redis Connection
+- Redis configured in .env
+- Cache driver set to redis
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+### ✅ Task 5: Migrations
+- 2026_04_01_070611_create_news_items_table
+- 2026_04_01_070615_create_feed_ready_items_table
+- Both migrations run successfully
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+### ✅ Task 6: Run Migrations
+- All tables created in PostgreSQL
+- Schema verified via psql
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+### ✅ Task 7: Nearby Eligibility Rule (Documented)
+- Radius-eligible: precision_type IN (exact_area, approximate_area)
+- NOT eligible: state_center, region, country, national, unresolved
+- relevance_mode: location_only, category_only, hybrid
 
-## Agentic Development
+### ✅ Task 8: API Contract
+- GET /api/feed - General feed
+- GET /api/feed/{category} - Filter by primary_category
+- Response includes: id, title, summary, source, url, published_at, primary_category, secondary_category
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## API Endpoints
 
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+```
+GET /api/feed
+GET /api/feed/{category}
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+## Response Format
 
-## Contributing
+```json
+[
+  {
+    "id": 123,
+    "title": "string",
+    "summary": "string | null",
+    "source": "string | null",
+    "url": "string",
+    "published_at": "datetime | null",
+    "primary_category": "string | null",
+    "secondary_category": "string | null"
+  }
+]
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Approved Primary Categories
 
-## Code of Conduct
+property, transport, crime, sports, business, government, education, health, lifestyle, community, environment, technology, entertainment, jobs, others
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## Notes
 
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- Server serves on port 8000 (artisan serve)
+- API routes registered under /api prefix
+- FeedController implements index() and byCategory() methods
+- Redis and PostgreSQL connections configured in .env

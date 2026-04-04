@@ -1,0 +1,176 @@
+{
+  "name": "Nearbypost News Ingestion",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{"field": "minutes", "minutesInterval": 15}]
+        }
+      },
+      "id": "schedule",
+      "name": "Every 15 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://feeds.bbci.co.uk/news/rss.xml",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "rss_bbc",
+      "name": "Fetch BBC News RSS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [450, 150]
+    },
+    {
+      "parameters": {
+        "url": "https://www.thestar.com.my/rss/news",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "rss_star",
+      "name": "Fetch The Star RSS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://www.malaymail.com/rss/news",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "rss_malaymail",
+      "name": "Fetch Malay Mail RSS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [450, 450]
+    },
+    {
+      "parameters": {
+        "functionCode": "const items = $input.all();\nconst normalized = [];\n\nfor (const item of items) {\n  const xml = item.json.body || item.json;\n  const titleMatch = xml.match(/<title><!\\[CDATA\\[([^\\]]+)\\]\\]><\\/title>|<title>([^<]+)<\\/title>/);\n  const linkMatch = xml.match(/<link>([^<]+)<\\/link>/);\n  const descMatch = xml.match(/<description><!\\[CDATA\\[([^\\]]+)\\]\\]><\\/description>|<description>([^<]+)<\\/description>/);\n  const pubDateMatch = xml.match(/<pubDate>([^<]+)<\\/pubDate>/);\n  const categoryMatch = xml.match(/<category>([^<]+)<\\/category>/);\n  \n  normalized.push({\n    json: {\n      title: titleMatch ? (titleMatch[1] || titleMatch[2]) : 'Untitled',\n      url: linkMatch ? linkMatch[1] : '',\n      source: 'bbc_news',\n      summary: descMatch ? (descMatch[1] || descMatch[2]) : null,\n      published_at: pubDateMatch ? new Date(pubDateMatch[1]).toISOString() : new Date().toISOString(),\n      category: categoryMatch ? categoryMatch[1] : 'others'\n    }\n  });\n}\n\nreturn normalized;"
+      },
+      "id": "normalize_bbc",
+      "name": "Normalize BBC Items",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [650, 150]
+    },
+    {
+      "parameters": {
+        "functionCode": "const items = $input.all();\nconst normalized = [];\n\nfor (const item of items) {\n  const data = item.json;\n  normalized.push({\n    json: {\n      title: data.title || 'Untitled',\n      url: data.link || data.url || '',\n      source: 'the_star',\n      summary: data.description || null,\n      published_at: data.pubDate ? new Date(data.pubDate).toISOString() : new Date().toISOString(),\n      category: 'others'\n    }\n  });\n}\n\nreturn normalized;"
+      },
+      "id": "normalize_star",
+      "name": "Normalize Star Items",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const items = $input.all();\nconst normalized = [];\n\nfor (const item of items) {\n  const data = item.json;\n  normalized.push({\n    json: {\n      title: data.title || 'Untitled',\n      url: data.link || data.url || '',\n      source: 'malay_mail',\n      summary: data.description || null,\n      published_at: data.pubDate ? new Date(data.pubDate).toISOString() : new Date().toISOString(),\n      category: 'others'\n    }\n  });\n}\n\nreturn normalized;"
+      },
+      "id": "normalize_malaymail",
+      "name": "Normalize Malay Mail Items",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [650, 450]
+    },
+    {
+      "parameters": {
+        "url": "https://nearbypost.com/api/internal/ingest/news",
+        "method": "POST",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "title",
+              "value": "{{ $json.title }}"
+            },
+            {
+              "name": "url",
+              "value": "{{ $json.url }}"
+            },
+            {
+              "name": "source",
+              "value": "{{ $json.source }}"
+            },
+            {
+              "name": "summary",
+              "value": "{{ $json.summary }}"
+            },
+            {
+              "name": "published_at",
+              "value": "{{ $json.published_at }}"
+            },
+            {
+              "name": "category",
+              "value": "{{ $json.category }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "retry": {
+            "maxRetries": 3,
+            "retryWait": 5000
+          }
+        }
+      },
+      "id": "webhook_post",
+      "name": "Send to Laravel Webhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "Every 15 minutes": {
+      "main": [
+        [
+          {"node": "Fetch BBC News RSS", "type": "main", "index": 0},
+          {"node": "Fetch The Star RSS", "type": "main", "index": 0},
+          {"node": "Fetch Malay Mail RSS", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "Fetch BBC News RSS": {
+      "main": [
+        [{"node": "Normalize BBC Items", "type": "main", "index": 0}]
+      ]
+    },
+    "Fetch The Star RSS": {
+      "main": [
+        [{"node": "Normalize Star Items", "type": "main", "index": 0}]
+      ]
+    },
+    "Fetch Malay Mail RSS": {
+      "main": [
+        [{"node": "Normalize Malay Mail Items", "type": "main", "index": 0}]
+      ]
+    },
+    "Normalize BBC Items": {
+      "main": [
+        [{"node": "Send to Laravel Webhook", "type": "main", "index": 0}]
+      ]
+    },
+    "Normalize Star Items": {
+      "main": [
+        [{"node": "Send to Laravel Webhook", "type": "main", "index": 0}]
+      ]
+    },
+    "Normalize Malay Mail Items": {
+      "main": [
+        [{"node": "Send to Laravel Webhook", "type": "main", "index": 0}]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
