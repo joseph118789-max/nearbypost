@@ -1,10 +1,11 @@
 <?php
 function adminer_object() {
-    class AutoLoginAdminer extends Adminer {
+    $plugins = [];
+    class AdminerDatabase extends AdminerPlugin {
         function credentials() {
-            return ['pgsql:host=127.0.0.1;port=5432;dbname=nearbypost', 'postgres', 'nearbypost123'];
+            return ["pgsql:host=127.0.0.1;port=5432;dbname=nearbypost", "postgres", "nearbypost123"];
         }
     }
-    return new AutoLoginAdminer;
+    return new AdminerDatabase($plugins);
 }
-include dirname(__FILE__) . '/adminer.php';
+include_once __DIR__ . "/adminer.php";

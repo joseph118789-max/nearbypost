@@ -13,33 +13,27 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-// Feed endpoints (existing)
-Route::get('/feed', [FeedController::class, 'index']);
-Route::get('/feed/{category}', [FeedController::class, 'byCategory']);
+Route::middleware('throttle:60,1')->group(function () {
+    Route::get('/feed', [FeedController::class, 'index']);
+    Route::get('/feed/default', [FeedController::class, 'default']);
+    Route::get('/feed/category/{slug}', [FeedController::class, 'byCategory']);
+    Route::get('/feed/nearby', [FeedController::class, 'nearby']);
+    Route::get('/feed/filter', [FeedController::class, 'filter']);
+    Route::get('/feed/{category}', [FeedController::class, 'byCategory']);
+});
 
-// Report content endpoint
 Route::post('/report-content', [ReportController::class, 'store']);
-
-// Internal ingestion webhook
 Route::post('/internal/ingest/news', [IngestController::class, 'ingest']);
 Route::post('/internal/ingest/batch', [IngestController::class, 'ingestBatch']);
 
-// Admin API routes
 Route::prefix('admin')->group(function () {
-    // Subscriber routes
     Route::get('/subscribers', [SubscriberController::class, 'index']);
     Route::post('/subscribers', [SubscriberController::class, 'store']);
     Route::put('/subscribers/{id}', [SubscriberController::class, 'update']);
     Route::delete('/subscribers/{id}', [SubscriberController::class, 'destroy']);
-    
-    // Subscriber preference management
     Route::get('/subscribers/{id}/preferences', [SubscriberController::class, 'getPreferences']);
     Route::put('/subscribers/{id}/preferences', [SubscriberController::class, 'updatePreferences']);
-    
-    // Bulk preference updates
     Route::post('/subscribers/bulk-update-preferences', [SubscriberController::class, 'bulkUpdatePreferences']);
-    
-    // Broadcast Group routes
     Route::get('/broadcast-groups', [BroadcastGroupController::class, 'index']);
     Route::post('/broadcast-groups', [BroadcastGroupController::class, 'store']);
     Route::put('/broadcast-groups/{id}', [BroadcastGroupController::class, 'update']);

@@ -1216,7 +1216,7 @@
        */
       async fetchDefault() {
         try {
-          const response = await fetch('/feed/default');
+          const response = await fetch('/api/feed/default');
           if (!response.ok) throw new Error('API error');
           const items = await response.json();
           return items.map(item => Utils.mapApiItem(item, CONFIG.defaultRadius));
@@ -1231,7 +1231,7 @@
        */
       async fetchNearby(lat, lng, radius) {
         try {
-          const response = await fetch(`/feed/nearby?lat=${lat}&lng=${lng}&radius=${radius}`);
+          const response = await fetch(`/api/feed/nearby?lat=${lat}&lng=${lng}&radius=${radius}`);
           if (!response.ok) throw new Error('API error');
           const items = await response.json();
           return items.map(item => Utils.mapApiItem(item, radius));
