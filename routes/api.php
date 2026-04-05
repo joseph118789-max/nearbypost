@@ -20,6 +20,9 @@ Route::middleware('throttle:60,1')->group(function () {
     Route::get('/feed/nearby', [FeedController::class, 'nearby']);
     Route::get('/feed/filter', [FeedController::class, 'filter']);
     Route::get('/feed/{category}', [FeedController::class, 'byCategory']);
+//    Route::get('/feed/default', [FeedController::class, 'index']);
+//    Route::get('/feed/category/{category}', [FeedController::class, 'byCategory']);
+
 });
 
 Route::post('/report-content', [ReportController::class, 'store']);

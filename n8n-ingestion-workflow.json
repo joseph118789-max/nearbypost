@@ -65,133 +65,223 @@
     },
     {
       "parameters": {
-        "functionCode": "// Normalize RSS item to Laravel ingest format\nconst items = [];\nfor (const item of items_all) {\n  const sourceMap = {\n    'bbc-rss': 'BBC World',\n    'reuters-rss': 'Reuters Tech',\n    'arstechnica-rss': 'Ars Technica',\n    'nyt-tech-rss': 'NYT Tech'\n  };\n  const sourceKey = item._meta?.source || 'unknown';\n  const source = sourceMap[sourceKey] || sourceKey;\n  \n  // Determine category from title/summary\n  let category = 'general';\n  const text = ((item.title || '') + ' ' + (item.summary || '')).toLowerCase();\n  if (text.includes('ai') || text.includes('artificial intelligence') || text.includes('chatgpt') || text.includes('machine learning')) category = 'technology';\n  else if (text.includes('sport') || text.includes('football') || text.includes('basketball') || text.includes('tennis')) category = 'sports';\n  else if (text.includes('politics') || text.includes('election') || text.includes('government')) category = 'politics';\n  else if (text.includes('business') || text.includes('economy') || text.includes('market')) category = 'business';\n  else if (text.includes('science') || text.includes('research')) category = 'science';\n  else if (text.includes('health') || text.includes('medical') || text.includes('virus')) category = 'health';\n  \n  items.push({\n    title: item.title || 'Untitled',\n    url: item.url || item.link || '',\n    source: source,\n    published_at: item.pubDate || item.datePublished || new Date().toISOString(),\n    summary: (item.summary || item.description || '').replace(/<[^>]*>/g, '').substring(0, 500),\n    category: category\n  });\n}\nreturn items;"
+        "url": "https://www.thestar.com.my/rss/News/Nation",
+        "options": {}
       },
-      "id": "normalize-bbc",
-      "name": "Normalize BBC Items",
+      "id": "star-malaysia-rss",
+      "name": "The Star Malaysia RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [320, 580]
+    },
+    {
+      "parameters": {
+        "url": "https://www.nst.com.my/rss",
+        "options": {}
+      },
+      "id": "nst-rss",
+      "name": "NST Malaysia RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [320, 700]
+    },
+    {
+      "parameters": {
+        "url": "https://www.freemalaysiatoday.com/feed/",
+        "options": {}
+      },
+      "id": "fmt-rss",
+      "name": "Free Malaysia Today RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [320, 820]
+    },
+    {
+      "parameters": {
+        "url": "https://bernama.com/en/rssfeed.php",
+        "options": {}
+      },
+      "id": "bernama-rss",
+      "name": "Bernama RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [320, 940]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { ...item.json, _source: 'BBC World' } }));"
+      },
+      "id": "tag-bbc",
+      "name": "Tag BBC",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
       "position": [540, 100]
     },
     {
       "parameters": {
-        "functionCode": "const sourceMap = { 'bbc-rss': 'BBC World', 'reuters-rss': 'Reuters Tech', 'arstechnica-rss': 'Ars Technica', 'nyt-tech-rss': 'NYT Tech' };\nconst items = [];\nfor (const item of input.all()) {\n  const src = item.json._meta?.source || 'unknown';\n  const source = sourceMap[src] || src;\n  let category = 'general';\n  const text = ((item.json.title || '') + ' ' + (item.json.summary || '')).toLowerCase();\n  if (text.includes('ai') || text.includes('artificial intelligence') || text.includes('chatgpt') || text.includes('machine learning')) category = 'technology';\n  else if (text.includes('sport') || text.includes('football')) category = 'sports';\n  else if (text.includes('politics') || text.includes('election')) category = 'politics';\n  else if (text.includes('business') || text.includes('economy')) category = 'business';\n  else if (text.includes('science') || text.includes('research')) category = 'science';\n  else if (text.includes('health') || text.includes('medical')) category = 'health';\n  items.push({ json: { title: item.json.title || 'Untitled', url: item.json.url || item.json.link || '', source, published_at: item.json.pubDate || new Date().toISOString(), summary: (item.json.summary || item.json.description || '').replace(/<[^>]*>/g, '').substring(0, 500), category } });\n}\nreturn items;"
+        "functionCode": "return items.map(item => ({ json: { ...item.json, _source: 'Reuters Tech' } }));"
+      },
+      "id": "tag-reuters",
+      "name": "Tag Reuters",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [540, 220]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { ...item.json, _source: 'Ars Technica' } }));"
+      },
+      "id": "tag-arstechnica",
+      "name": "Tag Ars Technica",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [540, 340]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { ...item.json, _source: 'NYT Tech' } }));"
+      },
+      "id": "tag-nyt",
+      "name": "Tag NYT",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [540, 460]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { ...item.json, _source: 'The Star Malaysia' } }));"
+      },
+      "id": "tag-star",
+      "name": "Tag The Star",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [540, 580]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { ...item.json, _source: 'NST Malaysia' } }));"
+      },
+      "id": "tag-nst",
+      "name": "Tag NST",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [540, 700]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { ...item.json, _source: 'Free Malaysia Today' } }));"
+      },
+      "id": "tag-fmt",
+      "name": "Tag FMT",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [540, 820]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { ...item.json, _source: 'Bernama' } }));"
+      },
+      "id": "tag-bernama",
+      "name": "Tag Bernama",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [540, 940]
+    },
+    {
+      "parameters": {
+        "functionCode": "const out = []; for (let i = 0; i < items.length; i++) { const item = items[i]; const src = item.json._source || 'unknown'; const text = ((item.json.title || '') + ' ' + (item.json.summary || '')).toLowerCase(); let category = 'general'; if (/ai|artificial intelligence|chatgpt|machine learning/.test(text)) category = 'technology'; else if (/sport\\b|football|basketball|tennis|badminton/.test(text)) category = 'sports'; else if (/politics|election|government|parliament/.test(text)) category = 'politics'; else if (/business|economy|market|trade/.test(text)) category = 'business'; else if (/science|research/.test(text)) category = 'science'; else if (/health|medical|virus|disease/.test(text)) category = 'health'; else if (/crime|theft|fraud|murder/.test(text)) category = 'crime'; else if (/education|school|university/i.test(text)) category = 'education'; else if (/environment|climate|pollution/i.test(text)) category = 'environment'; else if (/kl |kuala lumpur|petaling jaya|penang|johor/i.test(text)) category = 'malaysia'; out.push({ json: { title: item.json.title || 'Untitled', url: item.json.url || item.json.link || '', source: src, published_at: item.json.pubDate || item.json.datePublished || new Date().toISOString(), summary: (item.json.summary || item.json.description || '').replace(/<[^>]*>/g, '').substring(0, 500), category } }); } return out;"
       },
       "id": "normalize-generic",
       "name": "Normalize RSS Items",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [540, 300]
+      "position": [760, 520]
     },
     {
       "parameters": {
-        "url": "https://nearbypost.com/api/internal/ingest/news",
+        "functionCode": "const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)); const locationPatterns = [/\\bin ([A-Z][A-Za-z]+(?:\\s+[A-Z][A-Za-z]+){0,2})\\b/, /\\bfrom ([A-Z][A-Za-z]+(?:\\s+[A-Z][A-Za-z]+){0,2})\\b/, /\\bin ([A-Z][A-Za-z]+,\\s*[A-Z][A-Za-z ]+)\\b/, /\\b(?:Kuala Lumpur|Petaling Jaya|Penang|Johor|Shah Alam|Ipoh|Malacca|Kota Kinabalu|Kuching|Singapore|London|Paris|Berlin|Tokyo|Beijing|New York|California|Texas|Florida|Washington|Ukraine|Israel|Gaza|Taiwan|India|China|Japan|France|Germany|Spain|Italy|Australia|Canada)\\b/i]; function extractLocation(text) { if (!text) return ''; for (const pattern of locationPatterns) { const match = text.match(pattern); if (match) return (match[1] || match[0]).trim().replace(/^[,;:\\s]+|[,;:\\s]+$/g, ''); } return ''; } const out = []; for (let i = 0; i < items.length; i++) { const item = items[i].json; const combined = item.title || '' + ' ' + item.summary || ''; const location = extractLocation(combined); const next = { ...item }; if (location) { try { const qs = new URLSearchParams({ q: location, format: 'json', limit: '1' }).toString(); const res = await fetch('https://nominatim.openstreetmap.org/search?' + qs, { headers: { 'User-Agent': 'NearbypostGeoFix/1.0 (support@nearbypost.com)', 'Accept': 'application/json' } }); const data = await res.json(); if (Array.isArray(data) && data.length > 0 && data[0].lat && data[0].lon) { next.lat = Number.parseFloat(data[0].lat); next.lng = Number.parseFloat(data[0].lon); next.location_query = location; } } catch (error) { next.geocode_error = error.message; } await sleep(1000); } out.push({ json: next }); } return out;"
+      },
+      "id": "geocode-locations",
+      "name": "Geocode Locations",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [900, 520]
+    },
+    {
+      "parameters": {
+        "functionCode": "const allItems = items.map(item => item.json); return [{ json: { items: allItems } }];"
+      },
+      "id": "batch-collect",
+      "name": "Batch Collect",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [980, 520]
+    },
+    {
+      "parameters": {
+        "url": "http://172.18.0.1:8000/api/internal/ingest/batch",
         "method": "POST",
         "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
         "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "title",
-              "value": "={{ $json.title }}"
-            },
-            {
-              "name": "url",
-              "value": "={{ $json.url }}"
-            },
-            {
-              "name": "source",
-              "value": "={{ $json.source }}"
-            },
-            {
-              "name": "published_at",
-              "value": "={{ $json.published_at }}"
-            },
-            {
-              "name": "summary",
-              "value": "={{ $json.summary }}"
-            },
-            {
-              "name": "category",
-              "value": "={{ $json.category }}"
-            }
-          ]
-        },
-        "options": {}
+        "bodyParameters": { "parameters": [{ "name": "items", "value": "={{ $json.items }}" }] },
+        "options": { "timeout": 60000 }
       },
       "id": "laravel-webhook",
       "name": "Ingest to Laravel",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [760, 300]
+      "position": [1200, 520]
     },
     {
       "parameters": {
-        "functionCode": "// Log output\nconst results = input.all();\nconsole.log('Ingestion results:', JSON.stringify(results, null, 2));\nreturn input.all();"
+        "functionCode": "const result = items[0]?.json; console.log('Batch ingestion result:', JSON.stringify(result, null, 2)); return items;"
       },
       "id": "log-results",
       "name": "Log Results",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [980, 300]
+      "position": [1400, 520]
     }
   ],
   "connections": {
     "Cron Trigger": {
-      "main": [
-        [
-          { "node": "BBC World RSS", "type": "main", "index": 0 },
-          { "node": "Reuters Tech RSS", "type": "main", "index": 0 },
-          { "node": "Ars Technica RSS", "type": "main", "index": 0 },
-          { "node": "NYT Tech RSS", "type": "main", "index": 0 }
-        ]
-      ]
+      "main": [[
+        { "node": "BBC World RSS", "type": "main", "index": 0 },
+        { "node": "Reuters Tech RSS", "type": "main", "index": 0 },
+        { "node": "Ars Technica RSS", "type": "main", "index": 0 },
+        { "node": "NYT Tech RSS", "type": "main", "index": 0 },
+        { "node": "The Star Malaysia RSS", "type": "main", "index": 0 },
+        { "node": "NST Malaysia RSS", "type": "main", "index": 0 },
+        { "node": "Free Malaysia Today RSS", "type": "main", "index": 0 },
+        { "node": "Bernama RSS", "type": "main", "index": 0 }
+      ]]
     },
-    "BBC World RSS": {
-      "main": [
-        [{ "node": "Normalize RSS Items", "type": "main", "index": 0 }]
-      ]
-    },
-    "Reuters Tech RSS": {
-      "main": [
-        [{ "node": "Normalize RSS Items", "type": "main", "index": 0 }]
-      ]
-    },
-    "Ars Technica RSS": {
-      "main": [
-        [{ "node": "Normalize RSS Items", "type": "main", "index": 0 }]
-      ]
-    },
-    "NYT Tech RSS": {
-      "main": [
-        [{ "node": "Normalize RSS Items", "type": "main", "index": 0 }]
-      ]
-    },
-    "Normalize RSS Items": {
-      "main": [
-        [{ "node": "Ingest to Laravel", "type": "main", "index": 0 }]
-      ]
-    },
-    "Ingest to Laravel": {
-      "main": [
-        [{ "node": "Log Results", "type": "main", "index": 0 }]
-      ]
-    }
+    "BBC World RSS": { "main": [[{ "node": "Tag BBC", "type": "main", "index": 0 }]] },
+    "Reuters Tech RSS": { "main": [[{ "node": "Tag Reuters", "type": "main", "index": 0 }]] },
+    "Ars Technica RSS": { "main": [[{ "node": "Tag Ars Technica", "type": "main", "index": 0 }]] },
+    "NYT Tech RSS": { "main": [[{ "node": "Tag NYT", "type": "main", "index": 0 }]] },
+    "The Star Malaysia RSS": { "main": [[{ "node": "Tag The Star", "type": "main", "index": 0 }]] },
+    "NST Malaysia RSS": { "main": [[{ "node": "Tag NST", "type": "main", "index": 0 }]] },
+    "Free Malaysia Today RSS": { "main": [[{ "node": "Tag FMT", "type": "main", "index": 0 }]] },
+    "Bernama RSS": { "main": [[{ "node": "Tag Bernama", "type": "main", "index": 0 }]] },
+    "Tag BBC": { "main": [[{ "node": "Normalize RSS Items", "type": "main", "index": 0 }]] },
+    "Tag Reuters": { "main": [[{ "node": "Normalize RSS Items", "type": "main", "index": 1 }]] },
+    "Tag Ars Technica": { "main": [[{ "node": "Normalize RSS Items", "type": "main", "index": 2 }]] },
+    "Tag NYT": { "main": [[{ "node": "Normalize RSS Items", "type": "main", "index": 3 }]] },
+    "Tag The Star": { "main": [[{ "node": "Normalize RSS Items", "type": "main", "index": 4 }]] },
+    "Tag NST": { "main": [[{ "node": "Normalize RSS Items", "type": "main", "index": 5 }]] },
+    "Tag FMT": { "main": [[{ "node": "Normalize RSS Items", "type": "main", "index": 6 }]] },
+    "Tag Bernama": { "main": [[{ "node": "Normalize RSS Items", "type": "main", "index": 7 }]] },
+    "Normalize RSS Items": { "main": [[{ "node": "Geocode Locations", "type": "main", "index": 0 }]] },
+    "Geocode Locations": { "main": [[{ "node": "Batch Collect", "type": "main", "index": 0 }]] },
+    "Batch Collect": { "main": [[{ "node": "Ingest to Laravel", "type": "main", "index": 0 }]] },
+    "Ingest to Laravel": { "main": [[{ "node": "Log Results", "type": "main", "index": 0 }]] }
   },
-  "settings": {
-    "executionOrder": "v1"
-  },
+  "settings": { "executionOrder": "v1" },
   "staticData": null,
   "tags": [],
   "triggerCount": 1,
-  "updatedAt": "2026-04-04T06:45:00.000Z",
-  "versionId": "1"
+  "updatedAt": "2026-04-05T06:21:00.000Z",
+  "versionId": "6"
 }

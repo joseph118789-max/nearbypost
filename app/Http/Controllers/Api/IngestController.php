@@ -153,81 +153,78 @@ class IngestController extends Controller
             ], 500);
         }
     }
-    
+
     /**
      * POST /api/internal/ingest/batch
-     * 
-     * Receives multiple normalized news items from n8n in a SINGLE request.
-     * This avoids the concurrent request rate-limit issue with n8n's HTTP client.
-     * Input: { items: [{ title, url, source, published_at, summary, category }, ...] }
+     * Accepts an array of normalized items from n8n.
      */
     public function ingestBatch(Request $request): JsonResponse
     {
         $requestId = 'batch_' . uniqid();
-        $startTime = microtime(true);
-        
         $items = $request->input('items', []);
-        
-        if (empty($items) || !is_array($items)) {
+
+        if (!is_array($items) || empty($items)) {
             return response()->json([
                 'success' => false,
-                'message' => 'No items provided',
+                'message' => 'items must be a non-empty array',
             ], 422);
         }
-        
-        $results = ['created' => 0, 'duplicates' => 0, 'failed' => 0, 'items' => []];
-        
-        foreach ($items as $item) {
-            try {
-                if (empty($item['url'])) {
-                    $results['failed']++;
-                    $results['items'][] = ['url' => '', 'status' => 'error', 'error' => 'Missing URL'];
-                    continue;
-                }
-                
-                // Check for duplicate by URL
-                $existing = NewsItem::where('url', $item['url'])->first();
-                if ($existing) {
-                    $results['duplicates']++;
-                    $results['items'][] = ['url' => $item['url'], 'status' => 'duplicate', 'existing_id' => $existing->id];
-                    continue;
-                }
-                
-                $newsItem = NewsItem::create([
-                    'title' => $item['title'] ?? 'Untitled',
-                    'url' => $item['url'],
-                    'source' => $item['source'] ?? 'unknown',
-                    'published_at' => $item['published_at'] ?? null,
-                    'summary' => $item['summary'] ?? null,
-                    'primary_category' => $item['category'] ?? 'others',
-                    'status' => 'pending_extraction',
-                ]);
-                
-                $results['created']++;
-                $results['items'][] = ['url' => $item['url'], 'status' => 'created', 'id' => $newsItem->id];
-                
-            } catch (\Exception $e) {
-                $results['failed']++;
-                $results['items'][] = ['url' => $item['url'] ?? '', 'status' => 'error', 'error' => $e->getMessage()];
+
+        $results = [];
+
+        foreach ($items as $index => $payload) {
+            $data = is_array($payload) ? $payload : [];
+
+            $validator = Validator::make($data, [
+                'title' => 'required|string|max:500',
+                'url' => 'required|url|max:1000',
+                'source' => 'required|string|max:100',
+                'published_at' => 'nullable|date',
+                'summary' => 'nullable|string',
+                'category' => 'nullable|string|max:100',
+                'lat' => 'nullable|numeric|between:-90,90',
+                'lng' => 'nullable|numeric|between:-180,180',
+            ]);
+
+            if ($validator->fails()) {
+                $this->storeFailedIngest($data, 'batch_validation_failed: ' . json_encode($validator->errors()->toArray()), $requestId . '_' . $index);
+                $results[] = ['index' => $index, 'success' => false, 'error' => 'validation_failed'];
+                continue;
             }
+
+            $validated = $validator->validated();
+
+            $existing = NewsItem::where('url', $validated['url'])->first();
+            if ($existing) {
+                $results[] = ['index' => $index, 'success' => true, 'duplicate' => true, 'id' => $existing->id];
+                continue;
+            }
+
+            $createData = [
+                'title' => $validated['title'],
+                'url' => $validated['url'],
+                'source' => $validated['source'],
+                'published_at' => $validated['published_at'] ?? null,
+                'summary' => $validated['summary'] ?? null,
+                'primary_category' => $validated['category'] ?? 'others',
+                'status' => 'pending_extraction',
+            ];
+
+            if (array_key_exists('lat', $validated)) {
+                $createData['lat'] = $validated['lat'];
+            }
+            if (array_key_exists('lng', $validated)) {
+                $createData['lng'] = $validated['lng'];
+            }
+
+            $newsItem = NewsItem::create($createData);
+            $results[] = ['index' => $index, 'success' => true, 'id' => $newsItem->id];
         }
-        
-        $duration = round((microtime(true) - $startTime) * 1000, 2);
-        
-        Log::info('ingest.batch_complete', [
-            'request_id' => $requestId,
-            'total' => count($items),
-            'created' => $results['created'],
-            'duplicates' => $results['duplicates'],
-            'failed' => $results['failed'],
-            'duration_ms' => $duration,
-        ]);
-        
+
         return response()->json([
             'success' => true,
-            'message' => 'Batch ingestion complete',
+            'request_id' => $requestId,
             'results' => $results,
-            'duration_ms' => $duration,
         ], 201);
     }
     

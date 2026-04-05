@@ -2,11 +2,11 @@
 
 namespace App\Models;
 
+use App\Observers\NewsItemObserver;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class NewsItem extends Model
 {
@@ -20,13 +20,11 @@ class NewsItem extends Model
         'summary',
         'primary_category',
         'secondary_category',
-        // Extracted fields
         'extracted_title',
         'extracted_summary',
         'extracted_text',
         'extracted_author',
         'extracted_image_url',
-        // AI enrichment fields
         'ai_summary',
         'ai_category',
         'main_place_text',
@@ -38,11 +36,12 @@ class NewsItem extends Model
         'ai_tokens_in',
         'ai_tokens_out',
         'ai_estimated_cost',
-        // Geo fields
-        'latitude',
-        'longitude',
+        'lat',
+        'lng',
         'precision_type',
         'geo_confidence',
+        'status',
+        'is_active',
     ];
 
     protected $casts = [
@@ -51,9 +50,15 @@ class NewsItem extends Model
         'ai_tokens_in' => 'integer',
         'ai_tokens_out' => 'integer',
         'ai_estimated_cost' => 'float',
-        'latitude' => 'float',
-        'longitude' => 'float',
+        'lat' => 'float',
+        'lng' => 'float',
+        'is_active' => 'boolean',
     ];
+
+    protected static function booted(): void
+    {
+        static::observe(NewsItemObserver::class);
+    }
 
     public function feedReadyItem(): HasOne
     {
@@ -68,20 +73,5 @@ class NewsItem extends Model
     public function topicEntities(): HasMany
     {
         return $this->hasMany(TopicEntity::class);
-    }
-
-    public function scopePublished($query)
-    {
-        return $query->whereNotNull('published_at');
-    }
-
-    public function scopeAiProcessed($query)
-    {
-        return $query->where('ai_status', 'success');
-    }
-
-    public function scopeRecent($query, int $hours = 24)
-    {
-        return $query->where('published_at', '>=', now()->subHours($hours));
     }
 }
