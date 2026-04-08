@@ -1,14 +1,14 @@
 {
-  "name": "NearByPost News Ingestion",
+  "name": "NearByPost Malaysia News Ingestion",
   "nodes": [
     {
       "parameters": {
         "rule": {
           "interval": [
             {
-              "triggerAtHour": 1,
+              "triggerAtHour": 0,
               "triggerAtMinute": 0,
-              "hoursInterval": 1
+              "hoursInterval": 12
             }
           ]
         }
@@ -17,271 +17,616 @@
       "name": "Cron Trigger",
       "type": "n8n-nodes-base.cron",
       "typeVersion": 1,
-      "position": [100, 300]
+      "position": [
+        100,
+        300
+      ]
     },
     {
       "parameters": {
-        "url": "http://feeds.bbci.co.uk/news/world/rss.xml",
+        "url": "https://www.thestar.com.my/rss/news",
         "options": {}
       },
-      "id": "bbc-rss",
-      "name": "BBC World RSS",
+      "id": "star-rss",
+      "name": "The Star RSS",
       "type": "n8n-nodes-base.rssFeedRead",
       "typeVersion": 1,
-      "position": [320, 100]
+      "position": [
+        320,
+        40
+      ]
     },
     {
       "parameters": {
-        "url": "https://www.reutersagency.com/feed/?best-topics=tech&post_type=best",
-        "options": {}
-      },
-      "id": "reuters-rss",
-      "name": "Reuters Tech RSS",
-      "type": "n8n-nodes-base.rssFeedRead",
-      "typeVersion": 1,
-      "position": [320, 220]
-    },
-    {
-      "parameters": {
-        "url": "https://feeds.arstechnica.com/arstechnica/technology-lab",
-        "options": {}
-      },
-      "id": "arstechnica-rss",
-      "name": "Ars Technica RSS",
-      "type": "n8n-nodes-base.rssFeedRead",
-      "typeVersion": 1,
-      "position": [320, 340]
-    },
-    {
-      "parameters": {
-        "url": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
-        "options": {}
-      },
-      "id": "nyt-tech-rss",
-      "name": "NYT Tech RSS",
-      "type": "n8n-nodes-base.rssFeedRead",
-      "typeVersion": 1,
-      "position": [320, 460]
-    },
-    {
-      "parameters": {
-        "url": "https://www.thestar.com.my/rss/News/Nation",
-        "options": {}
-      },
-      "id": "star-malaysia-rss",
-      "name": "The Star Malaysia RSS",
-      "type": "n8n-nodes-base.rssFeedRead",
-      "typeVersion": 1,
-      "position": [320, 580]
-    },
-    {
-      "parameters": {
-        "url": "https://www.nst.com.my/rss",
+        "url": "https://www.nst.com.my/rss/news",
         "options": {}
       },
       "id": "nst-rss",
-      "name": "NST Malaysia RSS",
+      "name": "NST RSS",
       "type": "n8n-nodes-base.rssFeedRead",
       "typeVersion": 1,
-      "position": [320, 700]
+      "position": [
+        320,
+        120
+      ]
     },
     {
       "parameters": {
-        "url": "https://www.freemalaysiatoday.com/feed/",
+        "url": "https://www.freemalaysiatoday.com/category/nation/feed/",
         "options": {}
       },
       "id": "fmt-rss",
-      "name": "Free Malaysia Today RSS",
+      "name": "FMT Nation RSS",
       "type": "n8n-nodes-base.rssFeedRead",
       "typeVersion": 1,
-      "position": [320, 820]
+      "position": [
+        320,
+        200
+      ]
     },
     {
       "parameters": {
-        "url": "https://bernama.com/en/rssfeed.php",
+        "url": "https://www.bernama.com/en/rss.php?id=news",
         "options": {}
       },
       "id": "bernama-rss",
       "name": "Bernama RSS",
       "type": "n8n-nodes-base.rssFeedRead",
       "typeVersion": 1,
-      "position": [320, 940]
+      "position": [
+        320,
+        280
+      ]
     },
     {
       "parameters": {
-        "functionCode": "return items.map(item => ({ json: { ...item.json, _source: 'BBC World' } }));"
+        "url": "https://www.malaymail.com/feed/rss/malaysia",
+        "options": {}
       },
-      "id": "tag-bbc",
-      "name": "Tag BBC",
-      "type": "n8n-nodes-base.function",
+      "id": "malaymail-rss",
+      "name": "Malay Mail Malaysia RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
       "typeVersion": 1,
-      "position": [540, 100]
+      "position": [
+        320,
+        360
+      ]
     },
     {
       "parameters": {
-        "functionCode": "return items.map(item => ({ json: { ...item.json, _source: 'Reuters Tech' } }));"
+        "url": "https://www.thesundaily.my/rss/news/national",
+        "options": {}
       },
-      "id": "tag-reuters",
-      "name": "Tag Reuters",
-      "type": "n8n-nodes-base.function",
+      "id": "thesun-rss",
+      "name": "The Sun Daily National RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
       "typeVersion": 1,
-      "position": [540, 220]
+      "position": [
+        320,
+        440
+      ]
     },
     {
       "parameters": {
-        "functionCode": "return items.map(item => ({ json: { ...item.json, _source: 'Ars Technica' } }));"
+        "url": "https://news.google.com/rss/search?q=Malaysia&hl=en-MY&gl=MY&ceid=MY:en",
+        "options": {}
       },
-      "id": "tag-arstechnica",
-      "name": "Tag Ars Technica",
-      "type": "n8n-nodes-base.function",
+      "id": "google-malaysia-rss",
+      "name": "Google News Malaysia RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
       "typeVersion": 1,
-      "position": [540, 340]
+      "position": [
+        320,
+        560
+      ]
     },
     {
       "parameters": {
-        "functionCode": "return items.map(item => ({ json: { ...item.json, _source: 'NYT Tech' } }));"
+        "url": "https://news.google.com/rss/search?q=site:reuters.com+Malaysia+OR+site:bbc.com+Malaysia+OR+site:cnn.com+Malaysia+OR+site:bloomberg.com+Malaysia+OR+site:straitstimes.com+Malaysia+OR+site:scmp.com+Malaysia+OR+site:channelnewsasia.com+Malaysia&hl=en-MY&gl=MY&ceid=MY:en",
+        "options": {}
       },
-      "id": "tag-nyt",
-      "name": "Tag NYT",
-      "type": "n8n-nodes-base.function",
+      "id": "google-foreign-discovery-rss",
+      "name": "Google News Foreign Discovery RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
       "typeVersion": 1,
-      "position": [540, 460]
+      "position": [
+        320,
+        640
+      ]
     },
     {
       "parameters": {
-        "functionCode": "return items.map(item => ({ json: { ...item.json, _source: 'The Star Malaysia' } }));"
+        "url": "https://www.bursamalaysia.com/market_information/announcements/company_announcement/rss",
+        "options": {}
+      },
+      "id": "bursa-rss",
+      "name": "Bursa Announcements RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        320,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { ...item.json, source_mode: 'direct_seed', source_label: 'The Star', source_name: 'The Star', source_domain: 'thestar.com.my' } }));"
       },
       "id": "tag-star",
       "name": "Tag The Star",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [540, 580]
+      "position": [
+        540,
+        40
+      ]
     },
     {
       "parameters": {
-        "functionCode": "return items.map(item => ({ json: { ...item.json, _source: 'NST Malaysia' } }));"
+        "functionCode": "return items.map(item => ({ json: { ...item.json, source_mode: 'direct_seed', source_label: 'NST', source_name: 'NST', source_domain: 'nst.com.my' } }));"
       },
       "id": "tag-nst",
       "name": "Tag NST",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [540, 700]
+      "position": [
+        540,
+        120
+      ]
     },
     {
       "parameters": {
-        "functionCode": "return items.map(item => ({ json: { ...item.json, _source: 'Free Malaysia Today' } }));"
+        "functionCode": "return items.map(item => ({ json: { ...item.json, source_mode: 'direct_seed', source_label: 'Free Malaysia Today', source_name: 'Free Malaysia Today', source_domain: 'freemalaysiatoday.com' } }));"
       },
       "id": "tag-fmt",
       "name": "Tag FMT",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [540, 820]
+      "position": [
+        540,
+        200
+      ]
     },
     {
       "parameters": {
-        "functionCode": "return items.map(item => ({ json: { ...item.json, _source: 'Bernama' } }));"
+        "functionCode": "return items.map(item => ({ json: { ...item.json, source_mode: 'direct_seed', source_label: 'Bernama', source_name: 'Bernama', source_domain: 'bernama.com' } }));"
       },
       "id": "tag-bernama",
       "name": "Tag Bernama",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [540, 940]
+      "position": [
+        540,
+        280
+      ]
     },
     {
       "parameters": {
-        "functionCode": "const out = []; for (let i = 0; i < items.length; i++) { const item = items[i]; const src = item.json._source || 'unknown'; const text = ((item.json.title || '') + ' ' + (item.json.summary || '')).toLowerCase(); let category = 'general'; if (/ai|artificial intelligence|chatgpt|machine learning/.test(text)) category = 'technology'; else if (/sport\\b|football|basketball|tennis|badminton/.test(text)) category = 'sports'; else if (/politics|election|government|parliament/.test(text)) category = 'politics'; else if (/business|economy|market|trade/.test(text)) category = 'business'; else if (/science|research/.test(text)) category = 'science'; else if (/health|medical|virus|disease/.test(text)) category = 'health'; else if (/crime|theft|fraud|murder/.test(text)) category = 'crime'; else if (/education|school|university/i.test(text)) category = 'education'; else if (/environment|climate|pollution/i.test(text)) category = 'environment'; else if (/kl |kuala lumpur|petaling jaya|penang|johor/i.test(text)) category = 'malaysia'; out.push({ json: { title: item.json.title || 'Untitled', url: item.json.url || item.json.link || '', source: src, published_at: item.json.pubDate || item.json.datePublished || new Date().toISOString(), summary: (item.json.summary || item.json.description || '').replace(/<[^>]*>/g, '').substring(0, 500), category } }); } return out;"
+        "functionCode": "return items.map(item => ({ json: { ...item.json, source_mode: 'direct_seed', source_label: 'Malay Mail', source_name: 'Malay Mail', source_domain: 'malaymail.com' } }));"
       },
-      "id": "normalize-generic",
-      "name": "Normalize RSS Items",
+      "id": "tag-malaymail",
+      "name": "Tag Malay Mail",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [760, 520]
+      "position": [
+        540,
+        360
+      ]
     },
     {
       "parameters": {
-        "functionCode": "const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)); const locationPatterns = [/\\bin ([A-Z][A-Za-z]+(?:\\s+[A-Z][A-Za-z]+){0,2})\\b/, /\\bfrom ([A-Z][A-Za-z]+(?:\\s+[A-Z][A-Za-z]+){0,2})\\b/, /\\bin ([A-Z][A-Za-z]+,\\s*[A-Z][A-Za-z ]+)\\b/, /\\b(?:Kuala Lumpur|Petaling Jaya|Penang|Johor|Shah Alam|Ipoh|Malacca|Kota Kinabalu|Kuching|Singapore|London|Paris|Berlin|Tokyo|Beijing|New York|California|Texas|Florida|Washington|Ukraine|Israel|Gaza|Taiwan|India|China|Japan|France|Germany|Spain|Italy|Australia|Canada)\\b/i]; function extractLocation(text) { if (!text) return ''; for (const pattern of locationPatterns) { const match = text.match(pattern); if (match) return (match[1] || match[0]).trim().replace(/^[,;:\\s]+|[,;:\\s]+$/g, ''); } return ''; } const out = []; for (let i = 0; i < items.length; i++) { const item = items[i].json; const combined = item.title || '' + ' ' + item.summary || ''; const location = extractLocation(combined); const next = { ...item }; if (location) { try { const qs = new URLSearchParams({ q: location, format: 'json', limit: '1' }).toString(); const res = await fetch('https://nominatim.openstreetmap.org/search?' + qs, { headers: { 'User-Agent': 'NearbypostGeoFix/1.0 (support@nearbypost.com)', 'Accept': 'application/json' } }); const data = await res.json(); if (Array.isArray(data) && data.length > 0 && data[0].lat && data[0].lon) { next.lat = Number.parseFloat(data[0].lat); next.lng = Number.parseFloat(data[0].lon); next.location_query = location; } } catch (error) { next.geocode_error = error.message; } await sleep(1000); } out.push({ json: next }); } return out;"
+        "functionCode": "return items.map(item => ({ json: { ...item.json, source_mode: 'direct_seed', source_label: 'The Sun Daily', source_name: 'The Sun Daily', source_domain: 'thesundaily.my' } }));"
       },
-      "id": "geocode-locations",
-      "name": "Geocode Locations",
+      "id": "tag-thesun",
+      "name": "Tag The Sun",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        540,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { ...item.json, source_mode: 'google_discovery', source_label: 'Google News Malaysia', source_name: 'Google News Malaysia', source_domain: 'news.google.com' } }));"
+      },
+      "id": "tag-google-malaysia",
+      "name": "Tag Google Malaysia",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        540,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { ...item.json, source_mode: 'google_discovery', source_label: 'Google News Foreign Discovery', source_name: 'Google News Foreign Discovery', source_domain: 'news.google.com' } }));"
+      },
+      "id": "tag-google-foreign",
+      "name": "Tag Google Foreign",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        540,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { ...item.json, source_mode: 'bursa_announcements', source_label: 'Bursa Malaysia', source_name: 'Bursa Malaysia', source_domain: 'bursamalaysia.com' } }));"
+      },
+      "id": "tag-bursa",
+      "name": "Tag Bursa",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        540,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "\nconst MALAYSIA_KEYWORDS = [\n  'malaysia','malaysian','kuala lumpur','kl','putrajaya','selangor','penang','johor','kedah','kelantan','terengganu','pahang','perak','negeri sembilan','melaka','sabah','sarawak','labuan','perlis',\n  'anwar','bursa','ringgit','petronas','epf','kwsp','maybank','cimb','tenaga nasional','rapidkl','prasarana','bernama'\n];\nconst BLOCKED_PATH_PARTS = ['/tag/','/tags/','/category/','/categories/','/archive','/archives','/search','/video/','/videos/','/gallery/','/galleries/','/photo/','/photos/','/topic/','/topics/','/live/'];\nconst PAYWALL_HINTS = ['subscribe','subscription','premium','paywall','login','sign-in','signin','register'];\nconst DIRECT_ALLOWED = ['thestar.com.my','nst.com.my','freemalaysiatoday.com','bernama.com','malaymail.com','thesundaily.my'];\n\nfunction hostnameOf(value) {\n  try { return new URL(value).hostname.toLowerCase().replace(/^www\\./,''); } catch { return ''; }\n}\nfunction cleanText(value) {\n  return String(value || '').replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\n}\nfunction looksMalaysiaRelevant(text) {\n  const hay = text.toLowerCase();\n  return MALAYSIA_KEYWORDS.some(k => hay.includes(k));\n}\nfunction blockedUrl(url) {\n  const lower = String(url || '').toLowerCase();\n  return BLOCKED_PATH_PARTS.some(p => lower.includes(p)) || PAYWALL_HINTS.some(p => lower.includes(p));\n}\nfunction articleish(url) {\n  if (!url) return false;\n  const lower = url.toLowerCase();\n  if (blockedUrl(lower)) return false;\n  return /\\/20\\d{2}\\//.test(lower) || /\\/\\d{4}\\/\\d{2}\\/\\d{2}\\//.test(lower) || /-[a-z0-9-]{8,}$/.test(lower) || /\\/news\\//.test(lower) || /\\/business\\//.test(lower) || /\\/markets\\//.test(lower) || /\\/nation\\//.test(lower);\n}\nfunction categoryFor(text, url, sourceMode) {\n  const hay = `${text} ${url}`.toLowerCase();\n  if (sourceMode === 'bursa_announcements') return ['business','bursa-announcements'];\n  if (/bursa|stocks?|shares?|ipo|earnings|ringgit|market|bank negara|petronas|maybank|cimb|economy|economic/.test(hay)) return ['business', 'markets'];\n  if (/cabinet|parliament|minister|government|election|umno|pkr|pas|dap|anwar|zahid/.test(hay)) return ['government','politics'];\n  if (/police|court|crime|arrest|charged|murder|scam|raid/.test(hay)) return ['crime','general'];\n  if (/flood|weather|rain|monsoon|landslide|haze|earthquake|fire/.test(hay)) return ['weather','alerts'];\n  if (/football|badminton|hockey|motogp|formula 1|sport/.test(hay)) return ['sports','general'];\n  if (/school|university|education|student|spm|stpm/.test(hay)) return ['education','general'];\n  if (/hospital|health|ministry of health|covid|dengue|medical/.test(hay)) return ['health','general'];\n  if (/ai|technology|tech|digital|telecom|5g|startup|cyber/.test(hay)) return ['technology','general'];\n  return ['others','general'];\n}\nasync function resolveGoogleUrl(url) {\n  try {\n    const res = await fetch(url, { redirect: 'follow', method: 'GET' });\n    return res.url || url;\n  } catch {\n    return url;\n  }\n}\n\nconst out = [];\nfor (const wrapped of items) {\n  const item = wrapped.json || {};\n  const title = cleanText(item.title || 'Untitled');\n  const summary = cleanText(item.summary || item.contentSnippet || item.content || item.description || '');\n  const sourceMode = item.source_mode || 'direct_seed';\n  let finalUrl = item.link || item.url || '';\n  if (sourceMode === 'google_discovery' && finalUrl) {\n    finalUrl = await resolveGoogleUrl(finalUrl);\n  }\n  const finalDomain = hostnameOf(finalUrl);\n  const text = `${title} ${summary} ${finalUrl}`;\n  const malaysiaRelevant = sourceMode === 'bursa_announcements' ? true : looksMalaysiaRelevant(text);\n  if (!malaysiaRelevant) continue;\n  if (!articleish(finalUrl) && sourceMode !== 'bursa_announcements') continue;\n  if (sourceMode === 'direct_seed' && !DIRECT_ALLOWED.some(d => finalDomain === d || finalDomain.endsWith('.' + d))) continue;\n  if (sourceMode === 'google_discovery' && (!finalDomain || finalDomain === 'news.google.com' || blockedUrl(finalUrl))) continue;\n  if (sourceMode === 'bursa_announcements' && !(finalDomain === 'bursamalaysia.com' || finalDomain.endsWith('.bursamalaysia.com'))) continue;\n\n  const [primary_category, secondary_category] = categoryFor(text, finalUrl, sourceMode);\n  out.push({ json: {\n    title,\n    url: finalUrl,\n    source: item.source_label || item.source_name || finalDomain || 'unknown',\n    source_label: item.source_label || item.source_name || finalDomain || 'unknown',\n    source_name: item.source_name || item.source_label || finalDomain || 'unknown',\n    source_domain: finalDomain || item.source_domain || '',\n    published_at: item.isoDate || item.pubDate || item.datePublished || new Date().toISOString(),\n    summary: summary.slice(0, 500),\n    primary_category,\n    secondary_category,\n    source_mode: sourceMode\n  }});\n}\n\nconst seen = new Set();\nreturn out.filter(entry => {\n  const key = (entry.json.url || '').toLowerCase().replace(/#.*$/, '').replace(/\\?.*$/, '');\n  if (!key || seen.has(key)) return false;\n  seen.add(key);\n  return true;\n});\n"
+      },
+      "id": "normalize-filter",
+      "name": "Normalize + Policy Filter",
       "type": "n8n-nodes-base.function",
       "typeVersion": 2,
-      "position": [900, 520]
+      "position": [
+        820,
+        360
+      ]
     },
     {
       "parameters": {
-        "functionCode": "const allItems = items.map(item => item.json); return [{ json: { items: allItems } }];"
+        "functionCode": "const allItems = items.map(item => item.json); return allItems.length ? [{ json: { items: allItems } }] : [];"
       },
       "id": "batch-collect",
       "name": "Batch Collect",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [980, 520]
+      "position": [
+        1040,
+        360
+      ]
     },
     {
       "parameters": {
         "url": "http://172.18.0.1:8000/api/internal/ingest/batch",
         "method": "POST",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
         "sendBody": true,
-        "bodyParameters": { "parameters": [{ "name": "items", "value": "={{ $json.items }}" }] },
-        "options": { "timeout": 60000 }
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "items",
+              "value": "={{ $json.items }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        }
       },
       "id": "laravel-webhook",
       "name": "Ingest to Laravel",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [1200, 520]
+      "position": [
+        1260,
+        360
+      ]
     },
     {
       "parameters": {
-        "functionCode": "const result = items[0]?.json; console.log('Batch ingestion result:', JSON.stringify(result, null, 2)); return items;"
+        "functionCode": "return items;"
       },
       "id": "log-results",
       "name": "Log Results",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [1400, 520]
+      "position": [
+        1460,
+        360
+      ]
     }
   ],
   "connections": {
     "Cron Trigger": {
-      "main": [[
-        { "node": "BBC World RSS", "type": "main", "index": 0 },
-        { "node": "Reuters Tech RSS", "type": "main", "index": 0 },
-        { "node": "Ars Technica RSS", "type": "main", "index": 0 },
-        { "node": "NYT Tech RSS", "type": "main", "index": 0 },
-        { "node": "The Star Malaysia RSS", "type": "main", "index": 0 },
-        { "node": "NST Malaysia RSS", "type": "main", "index": 0 },
-        { "node": "Free Malaysia Today RSS", "type": "main", "index": 0 },
-        { "node": "Bernama RSS", "type": "main", "index": 0 }
-      ]]
+      "main": [
+        [
+          {
+            "node": "The Star RSS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "NST RSS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "FMT Nation RSS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Bernama RSS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Malay Mail Malaysia RSS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "The Sun Daily National RSS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google News Malaysia RSS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google News Foreign Discovery RSS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Bursa Announcements RSS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
-    "BBC World RSS": { "main": [[{ "node": "Tag BBC", "type": "main", "index": 0 }]] },
-    "Reuters Tech RSS": { "main": [[{ "node": "Tag Reuters", "type": "main", "index": 0 }]] },
-    "Ars Technica RSS": { "main": [[{ "node": "Tag Ars Technica", "type": "main", "index": 0 }]] },
-    "NYT Tech RSS": { "main": [[{ "node": "Tag NYT", "type": "main", "index": 0 }]] },
-    "The Star Malaysia RSS": { "main": [[{ "node": "Tag The Star", "type": "main", "index": 0 }]] },
-    "NST Malaysia RSS": { "main": [[{ "node": "Tag NST", "type": "main", "index": 0 }]] },
-    "Free Malaysia Today RSS": { "main": [[{ "node": "Tag FMT", "type": "main", "index": 0 }]] },
-    "Bernama RSS": { "main": [[{ "node": "Tag Bernama", "type": "main", "index": 0 }]] },
-    "Tag BBC": { "main": [[{ "node": "Normalize RSS Items", "type": "main", "index": 0 }]] },
-    "Tag Reuters": { "main": [[{ "node": "Normalize RSS Items", "type": "main", "index": 1 }]] },
-    "Tag Ars Technica": { "main": [[{ "node": "Normalize RSS Items", "type": "main", "index": 2 }]] },
-    "Tag NYT": { "main": [[{ "node": "Normalize RSS Items", "type": "main", "index": 3 }]] },
-    "Tag The Star": { "main": [[{ "node": "Normalize RSS Items", "type": "main", "index": 4 }]] },
-    "Tag NST": { "main": [[{ "node": "Normalize RSS Items", "type": "main", "index": 5 }]] },
-    "Tag FMT": { "main": [[{ "node": "Normalize RSS Items", "type": "main", "index": 6 }]] },
-    "Tag Bernama": { "main": [[{ "node": "Normalize RSS Items", "type": "main", "index": 7 }]] },
-    "Normalize RSS Items": { "main": [[{ "node": "Geocode Locations", "type": "main", "index": 0 }]] },
-    "Geocode Locations": { "main": [[{ "node": "Batch Collect", "type": "main", "index": 0 }]] },
-    "Batch Collect": { "main": [[{ "node": "Ingest to Laravel", "type": "main", "index": 0 }]] },
-    "Ingest to Laravel": { "main": [[{ "node": "Log Results", "type": "main", "index": 0 }]] }
+    "The Star RSS": {
+      "main": [
+        [
+          {
+            "node": "Tag The Star",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NST RSS": {
+      "main": [
+        [
+          {
+            "node": "Tag NST",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FMT Nation RSS": {
+      "main": [
+        [
+          {
+            "node": "Tag FMT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bernama RSS": {
+      "main": [
+        [
+          {
+            "node": "Tag Bernama",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Malay Mail Malaysia RSS": {
+      "main": [
+        [
+          {
+            "node": "Tag Malay Mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "The Sun Daily National RSS": {
+      "main": [
+        [
+          {
+            "node": "Tag The Sun",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google News Malaysia RSS": {
+      "main": [
+        [
+          {
+            "node": "Tag Google Malaysia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google News Foreign Discovery RSS": {
+      "main": [
+        [
+          {
+            "node": "Tag Google Foreign",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bursa Announcements RSS": {
+      "main": [
+        [
+          {
+            "node": "Tag Bursa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag The Star": {
+      "main": [
+        [
+          {
+            "node": "Normalize + Policy Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag NST": {
+      "main": [
+        [
+          {
+            "node": "Normalize + Policy Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag FMT": {
+      "main": [
+        [
+          {
+            "node": "Normalize + Policy Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Bernama": {
+      "main": [
+        [
+          {
+            "node": "Normalize + Policy Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Malay Mail": {
+      "main": [
+        [
+          {
+            "node": "Normalize + Policy Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag The Sun": {
+      "main": [
+        [
+          {
+            "node": "Normalize + Policy Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Google Malaysia": {
+      "main": [
+        [
+          {
+            "node": "Normalize + Policy Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Google Foreign": {
+      "main": [
+        [
+          {
+            "node": "Normalize + Policy Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Bursa": {
+      "main": [
+        [
+          {
+            "node": "Normalize + Policy Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize + Policy Filter": {
+      "main": [
+        [
+          {
+            "node": "Batch Collect",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batch Collect": {
+      "main": [
+        [
+          {
+            "node": "Ingest to Laravel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ingest to Laravel": {
+      "main": [
+        [
+          {
+            "node": "Log Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
-  "settings": { "executionOrder": "v1" },
-  "staticData": null,
-  "tags": [],
-  "triggerCount": 1,
-  "updatedAt": "2026-04-05T06:21:00.000Z",
-  "versionId": "6"
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
 }

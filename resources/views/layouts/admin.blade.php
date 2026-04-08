@@ -12,16 +12,6 @@
 </head>
 <body class="admin-body">
     <div class="admin-wrapper">
-        <aside class="admin-sidebar">
-            <div class="admin-logo"><h2>NearbyPost</h2></div>
-            <nav class="admin-nav">
-                <a href="{{ route('admin.dashboard') }}" class="active">📊 Dashboard</a>
-                <form method="POST" action="{{ route('admin.logout') }}">
-                    @csrf
-                    <button type="submit" style="background:none;border:none;color:#fff;cursor:pointer;padding:8px 0;text-align:left;">🚪 Logout</button>
-                </form>
-            </nav>
-        </aside>
         <div class="admin-main">
             <header class="admin-header">
                 <div style="display:flex;align-items:center;gap:12px;">

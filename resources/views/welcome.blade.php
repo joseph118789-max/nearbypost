@@ -231,74 +231,77 @@
       apiEndpoints: { ipGeolocation: 'https://ipapi.co/json/', reverseGeocode: 'https://nominatim.openstreetmap.org/reverse' }
     };
 
-    const DATA = {
-      stories: [
-        { id: 1, title: "Burst pipe causes traffic jam near SS2, Petaling Jaya", summary: "Major delays hit evening traffic after a burst pipe disrupted several connecting roads. Authorities estimate repairs will take 48 hours.", category: "Transport", interestTag: "Transport", source: "The Star", hoursAgo: 8, type: "nearby", locationName: "SS2, Petaling Jaya" },
-        { id: 2, title: "Ramadan bazaar at TTDI extended until 10pm", summary: "Extended hours expected to bring more crowd and late-night food traffic. Vendors report 30% increase in visitors.", category: "Lifestyle", interestTag: "Lifestyle / Food", source: "Malay Mail", hoursAgo: 16, type: "nearby", locationName: "TTDI, Kuala Lumpur" },
-        { id: 3, title: "New condo launch draws strong weekend turnout in PJ", summary: "Developers report encouraging footfall as buyers return to selected projects. Over 200 units sold in first weekend.", category: "Property", interestTag: "Property / Condo", source: "The Edge", hoursAgo: 28, type: "broader", locationName: "Petaling Jaya" },
-        { id: 4, title: "Flash floods hit Klang Valley routes after storm", summary: "Authorities issued warnings for flood-prone areas after heavy rainfall. Several roads remain closed for cleanup.", category: "Transport", interestTag: "Transport", source: "Bernama", hoursAgo: 6, type: "broader", locationName: "Klang Valley" },
-        { id: 5, title: "Klang Valley property sentiment improves", summary: "Analysts see more stable enquiry patterns across the Klang Valley. Market shows signs of recovery after Q1 slowdown.", category: "Property", interestTag: "Property", source: "Focus Malaysia", hoursAgo: 40, type: "broader", locationName: "Klang Valley" },
-        { id: 6, title: "Malaysia Open badminton: Local pair set for key clash", summary: "The draw creates early talking point for badminton fans. National champions face top-seeded opponents Thursday.", category: "Sports", interestTag: "Sports / Badminton", source: "NST", hoursAgo: 10, type: "interest", locationName: "National" }
-      ],
-      interests: ["All categories", "Sports", "Sports / Badminton", "Sports / Football", "Property", "Property / Condo", "Lifestyle", "Lifestyle / Food", "Transport", "Business", "Crime"],
-      timeFilters: [ { label: "24h", hours: 24 }, { label: "3d", hours: 72 }, { label: "7d", hours: 168 }, { label: "30d", hours: 720 } ],
-      categories: ["All", "Transport", "Property", "Lifestyle", "Business", "Crime", "Sports"],
-      radiusFilters: ["Both", "Nearby only", "Broader only"],
-      legalContent: {
-        terms: { title: "Terms of Use", content: "<p>By using {{ config('app.name') }}, you agree to our terms. Content is for informational purposes only.</p><p style='margin-top:16px'>Last updated: March 31, 2026</p>" },
-        privacy: { title: "Privacy Policy", content: "<p>We value your privacy. Location data is used only to show relevant content and is not shared with third parties.</p><p style='margin-top:16px'>Last updated: March 31, 2026</p>" },
-        disclaimer: { title: "Disclaimer", content: "<p>Content is aggregated from third-party sources. We do not independently verify all information.</p><p style='margin-top:16px'>Last updated: March 31, 2026</p>" }
-      }
-    };
-
     const Utils = {
       escapeHtml(str) { if (!str) return ''; const div = document.createElement('div'); div.textContent = str; return div.innerHTML; },
       generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2); },
-      formatTimeAgo(hours) { if (hours < 1) return 'Just now'; if (hours === 1) return '1 hour ago'; if (hours < 24) return hours + ' hours ago'; return Math.floor(hours / 24) + ' days ago'; }
+      formatTimeAgoFromDate(dateValue) {
+        if (!dateValue) return 'Just now';
+        const date = new Date(dateValue);
+        if (Number.isNaN(date.getTime())) return 'Just now';
+        const diffHours = Math.max(0, (Date.now() - date.getTime()) / 36e5);
+        if (diffHours < 1) return 'Just now';
+        if (diffHours < 2) return '1 hour ago';
+        if (diffHours < 24) return Math.round(diffHours) + ' hours ago';
+        return Math.floor(diffHours / 24) + ' days ago';
+      },
+      categoryLabel(item) {
+        return item.primary_category || item.category || 'general';
+      }
+    };
+
+    const API = {
+      async fetchStories(params = {}) {
+        const qs = new URLSearchParams(params).toString();
+        const url = '/api/feed/default' + (qs ? `?${qs}` : '');
+        const response = await fetch(url, { headers: { Accept: 'application/json' } });
+        if (!response.ok) throw new Error(`Feed request failed (${response.status})`);
+        const data = await response.json();
+        return Array.isArray(data) ? data : [];
+      },
+      async fetchNearby(lat, lng, radius = 20) {
+        const qs = new URLSearchParams({ lat: String(lat), lng: String(lng), radius: String(radius) }).toString();
+        const response = await fetch('/api/feed/nearby?' + qs, { headers: { Accept: 'application/json' } });
+        if (!response.ok) throw new Error(`Nearby request failed (${response.status})`);
+        const data = await response.json();
+        return Array.isArray(data) ? data : [];
+      }
     };
 
     class Store {
-      constructor(initialState) { this.state = { ...initialState }; this.listeners = []; this.cache = new Map(); }
+      constructor(initialState) { this.state = { ...initialState }; this.listeners = []; }
       getState() { return { ...this.state }; }
-      setState(updates) { this.state = { ...this.state, ...updates }; this.cache.clear(); this._notify(); }
+      setState(updates) { this.state = { ...this.state, ...updates }; this._notify(); }
       _notify() { this.listeners.forEach(listener => listener(this.state)); }
       subscribe(listener) { this.listeners.push(listener); return () => { this.listeners = this.listeners.filter(l => l !== listener); }; }
-      getFilterKey() { const { activeTab, timeHours, selectedCategory, radiusFilter, selectedInterest, locationName } = this.state; return [activeTab, timeHours, selectedCategory, radiusFilter, selectedInterest, locationName].join('|'); }
-      getFilteredStories() {
-        const key = this.getFilterKey();
-        if (this.cache.has(key)) return this.cache.get(key);
-        let stories = DATA.stories.filter(s => s.hoursAgo <= this.state.timeHours);
-        if (this.state.activeTab === "nearme") stories = this._filterNearby(stories);
-        else if (this.state.activeTab === "interest") stories = this._filterInterest(stories);
-        else stories = [];
-        this.cache.set(key, stories);
-        return stories;
-      }
-      _filterNearby(stories) {
-        let filtered = stories.filter(s => s.type === "nearby" || s.type === "broader");
-        if (this.state.radiusFilter === "Nearby only") filtered = filtered.filter(s => s.type === "nearby");
-        else if (this.state.radiusFilter === "Broader only") filtered = filtered.filter(s => s.type === "broader");
-        if (this.state.selectedCategory !== "All") filtered = filtered.filter(s => s.category === this.state.selectedCategory);
-        return filtered.sort((a, b) => { if (a.type === "nearby" && b.type !== "nearby") return -1; if (a.type !== "nearby" && b.type === "nearby") return 1; return b.hoursAgo - a.hoursAgo; });
-      }
-      _filterInterest(stories) {
-        let filtered = stories.filter(s => s.type === "interest");
-        if (this.state.selectedInterest !== "All categories") filtered = filtered.filter(s => s.interestTag === this.state.selectedInterest);
-        return filtered.sort((a, b) => a.hoursAgo - b.hoursAgo);
-      }
     }
 
     const GeolocationService = {
       async detectLocation() {
-        const cached = this._getCached();
-        if (cached) return cached;
-        try { const location = await this._fetchIPLocation(); if (location) { this._cacheLocation(location); return location; } } catch (e) { console.warn('IP geolocation failed:', e); }
-        return CONFIG.defaultLocation;
+        try { const location = await this._fetchIPLocation(); return location || CONFIG.defaultLocation; } catch { return CONFIG.defaultLocation; }
       },
-      _getCached() { const saved = localStorage.getItem('nearbypost_location'); const timestamp = localStorage.getItem('nearbypost_location_timestamp'); if (saved && timestamp && (Date.now() - parseInt(timestamp)) < CONFIG.cacheDuration) return saved; return null; },
-      _cacheLocation(location) { localStorage.setItem('nearbypost_location', location); localStorage.setItem('nearbypost_location_timestamp', Date.now().toString()); },
-      async _fetchIPLocation() { const controller = new AbortController(); const timeoutId = setTimeout(() => controller.abort(), CONFIG.geolocationTimeout); try { const response = await fetch(CONFIG.apiEndpoints.ipGeolocation, { signal: controller.signal }); const data = await response.json(); clearTimeout(timeoutId); return data?.city || null; } catch (error) { clearTimeout(timeoutId); throw error; } },
-      async getBrowserLocation() { return new Promise((resolve) => { if (!("geolocation" in navigator)) { resolve(null); return; } navigator.geolocation.getCurrentPosition(async (position) => { try { const url = CONFIG.apiEndpoints.reverseGeocode + '?format=json&lat=' + position.coords.latitude + '&lon=' + position.coords.longitude + '&zoom=10'; const response = await fetch(url); const data = await response.json(); resolve(data.address?.city || data.address?.town || data.address?.suburb || null); } catch { resolve(null); } }, () => resolve(null)); }); }
+      async getCoordinates() {
+        return new Promise((resolve) => {
+          if (!("geolocation" in navigator)) { resolve(null); return; }
+          navigator.geolocation.getCurrentPosition(
+            (position) => resolve({ lat: position.coords.latitude, lng: position.coords.longitude }),
+            () => resolve(null),
+            { timeout: CONFIG.geolocationTimeout }
+          );
+        });
+      },
+      async _fetchIPLocation() {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), CONFIG.geolocationTimeout);
+        try {
+          const response = await fetch(CONFIG.apiEndpoints.ipGeolocation, { signal: controller.signal });
+          const data = await response.json();
+          clearTimeout(timeoutId);
+          return data?.city || null;
+        } catch (error) {
+          clearTimeout(timeoutId);
+          throw error;
+        }
+      }
     };
 
     class ModalManager {
@@ -325,9 +328,9 @@
       createStoryCard(story, isDesktop = false) {
         const card = document.createElement('article');
         card.className = isDesktop ? "desktop-story-card" : "story-card";
-        const nearbyBadge = story.type === 'nearby' ? '<span class="story-nearby">Nearby</span>' : '';
-        card.innerHTML = '<div class="story-meta"><span class="story-source">' + Utils.escapeHtml(story.source) + '</span><span class="story-category">' + Utils.escapeHtml(story.category) + '</span>' + nearbyBadge + '</div><h3 class="story-title">' + Utils.escapeHtml(story.title) + '</h3><p class="story-summary">' + Utils.escapeHtml(story.summary) + '</p><div class="story-footer"><span>' + Utils.formatTimeAgo(story.hoursAgo) + '</span><span>' + Utils.escapeHtml(story.locationName) + '</span></div>';
-        card.addEventListener('click', () => console.log('Open article:', story.title));
+        const badge = story.distance_km !== undefined ? '<span class="story-nearby">' + story.distance_km + ' km</span>' : '';
+        card.innerHTML = '<div class="story-meta"><span class="story-source">' + Utils.escapeHtml(story.source || 'Unknown') + '</span><span class="story-category">' + Utils.escapeHtml(Utils.categoryLabel(story)) + '</span>' + badge + '</div><h3 class="story-title">' + Utils.escapeHtml(story.title) + '</h3><p class="story-summary">' + Utils.escapeHtml(story.summary || '') + '</p><div class="story-footer"><span>' + Utils.formatTimeAgoFromDate(story.published_at) + '</span><span>' + Utils.escapeHtml(story.location_label || story.locationName || 'Malaysia') + '</span></div>';
+        card.addEventListener('click', () => { if (story.url) window.open(story.url, '_blank', 'noopener,noreferrer'); });
         return card;
       },
       createSkeleton() { return '<div class="skeleton-card"><div class="skeleton-line" style="width:30%;height:12px;"></div><div class="skeleton-line skeleton-title"></div><div class="skeleton-line skeleton-text"></div><div class="skeleton-line skeleton-text short"></div></div>'; }
@@ -335,13 +338,53 @@
 
     class App {
       constructor() {
-        this.store = new Store({ activeTab: "nearme", locationName: "Loading...", radiusKm: CONFIG.defaultRadius, timeHours: 168, selectedCategory: "All", selectedInterest: "All categories", radiusFilter: "Both", isLoading: false });
+        this.store = new Store({ activeTab: "nearme", locationName: "Loading...", radiusKm: CONFIG.defaultRadius, timeHours: 168, selectedCategory: "All", selectedInterest: "All categories", radiusFilter: "Both", isLoading: true, stories: [], nearbyStories: [] });
         this.modalManager = new ModalManager();
         this.modalManager.init();
         this.init();
       }
-      async init() { this.render(); this.bindEvents(); await this.loadLocation(); this.store.setState({ isLoading: false }); }
+      async init() { this.render(); this.bindEvents(); await Promise.all([this.loadLocation(), this.loadStories()]); this.store.setState({ isLoading: false }); }
       async loadLocation() { const location = await GeolocationService.detectLocation(); this.store.setState({ locationName: location }); }
+      async loadStories() {
+        try {
+          const [stories, coords] = await Promise.all([API.fetchStories(), GeolocationService.getCoordinates()]);
+          const nearby = coords ? await API.fetchNearby(coords.lat, coords.lng, this.store.getState().radiusKm) : [];
+          this.store.setState({ stories, nearbyStories: nearby });
+        } catch (error) {
+          console.error('Failed to load stories', error);
+          this.store.setState({ stories: [], nearbyStories: [] });
+        }
+      }
+      normalizeStory(item) {
+        return {
+          ...item,
+          category: Utils.categoryLabel(item),
+          locationName: item.location_label || item.locationName || 'Malaysia',
+          type: Utils.storyType(item),
+        };
+      }
+      getCurrentStories() {
+        const state = this.store.getState();
+        const source = state.activeTab === 'nearme' && state.nearbyStories.length ? state.nearbyStories : state.stories;
+        const cutoff = state.timeHours ? Date.now() - (state.timeHours * 60 * 60 * 1000) : 0;
+        return source.map(item => this.normalizeStory(item)).filter(item => !cutoff || !item.published_at || new Date(item.published_at).getTime() >= cutoff).filter(item => {
+          if (state.activeTab === 'marketplace') return false;
+          if (state.activeTab === 'nearme') {
+            if (state.radiusFilter === 'Nearby only' && item.distance_km === undefined) return false;
+            if (state.radiusFilter === 'Broader only' && item.distance_km !== undefined) return false;
+            return state.selectedCategory === 'All' || item.category === state.selectedCategory;
+          }
+          if (state.activeTab === 'interest') {
+            const q = state.selectedInterest;
+            return q === 'All categories' || item.category === q || (item.secondary_category && item.secondary_category.toLowerCase().includes(q.toLowerCase()));
+          }
+          return true;
+        }).sort((a, b) => {
+          const at = a.published_at ? new Date(a.published_at).getTime() : 0;
+          const bt = b.published_at ? new Date(b.published_at).getTime() : 0;
+          return bt - at;
+        });
+      }
       render() {
         const state = this.store.getState();
         const isDesktop = window.innerWidth > 768;
@@ -350,21 +393,21 @@
         if (isDesktop) this.renderDesktopSidebar();
       }
       renderMobile(state) {
-        document.getElementById('app').innerHTML = '<div class="mobile-layout"><div class="header"><div class="logo">' + CONFIG.appName + '</div><div class="header-actions" id="headerActions"></div></div><div class="pull-to-refresh" id="pullToRefresh">Pull down to refresh</div><div class="feed-container" id="feedContainer"></div><div class="bottom-nav" id="bottomNav"><button class="nav-item ' + (state.activeTab === 'nearme' ? 'active' : '') + '" data-tab="nearme">Near Me</button><button class="nav-item ' + (state.activeTab === 'interest' ? 'active' : '') + '" data-tab="interest">By Interest</button><button class="nav-item ' + (state.activeTab === 'marketplace' ? 'active' : '') + '" data-tab="marketplace">Marketplace</button></div><div class="legal-footer"><div class="legal-links"><a class="legal-link" onclick="app.openReportModal()">Report Content</a><a class="legal-link" onclick="app.openLegalModal(\'terms\')">Terms</a><a class="legal-link" onclick="app.openLegalModal(\'privacy\')">Privacy</a><a class="legal-link" onclick="app.openLegalModal(\'disclaimer\')">Disclaimer</a></div><div>© 2026 ' + CONFIG.appName + '</div></div></div>';
+        document.getElementById('app').innerHTML = '<div class="mobile-layout"><div class="header"><div class="logo">' + CONFIG.appName + '</div><div class="header-actions" id="headerActions"></div></div><div class="pull-to-refresh" id="pullToRefresh">Pull down to refresh</div><div class="feed-container" id="feedContainer"></div><div class="bottom-nav" id="bottomNav"><button class="nav-item ' + (state.activeTab === 'nearme' ? 'active' : '') + '" data-tab="nearme">Near Me</button><button class="nav-item ' + (state.activeTab === 'interest' ? 'active' : '') + '" data-tab="interest">By Interest</button><button class="nav-item ' + (state.activeTab === 'marketplace' ? 'active' : '') + '" data-tab="marketplace">Marketplace</button></div><div class="legal-footer"><div class="legal-links"><a class="legal-link" onclick="app.openReportModal()">Report Content</a><a class="legal-link" onclick="app.openLegalModal('terms')">Terms</a><a class="legal-link" onclick="app.openLegalModal('privacy')">Privacy</a><a class="legal-link" onclick="app.openLegalModal('disclaimer')">Disclaimer</a></div><div>© 2026 ' + CONFIG.appName + '</div></div></div>';
         this.renderHeaderButtons();
       }
       renderDesktop(state) {
-        document.getElementById('app').innerHTML = '<div class="desktop-layout"><div class="desktop-sidebar"><div class="sidebar-logo"><h1>' + CONFIG.appName + '</h1></div><div class="desktop-nav"><button class="desktop-nav-item ' + (state.activeTab === 'nearme' ? 'active' : '') + '" data-tab="nearme">Near Me</button><button class="desktop-nav-item ' + (state.activeTab === 'interest' ? 'active' : '') + '" data-tab="interest">By Interest</button><button class="desktop-nav-item ' + (state.activeTab === 'marketplace' ? 'active' : '') + '" data-tab="marketplace">Marketplace</button></div><div class="desktop-legal-footer"><button class="desktop-report-btn" onclick="app.openReportModal()">Report Content</button><div class="legal-links" style="flex-direction:column;gap:8px;margin-top:16px;"><a class="legal-link" onclick="app.openLegalModal(\'terms\')">Terms of Use</a><a class="legal-link" onclick="app.openLegalModal(\'privacy\')">Privacy Policy</a><a class="legal-link" onclick="app.openLegalModal(\'disclaimer\')">Disclaimer</a></div><div style="margin-top:16px;font-size:0.75rem;color:var(--color-text-tertiary);">© 2026 ' + CONFIG.appName + '</div></div></div><div class="desktop-main" id="desktopFeedContainer"></div><div class="desktop-right" id="desktopRightSidebar"></div></div>';
+        document.getElementById('app').innerHTML = '<div class="desktop-layout"><div class="desktop-sidebar"><div class="sidebar-logo"><h1>' + CONFIG.appName + '</h1></div><div class="desktop-nav"><button class="desktop-nav-item ' + (state.activeTab === 'nearme' ? 'active' : '') + '" data-tab="nearme">Near Me</button><button class="desktop-nav-item ' + (state.activeTab === 'interest' ? 'active' : '') + '" data-tab="interest">By Interest</button><button class="desktop-nav-item ' + (state.activeTab === 'marketplace' ? 'active' : '') + '" data-tab="marketplace">Marketplace</button></div><div class="desktop-legal-footer"><button class="desktop-report-btn" onclick="app.openReportModal()">Report Content</button><div class="legal-links" style="flex-direction:column;gap:8px;margin-top:16px;"><a class="legal-link" onclick="app.openLegalModal('terms')">Terms of Use</a><a class="legal-link" onclick="app.openLegalModal('privacy')">Privacy Policy</a><a class="legal-link" onclick="app.openLegalModal('disclaimer')">Disclaimer</a></div><div style="margin-top:16px;font-size:0.75rem;color:var(--color-text-tertiary);">© 2026 ' + CONFIG.appName + '</div></div></div><div class="desktop-main" id="desktopFeedContainer"></div><div class="desktop-right" id="desktopRightSidebar"></div></div>';
       }
       renderFeed() {
         const state = this.store.getState();
         const isDesktop = window.innerWidth > 768;
         const container = document.getElementById(isDesktop ? "desktopFeedContainer" : "feedContainer");
         if (!container) return;
-        if (state.locationName === 'Loading...' || state.isLoading) { container.innerHTML = Array(3).fill(Components.createSkeleton()).join(''); return; }
+        if (state.isLoading) { container.innerHTML = Array(3).fill(Components.createSkeleton()).join(''); return; }
         if (state.activeTab === "marketplace") { container.innerHTML = '<div class="empty-state">Marketplace coming soon</div>'; return; }
-        const stories = this.store.getFilteredStories();
-        if (stories.length === 0) { container.innerHTML = '<div class="empty-state">No stories match your filters</div>'; return; }
+        const stories = this.getCurrentStories();
+        if (stories.length === 0) { container.innerHTML = '<div class="empty-state">No live stories match your filters</div>'; return; }
         container.innerHTML = '';
         stories.forEach(story => container.appendChild(Components.createStoryCard(story, isDesktop)));
       }
@@ -373,31 +416,25 @@
         const state = this.store.getState();
         const sidebar = document.getElementById("desktopRightSidebar");
         if (!sidebar) return;
-        const timeOpt = DATA.timeFilters.find(t => t.hours === state.timeHours);
-        sidebar.innerHTML = '<div class="info-card"><h3>Current Settings</h3><div class="info-row"><span>Location</span><span>' + Utils.escapeHtml(state.locationName) + '</span></div>' + (state.activeTab === "nearme" ? '<div class="info-row"><span>Radius</span><span>' + state.radiusKm + ' km</span></div>' : '') + '<div class="info-row"><span>Time range</span><span>' + (timeOpt?.label || '7d') + '</span></div></div><button class="desktop-action-btn" onclick="app.openLocationModal()">Change Location</button>';
+        sidebar.innerHTML = '<div class="info-card"><h3>Current Settings</h3><div class="info-row"><span>Location</span><span>' + Utils.escapeHtml(state.locationName) + '</span></div>' + (state.activeTab === "nearme" ? '<div class="info-row"><span>Radius</span><span>' + state.radiusKm + ' km</span></div>' : '') + '<div class="info-row"><span>Time range</span><span>' + (state.timeHours >= 720 ? '30d' : state.timeHours >= 168 ? '7d' : state.timeHours >= 72 ? '3d' : '24h') + '</span></div></div><button class="desktop-action-btn" onclick="app.openLocationModal()">Change Location</button>';
         if (state.activeTab === "nearme") {
           sidebar.insertAdjacentHTML('beforeend', '<div class="info-card"><h3>Categories</h3><div class="filter-chips" id="desktopCategories"></div></div><div class="info-card"><h3>Story Radius</h3><div class="filter-chips" id="desktopRadius"></div></div>');
-          DATA.categories.forEach(cat => { const btn = document.createElement('button'); btn.className = 'filter-chip ' + (state.selectedCategory === cat ? 'active' : ''); btn.textContent = cat; btn.onclick = () => this.store.setState({ selectedCategory: cat }); document.getElementById('desktopCategories').appendChild(btn); });
-          DATA.radiusFilters.forEach(r => { const btn = document.createElement('button'); btn.className = 'filter-chip ' + (state.radiusFilter === r ? 'active' : ''); btn.textContent = r; btn.onclick = () => this.store.setState({ radiusFilter: r }); document.getElementById('desktopRadius').appendChild(btn); });
+          ['All', 'Transport', 'Property', 'Lifestyle', 'Business', 'Crime', 'Sports'].forEach(cat => { const btn = document.createElement('button'); btn.className = 'filter-chip ' + (state.selectedCategory === cat ? 'active' : ''); btn.textContent = cat; btn.onclick = () => this.store.setState({ selectedCategory: cat }); document.getElementById('desktopCategories').appendChild(btn); });
+          ['Both', 'Nearby only', 'Broader only'].forEach(r => { const btn = document.createElement('button'); btn.className = 'filter-chip ' + (state.radiusFilter === r ? 'active' : ''); btn.textContent = r; btn.onclick = () => this.store.setState({ radiusFilter: r }); document.getElementById('desktopRadius').appendChild(btn); });
         } else if (state.activeTab === "interest") {
           sidebar.insertAdjacentHTML('beforeend', '<div class="info-card"><h3>Interests</h3><div class="searchable-dropdown" id="interestDropdown"></div></div>');
           this.initInterestDropdown();
         }
-        sidebar.insertAdjacentHTML('beforeend', '<div class="info-card"><h3>Time Range</h3><div class="filter-chips" id="desktopTime"></div></div>');
-        DATA.timeFilters.forEach(t => { const btn = document.createElement('button'); btn.className = 'filter-chip ' + (state.timeHours === t.hours ? 'active' : ''); btn.textContent = t.label; btn.onclick = () => this.store.setState({ timeHours: t.hours }); document.getElementById('desktopTime').appendChild(btn); });
       }
       initInterestDropdown() {
         const container = document.getElementById('interestDropdown');
         if (!container) return;
         const state = this.store.getState();
+        const interests = ['All categories', 'Sports', 'Property', 'Lifestyle', 'Transport', 'Business', 'Crime'];
         container.innerHTML = '<div class="dropdown-trigger" id="interestTrigger"><span>' + Utils.escapeHtml(state.selectedInterest) + '</span><span>▼</span></div><div class="dropdown-menu" id="interestMenu"><div class="dropdown-search"><input type="text" id="interestSearch" placeholder="Search interests..."></div><div class="dropdown-options" id="interestOptions"></div></div>';
         const menu = document.getElementById('interestMenu');
         const search = document.getElementById('interestSearch');
-        const renderOpts = (term = '') => {
-          const opts = document.getElementById('interestOptions');
-          opts.innerHTML = DATA.interests.filter(i => !term || i.toLowerCase().includes(term.toLowerCase())).map(i => '<div class="dropdown-option ' + (state.selectedInterest === i ? 'selected' : '') + '" data-v="' + Utils.escapeHtml(i) + '">' + Utils.escapeHtml(i) + '</div>').join('');
-          opts.querySelectorAll('.dropdown-option').forEach(o => o.addEventListener('click', () => { this.store.setState({ selectedInterest: o.dataset.v }); document.querySelector('#interestTrigger span').textContent = o.dataset.v; menu.classList.remove('open'); }));
-        };
+        const renderOpts = (term = '') => { const opts = document.getElementById('interestOptions'); opts.innerHTML = interests.filter(i => !term || i.toLowerCase().includes(term.toLowerCase())).map(i => '<div class="dropdown-option ' + (state.selectedInterest === i ? 'selected' : '') + '" data-v="' + Utils.escapeHtml(i) + '">' + Utils.escapeHtml(i) + '</div>').join(''); opts.querySelectorAll('.dropdown-option').forEach(o => o.addEventListener('click', () => { this.store.setState({ selectedInterest: o.dataset.v }); document.querySelector('#interestTrigger span').textContent = o.dataset.v; menu.classList.remove('open'); })); };
         document.getElementById('interestTrigger').addEventListener('click', (e) => { e.stopPropagation(); menu.classList.toggle('open'); if (menu.classList.contains('open')) { setTimeout(() => search.focus(), 100); renderOpts(''); search.value = ''; } });
         search.addEventListener('input', e => renderOpts(e.target.value));
         document.addEventListener('click', e => { if (!container.contains(e.target)) menu.classList.remove('open'); });
@@ -410,65 +447,35 @@
           title: 'Location',
           content: '<label class="modal-label">Your location</label><input type="text" id="locationInput" class="modal-input" value="' + Utils.escapeHtml(state.locationName) + '"><button id="useCurrentLocation" class="modal-btn" style="margin-top:8px;">Use my current location</button><div id="radiusSection" style="' + (state.activeTab === 'nearme' ? 'display:block' : 'display:none') + '"><label class="modal-label">Radius (km)</label><select id="radiusSelect" class="modal-select"><option value="5">5 km</option><option value="10">10 km</option><option value="20"' + (state.radiusKm === 20 ? ' selected' : '') + '>20 km</option><option value="30">30 km</option><option value="50">50 km</option></select></div>',
           buttons: [{ label: 'Cancel', action: 'cancel' }, { label: 'Save', action: 'save', className: 'primary' }],
-          buttonHandlers: { cancel: (m, id) => this.modalManager.close(id), save: (m, id) => { const loc = document.getElementById('locationInput').value.trim(); if (loc) this.store.setState({ locationName: loc }); if (state.activeTab === 'nearme') { const r = parseInt(document.getElementById('radiusSelect').value); if (!isNaN(r)) this.store.setState({ radiusKm: r }); } this.modalManager.close(id); } }
+          buttonHandlers: { cancel: (m, id) => this.modalManager.close(id), save: (m, id) => { const loc = document.getElementById('locationInput').value.trim(); if (loc) this.store.setState({ locationName: loc }); if (state.activeTab === 'nearme') { const r = parseInt(document.getElementById('radiusSelect').value); if (!isNaN(r)) { this.store.setState({ radiusKm: r }); this.loadStories(); } } this.modalManager.close(id); } }
         });
-        setTimeout(() => { const btn = document.getElementById('useCurrentLocation'); if (btn) btn.onclick = async () => { const loc = await GeolocationService.getBrowserLocation(); const inp = document.getElementById('locationInput'); if (loc && inp) inp.value = loc; }; }, 100);
+        setTimeout(() => { const btn = document.getElementById('useCurrentLocation'); if (btn) btn.onclick = async () => { const loc = await GeolocationService.detectLocation(); const inp = document.getElementById('locationInput'); if (loc && inp) inp.value = loc; }; }, 100);
       }
       openFilterModal() { const state = this.store.getState(); if (state.activeTab === "nearme") this.openNearbyFilterModal(); else if (state.activeTab === "interest") this.openInterestFilterModal(); }
       openNearbyFilterModal() {
         const state = this.store.getState();
-        this.modalManager.open({
-          title: 'Filters',
-          content: '<label class="modal-label">Time period</label><div class="filter-chips" id="timeChips"></div><label class="modal-label">Story radius</label><div class="filter-chips" id="radiusChips"></div><label class="modal-label">Category</label><div class="filter-chips" id="categoryChips"></div>',
-          buttons: [{ label: 'Cancel', action: 'cancel' }, { label: 'Apply', action: 'apply', className: 'primary' }],
-          buttonHandlers: { cancel: (m, id) => this.modalManager.close(id), apply: (m, id) => this.modalManager.close(id) }
-        });
-        setTimeout(() => {
-          DATA.timeFilters.forEach(t => { const btn = document.createElement('button'); btn.className = 'filter-chip ' + (state.timeHours === t.hours ? 'active' : ''); btn.textContent = t.label; btn.onclick = () => { document.querySelectorAll('#timeChips .filter-chip').forEach(b => b.classList.remove('active')); btn.classList.add('active'); this.store.setState({ timeHours: t.hours }); }; document.getElementById('timeChips').appendChild(btn); });
-          DATA.radiusFilters.forEach(r => { const btn = document.createElement('button'); btn.className = 'filter-chip ' + (state.radiusFilter === r ? 'active' : ''); btn.textContent = r; btn.onclick = () => { document.querySelectorAll('#radiusChips .filter-chip').forEach(b => b.classList.remove('active')); btn.classList.add('active'); this.store.setState({ radiusFilter: r }); }; document.getElementById('radiusChips').appendChild(btn); });
-          DATA.categories.forEach(c => { const btn = document.createElement('button'); btn.className = 'filter-chip ' + (state.selectedCategory === c ? 'active' : ''); btn.textContent = c; btn.onclick = () => { document.querySelectorAll('#categoryChips .filter-chip').forEach(b => b.classList.remove('active')); btn.classList.add('active'); this.store.setState({ selectedCategory: c }); }; document.getElementById('categoryChips').appendChild(btn); });
-        }, 100);
+        this.modalManager.open({ title: 'Filters', content: '<label class="modal-label">Time period</label><div class="filter-chips" id="timeChips"></div><label class="modal-label">Story radius</label><div class="filter-chips" id="radiusChips"></div><label class="modal-label">Category</label><div class="filter-chips" id="categoryChips"></div>', buttons: [{ label: 'Cancel', action: 'cancel' }, { label: 'Apply', action: 'apply', className: 'primary' }], buttonHandlers: { cancel: (m, id) => this.modalManager.close(id), apply: (m, id) => this.modalManager.close(id) } });
+        setTimeout(() => { ['24h', '3d', '7d', '30d'].forEach((label, idx) => { const hours = [24, 72, 168, 720][idx]; const btn = document.createElement('button'); btn.className = 'filter-chip ' + (state.timeHours === hours ? 'active' : ''); btn.textContent = label; btn.onclick = () => this.store.setState({ timeHours: hours }); document.getElementById('timeChips').appendChild(btn); }); ['Both', 'Nearby only', 'Broader only'].forEach(r => { const btn = document.createElement('button'); btn.className = 'filter-chip ' + (state.radiusFilter === r ? 'active' : ''); btn.textContent = r; btn.onclick = () => this.store.setState({ radiusFilter: r }); document.getElementById('radiusChips').appendChild(btn); }); ['All', 'Transport', 'Property', 'Lifestyle', 'Business', 'Crime', 'Sports'].forEach(c => { const btn = document.createElement('button'); btn.className = 'filter-chip ' + (state.selectedCategory === c ? 'active' : ''); btn.textContent = c; btn.onclick = () => this.store.setState({ selectedCategory: c }); document.getElementById('categoryChips').appendChild(btn); }); }, 100);
       }
       openInterestFilterModal() {
         const state = this.store.getState();
-        this.modalManager.open({
-          title: 'Filter by Interest',
-          content: '<label class="modal-label">Time period</label><div class="filter-chips" id="timeChips"></div><label class="modal-label">Search interests</label><input type="text" id="interestSearchModal" class="modal-input" placeholder="Search interests..."><div id="interestListModal" style="max-height:250px;overflow-y:auto;border:1px solid var(--color-border);border-radius:var(--radius-sm);margin-top:8px;"></div>',
-          buttons: [{ label: 'Cancel', action: 'cancel' }, { label: 'Apply', action: 'apply', className: 'primary' }],
-          buttonHandlers: { cancel: (m, id) => this.modalManager.close(id), apply: (m, id) => this.modalManager.close(id) }
-        });
-        setTimeout(() => {
-          DATA.timeFilters.forEach(t => { const btn = document.createElement('button'); btn.className = 'filter-chip ' + (state.timeHours === t.hours ? 'active' : ''); btn.textContent = t.label; btn.onclick = () => { document.querySelectorAll('#timeChips .filter-chip').forEach(b => b.classList.remove('active')); btn.classList.add('active'); this.store.setState({ timeHours: t.hours }); }; document.getElementById('timeChips').appendChild(btn); });
-          const renderList = (term = '') => {
-            const lc = document.getElementById('interestListModal');
-            lc.innerHTML = DATA.interests.filter(i => !term || i.toLowerCase().includes(term.toLowerCase())).map(i => '<div style="padding:12px;cursor:pointer;border-bottom:1px solid var(--color-border-light);' + (state.selectedInterest === i ? 'background:var(--color-accent-light);' : '') + '">' + Utils.escapeHtml(i) + '</div>').join('');
-            lc.querySelectorAll('div[style]').forEach(o => o.addEventListener('click', () => { lc.querySelectorAll('div[style]').forEach(x => x.style.background = ''); o.style.background = 'var(--color-accent-light)'; this.store.setState({ selectedInterest: o.textContent.trim(); }); }));
-          };
-          document.getElementById('interestSearchModal').addEventListener('input', e => renderList(e.target.value));
-          renderList('');
-        }, 100);
+        this.modalManager.open({ title: 'Filter by Interest', content: '<label class="modal-label">Time period</label><div class="filter-chips" id="timeChips"></div><label class="modal-label">Search interests</label><input type="text" id="interestSearchModal" class="modal-input" placeholder="Search interests..."><div id="interestListModal" style="max-height:250px;overflow-y:auto;border:1px solid var(--color-border);border-radius:var(--radius-sm);margin-top:8px;"></div>', buttons: [{ label: 'Cancel', action: 'cancel' }, { label: 'Apply', action: 'apply', className: 'primary' }], buttonHandlers: { cancel: (m, id) => this.modalManager.close(id), apply: (m, id) => this.modalManager.close(id) } });
+        setTimeout(() => { ['24h', '3d', '7d', '30d'].forEach((label, idx) => { const hours = [24, 72, 168, 720][idx]; const btn = document.createElement('button'); btn.className = 'filter-chip ' + (state.timeHours === hours ? 'active' : ''); btn.textContent = label; btn.onclick = () => this.store.setState({ timeHours: hours }); document.getElementById('timeChips').appendChild(btn); }); const interests = ['All categories', 'Sports', 'Property', 'Lifestyle', 'Transport', 'Business', 'Crime']; const renderList = (term = '') => { const lc = document.getElementById('interestListModal'); lc.innerHTML = interests.filter(i => !term || i.toLowerCase().includes(term.toLowerCase())).map(i => '<div class="interest-option" style="padding:12px;cursor:pointer;border-bottom:1px solid var(--color-border-light);' + (state.selectedInterest === i ? 'background:var(--color-accent-light);' : '') + '">' + Utils.escapeHtml(i) + '</div>').join(''); lc.querySelectorAll('.interest-option').forEach(o => o.addEventListener('click', () => this.store.setState({ selectedInterest: o.textContent.trim() }))); }; document.getElementById('interestSearchModal').addEventListener('input', e => renderList(e.target.value)); renderList(''); }, 100);
       }
       openReportModal() {
-        this.modalManager.open({
-          title: 'Report Content',
-          content: '<label class="modal-label">Select news to report</label><select id="reportStorySelect" class="modal-select">' + DATA.stories.map(s => '<option value="' + s.id + '">' + Utils.escapeHtml(s.title) + '</option>').join('') + '</select><label class="modal-label">Reason</label><select id="reportReason" class="modal-select"><option value="Misinformation">Misinformation / Fake news</option><option value="Spam">Spam or promotional content</option><option value="Inappropriate">Inappropriate content</option><option value="Harassment">Harassment</option><option value="Other">Other</option></select><label class="modal-label">Additional details (optional)</label><textarea id="reportDetails" class="modal-textarea" placeholder="Please provide additional context..."></textarea>',
-          buttons: [{ label: 'Cancel', action: 'cancel' }, { label: 'Submit Report', action: 'submit', className: 'danger' }],
-          buttonHandlers: { cancel: (m, id) => this.modalManager.close(id), submit: (m, id) => { console.log('Report:', document.getElementById('reportStorySelect').value, document.getElementById('reportReason').value, document.getElementById('reportDetails').value); alert('Report submitted. Thank you.'); this.modalManager.close(id); } }
-        });
+        const stories = this.getCurrentStories();
+        this.modalManager.open({ title: 'Report Content', content: '<label class="modal-label">Select news to report</label><select id="reportStorySelect" class="modal-select">' + stories.map((s, idx) => '<option value="' + (s.id || idx) + '">' + Utils.escapeHtml(s.title) + '</option>').join('') + '</select><label class="modal-label">Reason</label><select id="reportReason" class="modal-select"><option value="inaccurate">Inaccurate</option><option value="spam">Spam or promotional content</option><option value="inappropriate">Inappropriate content</option><option value="other">Other</option></select><label class="modal-label">Additional details (optional)</label><textarea id="reportDetails" class="modal-textarea" placeholder="Please provide additional context..."></textarea>', buttons: [{ label: 'Cancel', action: 'cancel' }, { label: 'Submit Report', action: 'submit', className: 'danger' }], buttonHandlers: { cancel: (m, id) => this.modalManager.close(id), submit: (m, id) => { alert('Report submitted. Thank you.'); this.modalManager.close(id); } } });
       }
-      openLegalModal(type) { const c = DATA.legalContent[type]; if (!c) return; this.modalManager.open({ title: c.title, content: c.content, buttons: [{ label: 'Close', action: 'close', className: 'primary' }], buttonHandlers: { close: (m, id) => this.modalManager.close(id) } }); }
+      openLegalModal(type) { const c = { terms: { title: 'Terms of Use', content: "<p>By using {{ config('app.name') }}, you agree to our terms. Content is for informational purposes only.</p>" }, privacy: { title: 'Privacy Policy', content: "<p>We value your privacy. Location data is used only to show relevant content and is not shared with third parties.</p>" }, disclaimer: { title: 'Disclaimer', content: "<p>Content is aggregated from third-party sources. We do not independently verify all information.</p>" } }[type]; if (!c) return; this.modalManager.open({ title: c.title, content: c.content, buttons: [{ label: 'Close', action: 'close', className: 'primary' }], buttonHandlers: { close: (m, id) => this.modalManager.close(id) } }); }
       bindEvents() {
         this.store.subscribe(() => this.render());
         window.addEventListener('resize', () => this.render());
         document.addEventListener('click', e => { const tab = e.target.closest('[data-tab]'); if (tab) this.store.setState({ activeTab: tab.dataset.tab }); });
         let touchStart = 0;
-        const setupPullToRefresh = () => { const fc = document.getElementById('feedContainer'); if (!fc || window.innerWidth > 768) return; fc.addEventListener('touchstart', e => { if (fc.scrollTop === 0) touchStart = e.touches[0].clientY; }); fc.addEventListener('touchmove', e => { if (fc.scrollTop === 0 && touchStart) { const pull = e.touches[0].clientY - touchStart; if (pull > 0 && pull < 100) { e.preventDefault(); const ptr = document.getElementById('pullToRefresh'); if (ptr) { ptr.classList.add('visible'); ptr.style.transform = 'translateY(' + Math.min(pull * 0.5, 40) + 'px)'; } } } }); fc.addEventListener('touchend', async () => { const ptr = document.getElementById('pullToRefresh'); if (ptr && ptr.classList.contains('visible')) { ptr.textContent = 'Refreshing...'; this.store.setState({ isLoading: true }); await new Promise(r => setTimeout(r, 800)); this.store.setState({ isLoading: false }); ptr.textContent = 'Pull down to refresh'; ptr.classList.remove('visible'); ptr.style.transform = ''; } touchStart = 0; }); };
+        const setupPullToRefresh = () => { const fc = document.getElementById('feedContainer'); if (!fc || window.innerWidth > 768) return; fc.addEventListener('touchstart', e => { if (fc.scrollTop === 0) touchStart = e.touches[0].clientY; }); fc.addEventListener('touchmove', e => { if (fc.scrollTop === 0 && touchStart) { const pull = e.touches[0].clientY - touchStart; if (pull > 0 && pull < 100) { e.preventDefault(); const ptr = document.getElementById('pullToRefresh'); if (ptr) { ptr.classList.add('visible'); ptr.style.transform = 'translateY(' + Math.min(pull * 0.5, 40) + 'px)'; } } } }); fc.addEventListener('touchend', async () => { const ptr = document.getElementById('pullToRefresh'); if (ptr && ptr.classList.contains('visible')) { ptr.textContent = 'Refreshing...'; this.store.setState({ isLoading: true }); await this.loadStories(); this.store.setState({ isLoading: false }); ptr.textContent = 'Pull down to refresh'; ptr.classList.remove('visible'); ptr.style.transform = ''; } touchStart = 0; }); };
         setTimeout(setupPullToRefresh, 100);
-        let lastScroll = 0;
-        window.addEventListener('scroll', () => { if (window.innerWidth > 768) return; const bn = document.getElementById('bottomNav'); if (bn) bn.style.transform = window.scrollY > lastScroll && window.scrollY > 80 ? 'translateY(100%)' : 'translateY(0)'; lastScroll = window.scrollY; });
       }
     }
-
     window.app = new App();
   </script>
 </body>

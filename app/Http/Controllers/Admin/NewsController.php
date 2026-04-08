@@ -49,6 +49,7 @@ class NewsController extends Controller
     {
         $item = NewsItem::findOrFail($id);
         $data = $request->validated();
+        $data['status'] = $data['status'] ?? $item->status ?? 'pending_extraction';
         $item->update($data);
         return response()->json($item);
     }
