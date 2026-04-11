@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
             ApiAnalyticsMiddleware::class,
             LogApiTiming::class,
         ]);
+        $middleware->trustProxies('*');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

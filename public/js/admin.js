@@ -29,7 +29,7 @@ const fmt = d => { const x = new Date(d); return isNaN(x) ? "" : `${x.getMonth()
 const parseUiDateTime = v => { const d = new Date(v); return isNaN(d) ? new Date() : d; };
 
 async function api(method, url, body = null) {
-    const opts = { method, headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken } };
+    const opts = { method, headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken }, credentials: 'include' };
     if (body) opts.body = JSON.stringify(body);
     const r = await fetch(url, opts);
     if (!r.ok) {
