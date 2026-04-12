@@ -159,11 +159,21 @@ class EnrichWithAi extends Command
                     'relevance_mode'     => $validation['relevance_mode'],
                     'is_article'         => $validation['is_article'] ?? true,
                     'main_place_text'    => $validation['place'],
+                    'lat'                => $validation['lat'],
+                    'lng'                => $validation['lng'],
                     'tokens_in'          => $response['usage']['prompt_tokens'] ?? null,
                     'tokens_out'         => $response['usage']['completion_tokens'] ?? null,
                     'estimated_cost'      => $this->estimateCost($response),
                     'processed_at'       => now(),
                 ]);
+
+                // Update NewsItem with coordinates if available
+                if ($validation['lat'] !== null && $validation['lng'] !== null) {
+                    $item->update([
+                        'lat' => $validation['lat'],
+                        'lng' => $validation['lng'],
+                    ]);
+                }
 
                 $this->info("  OK {$item->id} | mode={$validation['relevance_mode']} | cat={$validation['category']}");
                 Log::info('AI enrichment success', [
@@ -204,7 +214,7 @@ class EnrichWithAi extends Command
     /**
      * Validate and normalise AI output.
      * Returns ['valid' => bool, 'summary' => string, 'category' => string,
-     *          'place' => string|null, 'relevance_mode' => string, 'is_article' => bool, 'errors' => string[]]
+     *          'place' => string|null, 'relevance_mode' => string, 'is_article' => bool, 'lat' => float|null, 'lng' => float|null, 'errors' => string[]]
      */
     private function validateAiOutput(array $parsed, string $rawOutput): array
     {
@@ -239,6 +249,22 @@ class EnrichWithAi extends Command
 
         // 4b. is_article — coerce to boolean (default true for backward compat)
         $isArticle = isset($parsed['is_article']) ? (bool) $parsed['is_article'] : true;
+
+        // 4c. lat/lng — validate coordinates if present
+        $lat = isset($parsed['lat']) && is_numeric($parsed['lat']) ? (float) $parsed['lat'] : null;
+        $lng = isset($parsed['lng']) && is_numeric($parsed['lng']) ? (float) $parsed['lng'] : null;
+        // Validate coordinate ranges
+        if ($lat !== null && ($lat < -90 || $lat > 90)) {
+            $lat = null;
+        }
+        if ($lng !== null && ($lng < -180 || $lng > 180)) {
+            $lng = null;
+        }
+        // If either coord is missing/invalid, clear both
+        if ($lat === null || $lng === null) {
+            $lat = null;
+            $lng = null;
+        }
         $relevanceMap = [
             'local'   => 'location_and_category',
             'national'=> 'category_only',
@@ -265,6 +291,8 @@ class EnrichWithAi extends Command
             'place'         => $place,
             'relevance_mode'=> $relevanceMode,
             'is_article'    => $isArticle,
+            'lat'           => $lat,
+            'lng'           => $lng,
             'errors'        => $errors,
         ];
     }
@@ -319,6 +347,8 @@ Return this exact shape:
   "summary": "2-3 sentence summary of the article (10-300 chars, omit if not an article)",
   "category": "one of: Property & Real Estate, Food & Lifestyle, Infrastructure, Transport & Mobility, Crime & Safety, Environment, Education, Health, Travel, Entertainment / Arts & Culture, Charity & Nonprofits, Weather, Defense & Military, Markets & Finance, Business & Corporate, Technology & Digital, Automotive, Government & Policy, Science, Sports, Religion, other (omit if not an article)",
   "place": "main specific location (city or state in Malaysia preferred, or null if not location-specific or not an article)",
+  "lat": "latitude of the place (number, e.g. 3.139, omit/null if not location-specific or cannot determine)",
+  "lng": "longitude of the place (number, e.g. 101.687, omit/null if not location-specific or cannot determine)",
   "relevance": "location_and_category if place is a specific city/area, category_only if national/world-wide (omit if not an article)"
 }
 
@@ -373,6 +403,9 @@ PROMPT;
             'category'  => $parsed['category']  ?? null,
             'place'     => $parsed['place']     ?? null,
             'relevance' => $parsed['relevance']  ?? 'category_only',
+            'is_article'=> isset($parsed['is_article']) ? (bool) $parsed['is_article'] : true,
+            'lat'       => isset($parsed['lat']) && is_numeric($parsed['lat']) ? (float) $parsed['lat'] : null,
+            'lng'       => isset($parsed['lng']) && is_numeric($parsed['lng']) ? (float) $parsed['lng'] : null,
         ];
     }
 
