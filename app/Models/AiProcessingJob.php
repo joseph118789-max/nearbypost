@@ -29,12 +29,14 @@ class AiProcessingJob extends Model
         'validated_place',
         'validation_notes',
         'processed_at',
+        'is_article',
     ];
 
     protected $casts = [
         'tokens_in'  => 'integer',
         'tokens_out' => 'integer',
         'estimated_cost' => 'decimal:6',
+        'is_article' => 'boolean',
     ];
 
     // ── Controlled enums ────────────────────────────────────────────────────

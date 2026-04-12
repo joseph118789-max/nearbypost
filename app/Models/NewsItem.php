@@ -29,6 +29,7 @@ class NewsItem extends Model
         "ai_category",
         "main_place_text",
         "relevance_mode",
+        "is_article",
         "ai_status",
         "ai_processed_at",
         "ai_model",
@@ -53,6 +54,7 @@ class NewsItem extends Model
         "lat" => "float",
         "lng" => "float",
         "is_active" => "boolean",
+        "is_article" => "boolean",
     ];
 
     protected static function booted(): void

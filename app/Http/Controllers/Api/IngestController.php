@@ -139,26 +139,6 @@ class IngestController extends Controller
         return false;
     }
 
-    private function looksLikeArticleUrl(string $url): bool
-    {
-        if ($url === '') {
-            return false;
-        }
-
-        // If URL has a clear article pattern, bypass blocked-URL checks.
-        // This prevents /category/[section]/[year]/article-slug URLs from being
-        // rejected just because /category/ is in BLOCKED_URL_PARTS.
-        if (preg_match('#/(20\d{2}|\d{4}/\d{2}/\d{2})/#', $url)
-            || str_contains($url, '/news/')
-            || str_contains($url, '/business/')
-            || str_contains($url, '/markets/')
-            || str_contains($url, '/nation/')
-            || preg_match('#-[a-z0-9-]{8,}$#', $url)) {
-            return true;
-        }
-
-        return !$this->isBlockedUrl($url);
-    }
 
     private function policyDecision(array $data): array
     {
@@ -192,9 +172,6 @@ class IngestController extends Controller
         }
 
 
-        if (!$this->looksLikeArticleUrl($url)) {
-            return [false, 'not_article_page'];
-        }
 
         if ($mode === 'google_discovery' && ($domain === '' || $domain === 'news.google.com')) {
             return [false, 'google_not_resolved_to_final_article'];

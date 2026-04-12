@@ -138,6 +138,7 @@ class EnrichWithAi extends Command
                     'validated_category' => $validation['category'],
                     'validated_place'    => $validation['place'],
                     'relevance_mode'     => $validation['relevance_mode'],
+                    'is_article'         => $validation['is_article'] ?? true,
                     'main_place_text'    => $validation['place'],
                     'tokens_in'          => $response['usage']['prompt_tokens'] ?? null,
                     'tokens_out'         => $response['usage']['completion_tokens'] ?? null,
@@ -184,7 +185,7 @@ class EnrichWithAi extends Command
     /**
      * Validate and normalise AI output.
      * Returns ['valid' => bool, 'summary' => string, 'category' => string,
-     *          'place' => string|null, 'relevance_mode' => string, 'errors' => string[]]
+     *          'place' => string|null, 'relevance_mode' => string, 'is_article' => bool, 'errors' => string[]]
      */
     private function validateAiOutput(array $parsed, string $rawOutput): array
     {
@@ -216,6 +217,9 @@ class EnrichWithAi extends Command
 
         // 4. relevance_mode — coerce to controlled set
         $rawRelevance = strtolower(trim($parsed['relevance'] ?? ''));
+
+        // 4b. is_article — coerce to boolean (default true for backward compat)
+        $isArticle = isset($parsed['is_article']) ? (bool) $parsed['is_article'] : true;
         $relevanceMap = [
             'local'   => 'location_and_category',
             'national'=> 'category_only',
@@ -241,6 +245,7 @@ class EnrichWithAi extends Command
             'category'      => $category,
             'place'         => $place,
             'relevance_mode'=> $relevanceMode,
+            'is_article'    => $isArticle,
             'errors'        => $errors,
         ];
     }
@@ -265,6 +270,7 @@ class EnrichWithAi extends Command
             'validated_place'    => null,
             'relevance_mode'     => !empty($extractedPlace) ? 'location_only' : 'category_only',
             'main_place_text'    => null,
+            'is_article'         => true,
             'raw_ai_output'      => null,
             'validation_notes'   => 'Fallback: AI unavailable, rule-based values applied',
         ]);
@@ -290,10 +296,11 @@ You are a precise news analyst. Given the article below, respond with ONLY valid
 
 Return this exact shape:
 {
-  "summary": "2-3 sentence summary of the article (10-300 chars)",
-  "category": "one of: technology, politics, business, sports, entertainment, health, science, world, local, other",
-  "place": "main specific location (city or state in Malaysia preferred, or null if not location-specific)",
-  "relevance": "location_and_category if place is a specific city/area, category_only if national/world-wide"
+  "is_article": true or false - is this content a genuine news article (true) or just a navigation page, tag page, category listing, or non-content page (false),
+  "summary": "2-3 sentence summary of the article (10-300 chars, omit if not an article)",
+  "category": "one of: technology, politics, business, sports, entertainment, health, science, world, local, other (omit if not an article)",
+  "place": "main specific location (city or state in Malaysia preferred, or null if not location-specific or not an article)",
+  "relevance": "location_and_category if place is a specific city/area, category_only if national/world-wide (omit if not an article)"
 }
 
 Article title: {$safeTitle}
