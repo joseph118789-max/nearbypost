@@ -293,7 +293,7 @@
     },
     {
       "parameters": {
-        "url": "http://172.18.0.1:8000/api/internal/ingest/batch",
+        "url": "https://ingest.nearbypost.com/api/internal/ingest/batch",
         "method": "POST",
         "sendHeaders": true,
         "headerParameters": {

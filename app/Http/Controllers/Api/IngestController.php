@@ -141,16 +141,23 @@ class IngestController extends Controller
 
     private function looksLikeArticleUrl(string $url): bool
     {
-        if ($url === '' || $this->isBlockedUrl($url)) {
+        if ($url === '') {
             return false;
         }
 
-        return (bool) preg_match('#/(20\d{2}|\d{4}/\d{2}/\d{2})/#', $url)
+        // If URL has a clear article pattern, bypass blocked-URL checks.
+        // This prevents /category/[section]/[year]/article-slug URLs from being
+        // rejected just because /category/ is in BLOCKED_URL_PARTS.
+        if (preg_match('#/(20\d{2}|\d{4}/\d{2}/\d{2})/#', $url)
             || str_contains($url, '/news/')
             || str_contains($url, '/business/')
             || str_contains($url, '/markets/')
             || str_contains($url, '/nation/')
-            || (bool) preg_match('#-[a-z0-9-]{8,}$#', $url);
+            || preg_match('#-[a-z0-9-]{8,}$#', $url)) {
+            return true;
+        }
+
+        return !$this->isBlockedUrl($url);
     }
 
     private function policyDecision(array $data): array
@@ -184,9 +191,6 @@ class IngestController extends Controller
             return [false, 'not_malaysia_relevant'];
         }
 
-        if ($this->isBlockedUrl($url)) {
-            return [false, 'blocked_url_pattern'];
-        }
 
         if (!$this->looksLikeArticleUrl($url)) {
             return [false, 'not_article_page'];
