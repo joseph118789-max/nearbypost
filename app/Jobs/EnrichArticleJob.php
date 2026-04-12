@@ -16,29 +16,41 @@ class EnrichArticleJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 3;
-    public int $backoff = 120; // 2 minutes initial backoff
+    public int $backoff = 120;
     public int $timeout = 180;
 
     private const PROMPT_VERSION = 'v1';
+    private const VALID_CATEGORIES = [
+        'Property & Real Estate',
+        'Food & Lifestyle',
+        'Infrastructure',
+        'Transport & Mobility',
+        'Crime & Safety',
+        'Environment',
+        'Education',
+        'Health',
+        'Travel',
+        'Entertainment / Arts & Culture',
+        'Charity & Nonprofits',
+        'Weather',
+        'Defense & Military',
+        'Markets & Finance',
+        'Business & Corporate',
+        'Technology & Digital',
+        'Automotive',
+        'Government & Policy',
+        'Science',
+        'Sports',
+        'Religion',
+        'other',
+    ];
 
-    /**
-     * Execute the job.
-     */
     public function handle(): void
     {
         $newsItem = NewsItem::find($this->newsItemId);
-        
+
         if (!$newsItem) {
             Log::warning('EnrichArticleJob: News item not found', ['id' => $this->newsItemId]);
-            return;
-        }
-
-        // Check idempotency - skip if already processed with same version
-        if ($newsItem->ai_status === 'success' && $newsItem->ai_prompt_version === self::PROMPT_VERSION) {
-            Log::info('EnrichArticleJob: Skipping - already processed', [
-                'id' => $this->newsItemId,
-                'prompt_version' => $newsItem->ai_prompt_version,
-            ]);
             return;
         }
 
@@ -47,11 +59,9 @@ class EnrichArticleJob implements ShouldQueue
             'url' => $newsItem->url,
         ]);
 
-        // Update status to processing
         $newsItem->update(['ai_status' => 'processing']);
 
         try {
-            // Prepare input from extracted layer
             $input = [
                 'title' => $newsItem->extracted_title ?? $newsItem->title,
                 'source' => $newsItem->source,
@@ -61,32 +71,61 @@ class EnrichArticleJob implements ShouldQueue
                 'text' => $newsItem->extracted_text,
             ];
 
-            // Call AI API
             $result = $this->callAiApi($input);
 
-            // Calculate token and cost estimates
             $tokensIn = $this->estimateTokens(json_encode($input));
             $tokensOut = $this->estimateTokens(json_encode($result));
             $estimatedCost = $this->calculateCost($tokensIn, $tokensOut);
 
-            // Update news item with AI results
-            $newsItem->update([
+            // Validate and normalize AI response
+            $isArticle = isset($result['is_article']) ? (bool) $result['is_article'] : true;
+            $category = in_array($result['category'] ?? '', self::VALID_CATEGORIES) ? $result['category'] : 'other';
+            $lat = isset($result['lat']) && is_numeric($result['lat']) ? (float) $result['lat'] : null;
+            $lng = isset($result['lng']) && is_numeric($result['lng']) ? (float) $result['lng'] : null;
+
+            // Validate coordinate ranges for Malaysia (roughly)
+            if ($lat !== null && ($lat < 0.8 || $lat > 7.5 || $lng < 99.5 || $lng > 119.5)) {
+                $lat = null;
+                $lng = null;
+            }
+
+            // Build update data
+            $updateData = [
                 'ai_summary' => $result['summary'] ?? null,
-                'ai_category' => $result['category'] ?? $newsItem->primary_category,
+                'ai_category' => $category,
                 'main_place_text' => $result['main_place_text'] ?? null,
                 'relevance_mode' => $result['relevance_mode'] ?? 'category_only',
+                'is_article' => $isArticle,
+                'validated_category' => $category,
+                'validated_summary' => $result['summary'] ?? null,
                 'ai_status' => 'success',
                 'ai_processed_at' => now(),
-                'ai_model' => $this->model,
+                'ai_model' => 'deepseek-chat',
                 'ai_prompt_version' => self::PROMPT_VERSION,
                 'ai_tokens_in' => $tokensIn,
                 'ai_tokens_out' => $tokensOut,
                 'ai_estimated_cost' => $estimatedCost,
-            ]);
+            ];
+
+            // Add lat/lng if valid coordinates
+            if ($lat !== null && $lng !== null) {
+                $updateData['lat'] = $lat;
+                $updateData['lng'] = $lng;
+            }
+
+            // If is_article is true, set status to active
+            if ($isArticle) {
+                $updateData['status'] = 'active';
+            }
+
+            $newsItem->update($updateData);
 
             Log::info('ai_enrichment.success', [
                 'news_item_id' => $newsItem->id,
-                'category' => $result['category'],
+                'is_article' => $isArticle,
+                'category' => $category,
+                'lat' => $lat,
+                'lng' => $lng,
                 'tokens_in' => $tokensIn,
                 'tokens_out' => $tokensOut,
                 'estimated_cost' => $estimatedCost,
@@ -101,17 +140,13 @@ class EnrichArticleJob implements ShouldQueue
         }
     }
 
-    /**
-     * Call AI API - configure actual endpoint in .env
-     */
     private function callAiApi(array $input): array
     {
-        $apiKey = config('services.openai.key');
-        $model = config('services.openai.model', 'gpt-4o-mini');
-        
+        $apiKey = config('services.deepseek.key');
+        $model = config('services.deepseek.model', 'deepseek-chat');
+
         if (empty($apiKey)) {
-            // Fallback: return basic enriched data without API call
-            Log::warning('EnrichArticleJob: No AI API key configured, using fallback');
+            Log::warning('EnrichArticleJob: No DeepSeek API key configured, using fallback');
             return $this->fallbackEnrichment($input);
         }
 
@@ -121,85 +156,106 @@ class EnrichArticleJob implements ShouldQueue
             $response = Http::timeout(60)->withHeaders([
                 'Authorization' => 'Bearer ' . $apiKey,
                 'Content-Type' => 'application/json',
-            ])->post('https://api.openai.com/v1/chat/completions', [
+            ])->post('https://api.deepseek.com/v1/chat/completions', [
                 'model' => $model,
                 'messages' => [
-                    ['role' => 'system', 'content' => 'You are a news analyzer. Return ONLY valid JSON.'],
+                    ['role' => 'system', 'content' => 'You are a precise news analysis API. Return ONLY valid JSON - no markdown, no explanation.'],
                     ['role' => 'user', 'content' => $prompt],
                 ],
-                'max_tokens' => 1000,
-                'temperature' => 0.3,
+                'max_tokens' => 1200,
+                'temperature' => 0.2,
             ]);
 
             if (!$response->successful()) {
-                throw new \Exception('AI API error: ' . $response->status());
+                throw new \Exception('DeepSeek API error: ' . $response->status());
             }
 
-            $result = json_decode($response['choices'][0]['message']['content'], true);
+            $raw = $response['choices'][0]['message']['content'];
+            $raw = preg_replace('/^```json\s*/', '', $raw);
+            $raw = preg_replace('/\s*```$/s', '', $raw);
+            $result = json_decode(trim($raw), true);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                Log::warning('JSON decode failed, using fallback', ['raw' => substr($raw, 0, 200)]);
+                return $this->fallbackEnrichment($input);
+            }
+
             return $result ?? $this->fallbackEnrichment($input);
-            
+
         } catch (\Exception $e) {
-            Log::warning('AI API call failed, using fallback', ['error' => $e->getMessage()]);
+            Log::warning('DeepSeek API call failed, using fallback', ['error' => $e->getMessage()]);
             return $this->fallbackEnrichment($input);
         }
     }
 
-    /**
-     * Fallback enrichment without AI API
-     */
     private function fallbackEnrichment(array $input): array
     {
         return [
+            'is_article' => true,
+            'is_malaysia_relevant' => true,
             'summary' => substr($input['summary'] ?? $input['title'] ?? '', 0, 200),
-            'category' => $input['category'] ?? 'others',
+            'category' => $input['category'] ?? 'other',
             'main_place_text' => null,
+            'gps' => 'NO',
+            'lat' => null,
+            'lng' => null,
             'relevance_mode' => 'category_only',
         ];
     }
 
-    /**
-     * Build prompt for AI
-     */
     private function buildPrompt(array $input): string
     {
         return <<<PROMPT
-Analyze this news article and provide:
-1. A 2-3 sentence summary
-2. Primary category (property, transport, crime, sports, business, government, education, health, lifestyle, community, environment, technology, entertainment, jobs, others)
-3. Main place/location mentioned (if any)
-4. Relevance mode: location_only, category_only, or hybrid
+You are a precise Malaysian news analysis API. Analyze this news article and return ONLY valid JSON.
 
-Article:
+CONTENT VALIDATION:
+- is_article: Is this genuine news content (true) or a navigation page, tag page, category listing, author page, or non-content page (false)?
+- Only mark as true if it's a real article with substantive content.
+
+MALAYSIA RELEVANCE:
+- is_malaysia_relevant: Is this content about Malaysia or relevant to Malaysian readers?
+
+CATEGORY MAPPING (pick closest from this list):
+Property & Real Estate, Food & Lifestyle, Infrastructure, Transport & Mobility, Crime & Safety, Environment, Education, Health, Travel, Entertainment / Arts & Culture, Charity & Nonprofits, Weather, Defense & Military, Markets & Finance, Business & Corporate, Technology & Digital, Automotive, Government & Policy, Science, Sports, Religion, other
+
+LOCATION EXTRACTION:
+- If the article mentions specific Malaysian places (cities, towns, neighborhoods), extract main_place_text and GPS coordinates.
+- gps: Set to "YES" if the article mentions a specific Malaysian location with identifiable GPS coordinates. "NO" if it's purely national in scope or no specific location.
+- lat/lng: Return decimal coordinates (e.g., lat=3.1390, lng=101.6869 for Kuala Lumpur) if gps="YES". Use null if gps="NO" or no specific location.
+
+SUMMARY: A concise 2-3 sentence summary of the key news points.
+
+RELEVANCE_MODE:
+- location_only: Article is about a specific Malaysian location
+- category_only: Article is about Malaysia but no specific location mentioned
+- hybrid: Both specific location and broader Malaysian relevance
+
+Article to analyze:
 Title: {$input['title']}
 Source: {$input['source']}
+Published: {$input['published_at']}
 Category: {$input['category']}
-Summary: {$input['summary']}
+Existing Summary: {$input['summary']}
+Content: {$input['text']}
 
-Respond as JSON only: {"summary":"...","category":"...","main_place_text":"...","relevance_mode":"..."}
+Return EXACTLY this JSON structure (no markdown, no explanation):
+{"is_article":true/false,"is_malaysia_relevant":true/false,"category":"Category Name","summary":"2-3 sentence summary","main_place_text":"Place Name or null","gps":"YES or NO","lat":number or null,"lng":number or null,"relevance_mode":"location_only or category_only or hybrid"}
 PROMPT;
     }
 
-    /**
-     * Estimate token count
-     */
     private function estimateTokens(string $text): int
     {
         return (int) ceil(strlen($text) / 4);
     }
 
-    /**
-     * Calculate estimated cost
-     */
     private function calculateCost(int $tokensIn, int $tokensOut): float
     {
-        $pricePer1kInput = 0.00015;
-        $pricePer1kOutput = 0.0006;
+        // DeepSeek pricing (approximate)
+        $pricePer1kInput = 0.00027;
+        $pricePer1kOutput = 0.0011;
         return round(($tokensIn * $pricePer1kInput + $tokensOut * $pricePer1kOutput) / 1000, 6);
     }
 
-    /**
-     * Handle failure
-     */
     private function handleFailure(NewsItem $newsItem, string $reason): void
     {
         $newsItem->update(['ai_status' => 'failed']);
@@ -210,8 +266,5 @@ PROMPT;
         ]);
     }
 
-    public function __construct(
-        private int $newsItemId,
-        private string $model = 'gpt-4o-mini'
-    ) {}
+    public function __construct(private int $newsItemId) {}
 }
