@@ -3,7 +3,7 @@
  * Replaces localStorage logic from admin.html with fetch() calls
  */
 
-const REQUIRED_PRIMARIES = ["property","transport","crime","sports","business","government","education","health","lifestyle","community","environment","technology","entertainment","jobs","others"];
+const REQUIRED_PRIMARIES = ["Property & Real Estate","Food & Lifestyle","Infrastructure","Transport & Mobility","Crime & Safety","Environment","Education","Health","Travel","Entertainment / Arts & Culture","Charity & Nonprofits","Weather","Defense & Military","Markets & Finance","Business & Corporate","Technology & Digital","Automotive","Government & Policy","Science","Sports","Religion"];
 
 let primaryCategories = [...REQUIRED_PRIMARIES];
 let subCategoriesMap = {};

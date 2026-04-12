@@ -4,54 +4,71 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 
 class SettingsController extends Controller
 {
     const CACHE_KEY_CATEGORIES = "admin_settings_categories";
     const CACHE_KEY_WA_GROUPS = "admin_settings_wa_groups";
 
-    const DEFAULT_CATEGORIES = [
-        "primary" => [
-            ["id" => 1, "name" => "Crime", "slug" => "crime"],
-            ["id" => 2, "name" => "Politics", "slug" => "politics"],
-            ["id" => 3, "name" => "Business", "slug" => "business"],
-            ["id" => 4, "name" => "Technology", "slug" => "technology"],
-            ["id" => 5, "name" => "Entertainment", "slug" => "entertainment"],
-            ["id" => 6, "name" => "Sports", "slug" => "sports"],
-            ["id" => 7, "name" => "Health", "slug" => "health"],
-            ["id" => 8, "name" => "Science", "slug" => "science"],
-            ["id" => 9, "name" => "Weather", "slug" => "weather"],
-            ["id" => 10, "name" => "Traffic", "slug" => "traffic"],
-        ],
-        "sub" => [
-            "crime" => [["id" => 101, "name" => "Theft", "slug" => "theft"], ["id" => 102, "name" => "Violence", "slug" => "violence"]],
-            "politics" => [["id" => 201, "name" => "Local", "slug" => "local"], ["id" => 202, "name" => "National", "slug" => "national"]],
-            "business" => [["id" => 301, "name" => "Local Business", "slug" => "local-business"]],
-            "technology" => [["id" => 401, "name" => "Gadgets", "slug" => "gadgets"]],
-        ],
-    ];
+    // Load from subcategories.json - these are the canonical categories
+    private function loadSubcategories(): array
+    {
+        $path = storage_path('app/subcategories.json');
+        if (!file_exists($path)) {
+            return ['primary_categories' => [], 'sub_categories_map' => []];
+        }
+
+        $data = json_decode(file_get_contents($path), true);
+        $primaryCategories = [];
+        $subCategoriesMap = [];
+
+        foreach ($data as $entry) {
+            $primary = $entry['primary_category'];
+            $sub = $entry['sub_category'];
+
+            if (!in_array($primary, $primaryCategories)) {
+                $primaryCategories[] = $primary;
+                $subCategoriesMap[$primary] = [];
+            }
+
+            if (!in_array($sub, $subCategoriesMap[$primary])) {
+                $subCategoriesMap[$primary][] = $sub;
+            }
+        }
+
+        sort($primaryCategories);
+        foreach ($subCategoriesMap as $k => $v) {
+            sort($subCategoriesMap[$k]);
+        }
+
+        return [
+            'primary_categories' => $primaryCategories,
+            'sub_categories_map' => $subCategoriesMap,
+        ];
+    }
+
+    public function getCategories(): JsonResponse
+    {
+        $cats = $this->loadSubcategories();
+        return response()->json(["success" => true, "data" => $cats]);
+    }
+
+    public function saveCategories(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            "primary_categories" => "required|array",
+            "sub_categories_map" => "required|array",
+        ]);
+        Cache::put(self::CACHE_KEY_CATEGORIES, $validated, now()->addDays(365));
+        return response()->json(["success" => true, "message" => "Categories saved successfully.", "data" => $validated]);
+    }
 
     const DEFAULT_WA_GROUPS = [
         ["id" => 1, "name" => "Main Broadcast", "group_id" => "main-broadcast"],
         ["id" => 2, "name" => "Breaking News", "group_id" => "breaking-news"],
         ["id" => 3, "name" => "Local Updates", "group_id" => "local-updates"],
     ];
-
-    public function getCategories(): JsonResponse
-    {
-        $categories = Cache::get(self::CACHE_KEY_CATEGORIES, self::DEFAULT_CATEGORIES);
-        return response()->json(["success" => true, "data" => $categories]);
-    }
-
-    public function saveCategories(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            "primary" => "required|array",
-            "sub" => "required|array",
-        ]);
-        Cache::put(self::CACHE_KEY_CATEGORIES, $validated, now()->addDays(365));
-        return response()->json(["success" => true, "message" => "Categories saved successfully.", "data" => $validated]);
-    }
 
     public function getWAGroups(): JsonResponse
     {
