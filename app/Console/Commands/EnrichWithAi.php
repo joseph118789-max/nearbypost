@@ -25,10 +25,29 @@ class EnrichWithAi extends Command
     // ── Controlled enums ────────────────────────────────────────────────────
     private const RELEVANCE_MODES = ['category_only', 'location_only', 'location_and_category'];
     private const VALID_CATEGORIES = [
-        'technology','politics','business','sports','entertainment',
-        'health','science','world','local','other',
+        'Property & Real Estate',
+        'Food & Lifestyle',
+        'Infrastructure',
+        'Transport & Mobility',
+        'Crime & Safety',
+        'Environment',
+        'Education',
+        'Health',
+        'Travel',
+        'Entertainment / Arts & Culture',
+        'Charity & Nonprofits',
+        'Weather',
+        'Defense & Military',
+        'Markets & Finance',
+        'Business & Corporate',
+        'Technology & Digital',
+        'Automotive',
+        'Government & Policy',
+        'Science',
+        'Sports',
+        'Religion',
+        'other',
     ];
-
     // ── Validation thresholds ───────────────────────────────────────────────
     private const MIN_SUMMARY_LEN  = 10;
     private const MAX_SUMMARY_LEN  = 1000;
@@ -298,7 +317,7 @@ Return this exact shape:
 {
   "is_article": true or false - is this content a genuine news article (true) or just a navigation page, tag page, category listing, or non-content page (false),
   "summary": "2-3 sentence summary of the article (10-300 chars, omit if not an article)",
-  "category": "one of: technology, politics, business, sports, entertainment, health, science, world, local, other (omit if not an article)",
+  "category": "one of: Property & Real Estate, Food & Lifestyle, Infrastructure, Transport & Mobility, Crime & Safety, Environment, Education, Health, Travel, Entertainment / Arts & Culture, Charity & Nonprofits, Weather, Defense & Military, Markets & Finance, Business & Corporate, Technology & Digital, Automotive, Government & Policy, Science, Sports, Religion, other (omit if not an article)",
   "place": "main specific location (city or state in Malaysia preferred, or null if not location-specific or not an article)",
   "relevance": "location_and_category if place is a specific city/area, category_only if national/world-wide (omit if not an article)"
 }
