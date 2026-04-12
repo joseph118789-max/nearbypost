@@ -1,0 +1,389 @@
+{
+  "name": "NearByPost News Ingestion",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 1,
+              "triggerAtMinute": 0,
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Cron Trigger",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://feeds.bbci.co.uk/news/world/rss.xml",
+        "options": {}
+      },
+      "id": "bbc-rss",
+      "name": "BBC World RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        320,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.reutersagency.com/feed/?best-topics=tech&post_type=best",
+        "options": {}
+      },
+      "id": "reuters-rss",
+      "name": "Reuters Tech RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        320,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://feeds.arstechnica.com/arstechnica/technology-lab",
+        "options": {}
+      },
+      "id": "arstechnica-rss",
+      "name": "Ars Technica RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        320,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
+        "options": {}
+      },
+      "id": "nyt-tech-rss",
+      "name": "NYT Tech RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        320,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Tag BBC items with source\nreturn items.map(item => ({\n  json: { ...item.json, _source: 'BBC World' }\n}));"
+      },
+      "id": "tag-bbc",
+      "name": "Tag BBC",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        540,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Tag Reuters items with source\nreturn items.map(item => ({\n  json: { ...item.json, _source: 'Reuters Tech' }\n}));"
+      },
+      "id": "tag-reuters",
+      "name": "Tag Reuters",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        540,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Tag Ars Technica items with source\nreturn items.map(item => ({\n  json: { ...item.json, _source: 'Ars Technica' }\n}));"
+      },
+      "id": "tag-arstechnica",
+      "name": "Tag Ars Technica",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        540,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Tag NYT items with source\nreturn items.map(item => ({\n  json: { ...item.json, _source: 'NYT Tech' }\n}));"
+      },
+      "id": "tag-nyt",
+      "name": "Tag NYT",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        540,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Normalize all RSS items from all 4 sources\n// Output ALL items as a flat array for batch ingestion\nconst out = [];\nfor (let i = 0; i < items.length; i++) {\n  const item = items[i];\n  const src = item.json._source || 'unknown';\n  const text = ((item.json.title || '') + ' ' + (item.json.summary || '')).toLowerCase();\n  let primary_category = 'others';\n  let secondary_category = 'general';\n\n  if (/ai|artificial intelligence|chatgpt|machine learning/.test(text)) {\n    primary_category = 'technology';\n    secondary_category = /chatgpt|ai|artificial intelligence/.test(text) ? 'ai' : 'general';\n  } else if (/sport\\b|football|basketball|tennis/.test(text)) {\n    primary_category = 'sports';\n    if (/football/.test(text)) secondary_category = 'football';\n    else if (/basketball/.test(text)) secondary_category = 'basketball';\n    else if (/tennis/.test(text)) secondary_category = 'tennis';\n  } else if (/politics|election|government/.test(text)) {\n    primary_category = 'government';\n    secondary_category = /election/.test(text) ? 'elections' : 'general';\n  } else if (/business|economy|market/.test(text)) {\n    primary_category = 'business';\n    secondary_category = /market/.test(text) ? 'markets' : 'general';\n  } else if (/science|research/.test(text)) {\n    primary_category = 'technology';\n    secondary_category = 'research';\n  } else if (/health|medical|virus/.test(text)) {\n    primary_category = 'health';\n    secondary_category = /virus/.test(text) ? 'public-health' : 'general';\n  }\n\n  out.push({\n    json: {\n      title: item.json.title || 'Untitled',\n      url: item.json.url || item.json.link || '',\n      source: src,\n      source_label: src,\n      source_name: src,\n      source_domain: /google/i.test(src) ? 'news.google.com' : /bbc/i.test(src) ? 'bbc.co.uk' : /reuters/i.test(src) ? 'reuters.com' : /ars/i.test(src) ? 'arstechnica.com' : /nyt/i.test(src) ? 'nytimes.com' : 'unknown',\n      published_at: item.json.pubDate || item.json.datePublished || new Date().toISOString(),\n      summary: (item.json.summary || item.json.description || '').replace(/<[^>]*>/g, '').substring(0, 500),\n      primary_category,\n      secondary_category\n    }\n  });\n}\nreturn out;"
+      },
+      "id": "normalize-generic",
+      "name": "Normalize RSS Items",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        760,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extract likely place names from the title + summary and forward-geocode them via Nominatim\n// Respect Nominatim policy: send a proper User-Agent and wait 1 second between calls.\nconst sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));\n\nconst locationPatterns = [\n  /\\bin ([A-Z][A-Za-z]+(?:\\s+[A-Z][A-Za-z]+){0,2})\\b/,\n  /\\bfrom ([A-Z][A-Za-z]+(?:\\s+[A-Z][A-Za-z]+){0,2})\\b/,\n  /\\bin ([A-Z][A-Za-z]+,\\s*[A-Z][A-Za-z ]+)\\b/,\n  /\\b(?:London|Paris|Berlin|Tokyo|Beijing|New York|California|Texas|Florida|Washington|Ukraine|Israel|Gaza|Taiwan|India|China|Japan|France|Germany|Spain|Italy|Singapore|Malaysia|Indonesia|Australia|Canada)\\b/i,\n];\n\nfunction extractLocation(text) {\n  if (!text) return '';\n  for (const pattern of locationPatterns) {\n    const match = text.match(pattern);\n    if (match) return (match[1] || match[0]).trim().replace(/^[,;:\\s]+|[,;:\\s]+$/g, '');\n  }\n  return '';\n}\n\nconst out = [];\nfor (let i = 0; i < items.length; i++) {\n  const item = items[i].json;\n  const combined = `${item.title || ''} ${item.summary || ''}`;\n  const location = extractLocation(combined);\n  const next = { ...item };\n\n  if (location) {\n    try {\n      const qs = new URLSearchParams({ q: location, format: 'json', limit: '1' }).toString();\n      const res = await fetch(`https://nominatim.openstreetmap.org/search?${qs}`, {\n        headers: {\n          'User-Agent': 'NearbypostGeoFix/1.0 (support@nearbypost.com)',\n          'Accept': 'application/json',\n        },\n      });\n      const data = await res.json();\n      if (Array.isArray(data) && data.length > 0 && data[0].lat && data[0].lon) {\n        next.lat = Number.parseFloat(data[0].lat);\n        next.lng = Number.parseFloat(data[0].lon);\n        next.location_query = location;\n      }\n    } catch (error) {\n      next.geocode_error = error.message;\n    }\n    await sleep(1000);\n  }\n\n  out.push({ json: next });\n}\nreturn out;"
+      },
+      "id": "geocode-locations",
+      "name": "Geocode Locations",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Collect ALL items into a batch for a single HTTP request\n// Output a single item containing the entire array\nconst allItems = items.map(item => item.json);\nreturn [{ json: { items: allItems } }];"
+      },
+      "id": "batch-collect",
+      "name": "Batch Collect",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        980,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://172.18.0.1:8000/api/internal/ingest/batch",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "items",
+              "value": "={{ $json.items }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "laravel-webhook",
+      "name": "Ingest to Laravel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Log batch ingestion results\nconst result = items[0]?.json;\nconsole.log('Batch ingestion result:', JSON.stringify(result, null, 2));\nreturn items;"
+      },
+      "id": "log-results",
+      "name": "Log Results",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1400,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Cron Trigger": {
+      "main": [
+        [
+          {
+            "node": "BBC World RSS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Reuters Tech RSS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Ars Technica RSS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "NYT Tech RSS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BBC World RSS": {
+      "main": [
+        [
+          {
+            "node": "Tag BBC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reuters Tech RSS": {
+      "main": [
+        [
+          {
+            "node": "Tag Reuters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ars Technica RSS": {
+      "main": [
+        [
+          {
+            "node": "Tag Ars Technica",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NYT Tech RSS": {
+      "main": [
+        [
+          {
+            "node": "Tag NYT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag BBC": {
+      "main": [
+        [
+          {
+            "node": "Normalize RSS Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Reuters": {
+      "main": [
+        [
+          {
+            "node": "Normalize RSS Items",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Tag Ars Technica": {
+      "main": [
+        [
+          {
+            "node": "Normalize RSS Items",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Tag NYT": {
+      "main": [
+        [
+          {
+            "node": "Normalize RSS Items",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Normalize RSS Items": {
+      "main": [
+        [
+          {
+            "node": "Geocode Locations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Geocode Locations": {
+      "main": [
+        [
+          {
+            "node": "Batch Collect",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batch Collect": {
+      "main": [
+        [
+          {
+            "node": "Ingest to Laravel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ingest to Laravel": {
+      "main": [
+        [
+          {
+            "node": "Log Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2026-04-04T13:15:00.000Z",
+  "versionId": "5"
+}

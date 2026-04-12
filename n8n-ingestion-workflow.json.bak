@@ -1,0 +1,287 @@
+{
+  "name": "NearByPost News Ingestion",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 1,
+              "triggerAtMinute": 0,
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Cron Trigger",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://feeds.bbci.co.uk/news/world/rss.xml",
+        "options": {}
+      },
+      "id": "bbc-rss",
+      "name": "BBC World RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [320, 100]
+    },
+    {
+      "parameters": {
+        "url": "https://www.reutersagency.com/feed/?best-topics=tech&post_type=best",
+        "options": {}
+      },
+      "id": "reuters-rss",
+      "name": "Reuters Tech RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [320, 220]
+    },
+    {
+      "parameters": {
+        "url": "https://feeds.arstechnica.com/arstechnica/technology-lab",
+        "options": {}
+      },
+      "id": "arstechnica-rss",
+      "name": "Ars Technica RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [320, 340]
+    },
+    {
+      "parameters": {
+        "url": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
+        "options": {}
+      },
+      "id": "nyt-tech-rss",
+      "name": "NYT Tech RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [320, 460]
+    },
+    {
+      "parameters": {
+        "url": "https://www.thestar.com.my/rss/News/Nation",
+        "options": {}
+      },
+      "id": "star-malaysia-rss",
+      "name": "The Star Malaysia RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [320, 580]
+    },
+    {
+      "parameters": {
+        "url": "https://www.nst.com.my/rss",
+        "options": {}
+      },
+      "id": "nst-rss",
+      "name": "NST Malaysia RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [320, 700]
+    },
+    {
+      "parameters": {
+        "url": "https://www.freemalaysiatoday.com/feed/",
+        "options": {}
+      },
+      "id": "fmt-rss",
+      "name": "Free Malaysia Today RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [320, 820]
+    },
+    {
+      "parameters": {
+        "url": "https://bernama.com/en/rssfeed.php",
+        "options": {}
+      },
+      "id": "bernama-rss",
+      "name": "Bernama RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [320, 940]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { ...item.json, _source: 'BBC World' } }));"
+      },
+      "id": "tag-bbc",
+      "name": "Tag BBC",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [540, 100]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { ...item.json, _source: 'Reuters Tech' } }));"
+      },
+      "id": "tag-reuters",
+      "name": "Tag Reuters",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [540, 220]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { ...item.json, _source: 'Ars Technica' } }));"
+      },
+      "id": "tag-arstechnica",
+      "name": "Tag Ars Technica",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [540, 340]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { ...item.json, _source: 'NYT Tech' } }));"
+      },
+      "id": "tag-nyt",
+      "name": "Tag NYT",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [540, 460]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { ...item.json, _source: 'The Star Malaysia' } }));"
+      },
+      "id": "tag-star",
+      "name": "Tag The Star",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [540, 580]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { ...item.json, _source: 'NST Malaysia' } }));"
+      },
+      "id": "tag-nst",
+      "name": "Tag NST",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [540, 700]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { ...item.json, _source: 'Free Malaysia Today' } }));"
+      },
+      "id": "tag-fmt",
+      "name": "Tag FMT",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [540, 820]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { ...item.json, _source: 'Bernama' } }));"
+      },
+      "id": "tag-bernama",
+      "name": "Tag Bernama",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [540, 940]
+    },
+    {
+      "parameters": {
+        "functionCode": "const out = []; for (let i = 0; i < items.length; i++) { const item = items[i]; const src = item.json._source || 'unknown'; const text = ((item.json.title || '') + ' ' + (item.json.summary || '')).toLowerCase(); let category = 'general'; if (/ai|artificial intelligence|chatgpt|machine learning/.test(text)) category = 'technology'; else if (/sport\\b|football|basketball|tennis|badminton/.test(text)) category = 'sports'; else if (/politics|election|government|parliament/.test(text)) category = 'politics'; else if (/business|economy|market|trade/.test(text)) category = 'business'; else if (/science|research/.test(text)) category = 'science'; else if (/health|medical|virus|disease/.test(text)) category = 'health'; else if (/crime|theft|fraud|murder/.test(text)) category = 'crime'; else if (/education|school|university/i.test(text)) category = 'education'; else if (/environment|climate|pollution/i.test(text)) category = 'environment'; else if (/kl |kuala lumpur|petaling jaya|penang|johor/i.test(text)) category = 'malaysia'; out.push({ json: { title: item.json.title || 'Untitled', url: item.json.url || item.json.link || '', source: src, published_at: item.json.pubDate || item.json.datePublished || new Date().toISOString(), summary: (item.json.summary || item.json.description || '').replace(/<[^>]*>/g, '').substring(0, 500), category } }); } return out;"
+      },
+      "id": "normalize-generic",
+      "name": "Normalize RSS Items",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [760, 520]
+    },
+    {
+      "parameters": {
+        "functionCode": "const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)); const locationPatterns = [/\\bin ([A-Z][A-Za-z]+(?:\\s+[A-Z][A-Za-z]+){0,2})\\b/, /\\bfrom ([A-Z][A-Za-z]+(?:\\s+[A-Z][A-Za-z]+){0,2})\\b/, /\\bin ([A-Z][A-Za-z]+,\\s*[A-Z][A-Za-z ]+)\\b/, /\\b(?:Kuala Lumpur|Petaling Jaya|Penang|Johor|Shah Alam|Ipoh|Malacca|Kota Kinabalu|Kuching|Singapore|London|Paris|Berlin|Tokyo|Beijing|New York|California|Texas|Florida|Washington|Ukraine|Israel|Gaza|Taiwan|India|China|Japan|France|Germany|Spain|Italy|Australia|Canada)\\b/i]; function extractLocation(text) { if (!text) return ''; for (const pattern of locationPatterns) { const match = text.match(pattern); if (match) return (match[1] || match[0]).trim().replace(/^[,;:\\s]+|[,;:\\s]+$/g, ''); } return ''; } const out = []; for (let i = 0; i < items.length; i++) { const item = items[i].json; const combined = item.title || '' + ' ' + item.summary || ''; const location = extractLocation(combined); const next = { ...item }; if (location) { try { const qs = new URLSearchParams({ q: location, format: 'json', limit: '1' }).toString(); const res = await fetch('https://nominatim.openstreetmap.org/search?' + qs, { headers: { 'User-Agent': 'NearbypostGeoFix/1.0 (support@nearbypost.com)', 'Accept': 'application/json' } }); const data = await res.json(); if (Array.isArray(data) && data.length > 0 && data[0].lat && data[0].lon) { next.lat = Number.parseFloat(data[0].lat); next.lng = Number.parseFloat(data[0].lon); next.location_query = location; } } catch (error) { next.geocode_error = error.message; } await sleep(1000); } out.push({ json: next }); } return out;"
+      },
+      "id": "geocode-locations",
+      "name": "Geocode Locations",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [900, 520]
+    },
+    {
+      "parameters": {
+        "functionCode": "const allItems = items.map(item => item.json); return [{ json: { items: allItems } }];"
+      },
+      "id": "batch-collect",
+      "name": "Batch Collect",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [980, 520]
+    },
+    {
+      "parameters": {
+        "url": "http://172.18.0.1:8000/api/internal/ingest/batch",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
+        "sendBody": true,
+        "bodyParameters": { "parameters": [{ "name": "items", "value": "={{ $json.items }}" }] },
+        "options": { "timeout": 60000 }
+      },
+      "id": "laravel-webhook",
+      "name": "Ingest to Laravel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1200, 520]
+    },
+    {
+      "parameters": {
+        "functionCode": "const result = items[0]?.json; console.log('Batch ingestion result:', JSON.stringify(result, null, 2)); return items;"
+      },
+      "id": "log-results",
+      "name": "Log Results",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1400, 520]
+    }
+  ],
+  "connections": {
+    "Cron Trigger": {
+      "main": [[
+        { "node": "BBC World RSS", "type": "main", "index": 0 },
+        { "node": "Reuters Tech RSS", "type": "main", "index": 0 },
+        { "node": "Ars Technica RSS", "type": "main", "index": 0 },
+        { "node": "NYT Tech RSS", "type": "main", "index": 0 },
+        { "node": "The Star Malaysia RSS", "type": "main", "index": 0 },
+        { "node": "NST Malaysia RSS", "type": "main", "index": 0 },
+        { "node": "Free Malaysia Today RSS", "type": "main", "index": 0 },
+        { "node": "Bernama RSS", "type": "main", "index": 0 }
+      ]]
+    },
+    "BBC World RSS": { "main": [[{ "node": "Tag BBC", "type": "main", "index": 0 }]] },
+    "Reuters Tech RSS": { "main": [[{ "node": "Tag Reuters", "type": "main", "index": 0 }]] },
+    "Ars Technica RSS": { "main": [[{ "node": "Tag Ars Technica", "type": "main", "index": 0 }]] },
+    "NYT Tech RSS": { "main": [[{ "node": "Tag NYT", "type": "main", "index": 0 }]] },
+    "The Star Malaysia RSS": { "main": [[{ "node": "Tag The Star", "type": "main", "index": 0 }]] },
+    "NST Malaysia RSS": { "main": [[{ "node": "Tag NST", "type": "main", "index": 0 }]] },
+    "Free Malaysia Today RSS": { "main": [[{ "node": "Tag FMT", "type": "main", "index": 0 }]] },
+    "Bernama RSS": { "main": [[{ "node": "Tag Bernama", "type": "main", "index": 0 }]] },
+    "Tag BBC": { "main": [[{ "node": "Normalize RSS Items", "type": "main", "index": 0 }]] },
+    "Tag Reuters": { "main": [[{ "node": "Normalize RSS Items", "type": "main", "index": 1 }]] },
+    "Tag Ars Technica": { "main": [[{ "node": "Normalize RSS Items", "type": "main", "index": 2 }]] },
+    "Tag NYT": { "main": [[{ "node": "Normalize RSS Items", "type": "main", "index": 3 }]] },
+    "Tag The Star": { "main": [[{ "node": "Normalize RSS Items", "type": "main", "index": 4 }]] },
+    "Tag NST": { "main": [[{ "node": "Normalize RSS Items", "type": "main", "index": 5 }]] },
+    "Tag FMT": { "main": [[{ "node": "Normalize RSS Items", "type": "main", "index": 6 }]] },
+    "Tag Bernama": { "main": [[{ "node": "Normalize RSS Items", "type": "main", "index": 7 }]] },
+    "Normalize RSS Items": { "main": [[{ "node": "Geocode Locations", "type": "main", "index": 0 }]] },
+    "Geocode Locations": { "main": [[{ "node": "Batch Collect", "type": "main", "index": 0 }]] },
+    "Batch Collect": { "main": [[{ "node": "Ingest to Laravel", "type": "main", "index": 0 }]] },
+    "Ingest to Laravel": { "main": [[{ "node": "Log Results", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2026-04-05T06:21:00.000Z",
+  "versionId": "6"
+}

@@ -1,0 +1,632 @@
+{
+  "name": "NearByPost Malaysia News Ingestion",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 0,
+              "triggerAtMinute": 0,
+              "hoursInterval": 12
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Cron Trigger",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.thestar.com.my/rss/news",
+        "options": {}
+      },
+      "id": "star-rss",
+      "name": "The Star RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        320,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.nst.com.my/rss/news",
+        "options": {}
+      },
+      "id": "nst-rss",
+      "name": "NST RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        320,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.freemalaysiatoday.com/category/nation/feed/",
+        "options": {}
+      },
+      "id": "fmt-rss",
+      "name": "FMT Nation RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        320,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.bernama.com/en/rss.php?id=news",
+        "options": {}
+      },
+      "id": "bernama-rss",
+      "name": "Bernama RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        320,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.malaymail.com/feed/rss/malaysia",
+        "options": {}
+      },
+      "id": "malaymail-rss",
+      "name": "Malay Mail Malaysia RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        320,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.thesundaily.my/rss/news/national",
+        "options": {}
+      },
+      "id": "thesun-rss",
+      "name": "The Sun Daily National RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        320,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://news.google.com/rss/search?q=Malaysia&hl=en-MY&gl=MY&ceid=MY:en",
+        "options": {}
+      },
+      "id": "google-malaysia-rss",
+      "name": "Google News Malaysia RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        320,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://news.google.com/rss/search?q=site:reuters.com+Malaysia+OR+site:bbc.com+Malaysia+OR+site:cnn.com+Malaysia+OR+site:bloomberg.com+Malaysia+OR+site:straitstimes.com+Malaysia+OR+site:scmp.com+Malaysia+OR+site:channelnewsasia.com+Malaysia&hl=en-MY&gl=MY&ceid=MY:en",
+        "options": {}
+      },
+      "id": "google-foreign-discovery-rss",
+      "name": "Google News Foreign Discovery RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        320,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.bursamalaysia.com/market_information/announcements/company_announcement/rss",
+        "options": {}
+      },
+      "id": "bursa-rss",
+      "name": "Bursa Announcements RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        320,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { ...item.json, source_mode: 'direct_seed', source_label: 'The Star', source_name: 'The Star', source_domain: 'thestar.com.my' } }));"
+      },
+      "id": "tag-star",
+      "name": "Tag The Star",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        540,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { ...item.json, source_mode: 'direct_seed', source_label: 'NST', source_name: 'NST', source_domain: 'nst.com.my' } }));"
+      },
+      "id": "tag-nst",
+      "name": "Tag NST",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        540,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { ...item.json, source_mode: 'direct_seed', source_label: 'Free Malaysia Today', source_name: 'Free Malaysia Today', source_domain: 'freemalaysiatoday.com' } }));"
+      },
+      "id": "tag-fmt",
+      "name": "Tag FMT",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        540,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { ...item.json, source_mode: 'direct_seed', source_label: 'Bernama', source_name: 'Bernama', source_domain: 'bernama.com' } }));"
+      },
+      "id": "tag-bernama",
+      "name": "Tag Bernama",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        540,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { ...item.json, source_mode: 'direct_seed', source_label: 'Malay Mail', source_name: 'Malay Mail', source_domain: 'malaymail.com' } }));"
+      },
+      "id": "tag-malaymail",
+      "name": "Tag Malay Mail",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        540,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { ...item.json, source_mode: 'direct_seed', source_label: 'The Sun Daily', source_name: 'The Sun Daily', source_domain: 'thesundaily.my' } }));"
+      },
+      "id": "tag-thesun",
+      "name": "Tag The Sun",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        540,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { ...item.json, source_mode: 'google_discovery', source_label: 'Google News Malaysia', source_name: 'Google News Malaysia', source_domain: 'news.google.com' } }));"
+      },
+      "id": "tag-google-malaysia",
+      "name": "Tag Google Malaysia",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        540,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { ...item.json, source_mode: 'google_discovery', source_label: 'Google News Foreign Discovery', source_name: 'Google News Foreign Discovery', source_domain: 'news.google.com' } }));"
+      },
+      "id": "tag-google-foreign",
+      "name": "Tag Google Foreign",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        540,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => ({ json: { ...item.json, source_mode: 'bursa_announcements', source_label: 'Bursa Malaysia', source_name: 'Bursa Malaysia', source_domain: 'bursamalaysia.com' } }));"
+      },
+      "id": "tag-bursa",
+      "name": "Tag Bursa",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        540,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const allItems = items.map(item => item.json); return allItems.length ? [{ json: { items: allItems } }] : [];"
+      },
+      "id": "batch-collect",
+      "name": "Batch Collect",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://172.18.0.1:8000/api/internal/ingest/batch",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "items",
+              "value": "={{ $json.items }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "laravel-webhook",
+      "name": "Ingest to Laravel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1260,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items;"
+      },
+      "id": "log-results",
+      "name": "Log Results",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1460,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const APPROVED_DIRECT_DOMAINS = [\n  'thestar.com.my', 'nst.com.my', 'freemalaysiatoday.com', 'bernama.com', 'malaymail.com', 'thesundaily.my',\n];\n\nfunction normalizeDomain(url) {\n  try {\n    let host = url.includes('://') ? new URL(url).host : url;\n    return host.toLowerCase().replace(/^www\\./, '');\n  } catch { return ''; }\n}\n\nfunction isApprovedDomain(item) {\n  const mode = (item.source_mode || 'direct_seed').toLowerCase();\n  const domain = normalizeDomain(item.source_domain || item.url || '');\n  if (!domain) return false;\n  if (mode === 'direct_seed') {\n    return APPROVED_DIRECT_DOMAINS.some(d => domain === d || domain.endsWith('.' + d));\n  }\n  return true;\n}\n\nconst filtered = items.filter(item => {\n  const url = item.json.url || '';\n  const mode = (item.json.source_mode || 'direct_seed').toLowerCase();\n\n  if (!url) { item.json._reject = 'missing_url'; return false; }\n  if (mode === 'direct_seed' && !isApprovedDomain(item.json)) { item.json._reject = 'unapproved_domain'; return false; }\n  item.json._reject = null;\n  return true;\n});\n\nconst passed = filtered.length;\nconst rejected = items.length - passed;\nconsole.log('Article Filter: ' + passed + ' passed, ' + rejected + ' rejected');\nreturn filtered;\n"
+      },
+      "id": "article-filter",
+      "name": "Article Filter",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        540,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Cron Trigger": {
+      "main": [
+        [
+          {
+            "node": "The Star RSS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "NST RSS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "FMT Nation RSS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Bernama RSS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Malay Mail Malaysia RSS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "The Sun Daily National RSS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google News Malaysia RSS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google News Foreign Discovery RSS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Bursa Announcements RSS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "The Star RSS": {
+      "main": [
+        [
+          {
+            "node": "Tag The Star",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NST RSS": {
+      "main": [
+        [
+          {
+            "node": "Tag NST",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FMT Nation RSS": {
+      "main": [
+        [
+          {
+            "node": "Tag FMT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bernama RSS": {
+      "main": [
+        [
+          {
+            "node": "Tag Bernama",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Malay Mail Malaysia RSS": {
+      "main": [
+        [
+          {
+            "node": "Tag Malay Mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "The Sun Daily National RSS": {
+      "main": [
+        [
+          {
+            "node": "Tag The Sun",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google News Malaysia RSS": {
+      "main": [
+        [
+          {
+            "node": "Tag Google Malaysia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google News Foreign Discovery RSS": {
+      "main": [
+        [
+          {
+            "node": "Tag Google Foreign",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bursa Announcements RSS": {
+      "main": [
+        [
+          {
+            "node": "Tag Bursa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag The Star": {
+      "main": [
+        [
+          {
+            "node": "Article Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag NST": {
+      "main": [
+        [
+          {
+            "node": "Article Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag FMT": {
+      "main": [
+        [
+          {
+            "node": "Article Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Bernama": {
+      "main": [
+        [
+          {
+            "node": "Article Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Malay Mail": {
+      "main": [
+        [
+          {
+            "node": "Article Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag The Sun": {
+      "main": [
+        [
+          {
+            "node": "Article Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Google Malaysia": {
+      "main": [
+        [
+          {
+            "node": "Article Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Google Foreign": {
+      "main": [
+        [
+          {
+            "node": "Article Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Bursa": {
+      "main": [
+        [
+          {
+            "node": "Article Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batch Collect": {
+      "main": [
+        [
+          {
+            "node": "Ingest to Laravel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ingest to Laravel": {
+      "main": [
+        [
+          {
+            "node": "Log Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Article Filter": {
+      "main": [
+        [
+          {
+            "node": "Batch Collect",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}
