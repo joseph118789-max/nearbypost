@@ -19,7 +19,7 @@ class EnrichWithAi extends Command
     // ── Versioning ───────────────────────────────────────────────────────────
     private const PROMPT_VERSION    = 'v2';
     private const PIPELINE_VERSION  = 'v1.0';
-    private const MODEL             = 'gpt-4o-mini';
+    private const MODEL             = 'deepseek-chat';
     private const MAX_RETRIES       = 2;
 
     // ── Controlled enums ────────────────────────────────────────────────────
@@ -36,9 +36,9 @@ class EnrichWithAi extends Command
 
     public function handle(): int
     {
-        $apiKey = config('services.openai.key');
+        $apiKey = config('services.deepseek.key');
         if (!$apiKey) {
-            $this->error('OpenAI API key not configured: services.openai.key');
+            $this->error('DeepSeek API key not configured');
             return 1;
         }
 
@@ -303,23 +303,23 @@ Content:
 PROMPT;
     }
 
-    private function callOpenAi(string $apiKey, string $prompt): array
+    private function callDeepSeek(string $apiKey, string $prompt): array
     {
         $response = Http::withToken($apiKey)
             ->timeout(30)
-            ->post('https://api.openai.com/v1/chat/completions', [
+            ->post('https://api.deepseek.com/v1/chat/completions', [
                 'model'    => self::MODEL,
                 'messages' => [['role' => 'user', 'content' => $prompt]],
                 'temperature' => 0.3,
             ]);
 
         if (!$response->successful()) {
-            throw new \Exception('OpenAI API error: ' . $response->status() . ' - ' . $response->body());
+            throw new \Exception('DeepSeek API error: ' . $response->status() . ' - ' . $response->body());
         }
 
         $body = $response->json();
         if (!isset($body['choices'][0]['message']['content'])) {
-            throw new \Exception('Invalid OpenAI response: missing content field');
+            throw new \Exception('Invalid DeepSeek response: missing content field');
         }
         $body['raw_content'] = $body['choices'][0]['message']['content'];
         return $body;

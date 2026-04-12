@@ -35,6 +35,10 @@ return [
         ],
     ],
 
+    'deepseek' => [
+        'key' => env('DEEPSEEK_API_KEY'),
+    ],
+
     'openai' => [
         'key' => env('OPENAI_API_KEY'),
     ],
