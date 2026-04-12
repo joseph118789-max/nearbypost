@@ -20,7 +20,7 @@ class NewsItemRequest extends FormRequest
             'primary_category' => 'sometimes|nullable|string|max:100',
             'sub_cat' => 'sometimes|nullable|string|max:100',
             'secondary_category' => 'sometimes|nullable|string|max:100',
-            'status' => 'sometimes|nullable|in:active,inactive',
+            'status' => 'sometimes|nullable|in:pending_extraction,active';,
             'relevance_mode' => 'sometimes|nullable|in:hybrid,location_only,category_only',
             'precision_type' => 'sometimes|nullable|in:exact_area,approximate_area,state_center,region,country,national,unresolved',
             'main_place_text' => 'sometimes|nullable|string|max:255',
