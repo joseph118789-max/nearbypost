@@ -167,12 +167,18 @@ class EnrichWithAi extends Command
                     'processed_at'       => now(),
                 ]);
 
-                // Update NewsItem with coordinates if available
+                // Update NewsItem with coordinates if available and set status
+                $updateData = [];
                 if ($validation['lat'] !== null && $validation['lng'] !== null) {
-                    $item->update([
-                        'lat' => $validation['lat'],
-                        'lng' => $validation['lng'],
-                    ]);
+                    $updateData['lat'] = $validation['lat'];
+                    $updateData['lng'] = $validation['lng'];
+                }
+                // If is_article is true, set status to active
+                if ($validation['is_article'] ?? true) {
+                    $updateData['status'] = 'active';
+                }
+                if (!empty($updateData)) {
+                    $item->update($updateData);
                 }
 
                 $this->info("  OK {$item->id} | mode={$validation['relevance_mode']} | cat={$validation['category']}");
