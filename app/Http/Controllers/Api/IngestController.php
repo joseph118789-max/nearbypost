@@ -22,12 +22,6 @@ class IngestController extends Controller
         'thesundaily.my',
     ];
 
-    private const MALAYSIA_KEYWORDS = [
-        'malaysia', 'malaysian', 'kuala lumpur', 'putrajaya', 'selangor', 'penang', 'johor',
-        'kedah', 'kelantan', 'terengganu', 'pahang', 'perak', 'negeri sembilan', 'melaka',
-        'sabah', 'sarawak', 'labuan', 'perlis', 'ringgit', 'bursa', 'anwar', 'petronas',
-        'kwsp', 'epf', 'maybank', 'cimb', 'rapidkl', 'prasarana', 'bernama',
-    ];
 
     private const BLOCKED_URL_PARTS = [
         '/tag/', '/tags/', '/category/', '/categories/', '/archive', '/archives', '/search',
@@ -96,29 +90,6 @@ class IngestController extends Controller
         return strtolower((string) ($data['source_mode'] ?? 'direct_seed'));
     }
 
-    private function isMalaysiaRelevant(array $data): bool
-    {
-        if ($this->sourceMode($data) === 'bursa_announcements') {
-            return true;
-        }
-
-        $haystack = strtolower(trim(implode(' ', array_filter([
-            $data['title'] ?? null,
-            $data['summary'] ?? null,
-            $data['url'] ?? null,
-            $data['source'] ?? null,
-            $data['source_name'] ?? null,
-            $data['source_label'] ?? null,
-        ]))));
-
-        foreach (self::MALAYSIA_KEYWORDS as $keyword) {
-            if (str_contains($haystack, $keyword)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
 
     private function isBlockedUrl(string $url): bool
     {
@@ -166,11 +137,6 @@ class IngestController extends Controller
 
             return [true, null];
         }
-
-        if (!$this->isMalaysiaRelevant($data)) {
-            return [false, 'not_malaysia_relevant'];
-        }
-
 
 
         if ($mode === 'google_discovery' && ($domain === '' || $domain === 'news.google.com')) {
