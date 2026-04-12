@@ -127,7 +127,7 @@ function renderNewsTable(news, pagination) {
         <tr data-news-id="${n.id}">
             <td>${esc(fmt(n.published_at))}</td>
             <td><strong>${esc(n.title || n.headline || '')}</strong></td>
-            <td class="summary-preview">${esc(n.summary || '—')}</td>
+            <td class="summary-preview">${esc(n.ai_summary || n.summary || '—')}</td>
             <td><span class="category-badge">${esc(n.primary_category || '')}</span></td>
             <td><span class="subcat-badge">${esc(n.secondary_category || '')}</span></td>
             <td><span class="status-badge ${n.status === 'active' ? 'status-active' : 'status-inactive'}">${esc(n.status || 'inactive')}</span></td>
