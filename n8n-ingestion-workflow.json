@@ -295,27 +295,12 @@
       "parameters": {
         "url": "https://ingest.nearbypost.com/api/internal/ingest/batch",
         "method": "POST",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
         "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "items",
-              "value": "={{ $json.items }}"
-            }
-          ]
-        },
         "options": {
           "timeout": 60000
-        }
+        },
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ items: $json.items }) }}"
       },
       "id": "laravel-webhook",
       "name": "Ingest to Laravel",
