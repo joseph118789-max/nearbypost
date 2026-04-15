@@ -214,7 +214,7 @@
       storyType(item) {
         const mode = String(item.relevance_mode || '').toLowerCase();
         if (mode === 'location_only' || item.distance_km !== undefined) return 'nearby';
-        if (mode === 'category_only') return 'interest';
+        if (mode === 'category_only' || !mode) return 'interest';
         return 'broader';
       }
     };
