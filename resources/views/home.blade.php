@@ -254,6 +254,7 @@
       async detectLocation() {
         const cached = this._getCached();
         if (cached) return cached;
+        try { const location = await this.getBrowserLocation(); if (location) { this._cacheLocation(location); return location; } } catch (e) { console.warn('Browser geolocation failed:', e); }
         try { const location = await this._fetchIPLocation(); if (location) { this._cacheLocation(location); return location; } } catch (e) { console.warn('IP geolocation failed:', e); }
         return CONFIG.defaultLocation;
       },
