@@ -158,6 +158,7 @@
       cacheDuration: 24 * 60 * 60 * 1000,
       geolocationTimeout: 5000,
       feedEndpoint: '/api/feed/default',
+      nearbyApiEndpoint: '/api/feed/nearby',
       apiEndpoints: { ipGeolocation: 'https://ipapi.co/json/', reverseGeocode: 'https://nominatim.openstreetmap.org/reverse' }
     };
 
@@ -182,8 +183,15 @@
 
     const StoryService = {
       async loadStories() {
-        const response = await fetch(CONFIG.feedEndpoint, { headers: { Accept: 'application/json' } });
-        if (!response.ok) throw new Error(`Feed request failed (${response.status})`);
+        await this._loadFromEndpoint(CONFIG.feedEndpoint);
+      },
+      async loadNearby(lat, lng, radius) {
+        const url = CONFIG.nearbyApiEndpoint + '?lat=' + lat + '&lng=' + lng + '&radius=' + radius;
+        await this._loadFromEndpoint(url);
+      },
+      async _loadFromEndpoint(endpoint) {
+        const response = await fetch(endpoint, { headers: { Accept: 'application/json' } });
+        if (!response.ok) throw new Error('Feed request failed (' + response.status + ')');
         const items = await response.json();
         DATA.stories = (Array.isArray(items) ? items : []).map((item, index) => ({
           id: item.id ?? index + 1,
@@ -222,8 +230,8 @@
     class Store {
       constructor(initialState) { this.state = { ...initialState }; this.listeners = []; this.cache = new Map(); }
       getState() { return { ...this.state }; }
-      setState(updates) { this.state = { ...this.state, ...updates }; this.cache.clear(); this._notify(); }
-      _notify() { this.listeners.forEach(listener => listener(this.state)); }
+      setState(updates) { const oldState = { ...this.state }; this.state = { ...this.state, ...updates }; this.cache.clear(); this._notify(oldState); }
+      _notify(prevState) { this.listeners.forEach(listener => listener(this.state, prevState)); }
       subscribe(listener) { this.listeners.push(listener); return () => { this.listeners = this.listeners.filter(l => l !== listener); }; }
       getFilterKey() { const { activeTab, timeHours, selectedCategory, radiusFilter, selectedInterest, locationName } = this.state; return [activeTab, timeHours, selectedCategory, radiusFilter, selectedInterest, locationName].join('|'); }
       getFilteredStories() {
@@ -294,14 +302,25 @@
 
     class NearbypostApp {
       constructor() {
-        this.store = new Store({ activeTab: "nearme", locationName: "Loading...", radiusKm: CONFIG.defaultRadius, timeHours: 168, selectedCategory: "All", selectedInterest: "All categories", radiusFilter: "Both", isLoading: true });
+        this.store = new Store({ activeTab: "nearme", locationName: "Loading...", radiusKm: CONFIG.defaultRadius, timeHours: 168, selectedCategory: "All", selectedInterest: "All categories", radiusFilter: "Both", isLoading: true, userLat: null, userLng: null });
         this.modalManager = new ModalManager();
       }
       async init() {
-        this.bindEvents();
+        await this.bindEvents();
         this.render();
-        await Promise.allSettled([this.loadLocation(), StoryService.loadStories()]);
+        await Promise.allSettled([this.loadCoords(), this.loadLocation(), StoryService.loadStories()]);
         this.store.setState({ isLoading: false });
+      }
+      async loadCoords() {
+        try {
+          const pos = await new Promise((resolve, reject) => {
+            if (!('geolocation' in navigator)) { reject(new Error('no geolocation')); return; }
+            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000, enableHighAccuracy: false });
+          });
+          this.store.setState({ userLat: pos.coords.latitude, userLng: pos.coords.longitude });
+        } catch (e) {
+          this.store.setState({ userLat: null, userLng: null });
+        }
       }
       async loadLocation() { const location = await GeolocationService.detectLocation(); this.store.setState({ locationName: location }); }
       render() {
@@ -449,7 +468,41 @@
         if (!doc) return;
         this.modalManager.open({ title: doc.title, content: doc.content, buttons: [{ label: 'Close', action: 'close', className: 'primary' }], buttonHandlers: { close: (m, id) => this.modalManager.close(id) } });
       }
-      bindEvents() { this.store.subscribe(() => this.render()); window.addEventListener('resize', () => this.render()); document.addEventListener('click', e => { const tab = e.target.closest('[data-tab]'); if (tab) this.store.setState({ activeTab: tab.dataset.tab }); }); }
+      async bindEvents() {
+        this.store.subscribe(async (state, prevState) => {
+          if (state.activeTab !== prevState?.activeTab) {
+            if (state.activeTab === 'nearme' && state.userLat !== null && state.userLng !== null) {
+              await this.loadNearby();
+              return;
+            }
+          }
+          this.render();
+        });
+        window.addEventListener('resize', () => this.render());
+        document.addEventListener('click', e => {
+          const tab = e.target.closest('[data-tab]');
+          if (tab) {
+            const newTab = tab.dataset.tab;
+            const state = this.store.getState();
+            if (newTab === 'nearme' && state.userLat !== null && state.userLng !== null) {
+              this.loadNearby();
+            }
+            this.store.setState({ activeTab: newTab });
+          }
+        });
+      }
+      async loadNearby() {
+        const state = this.store.getState();
+        if (state.userLat === null || state.userLng === null) return;
+        try {
+          this.store.setState({ isLoading: true });
+          await StoryService.loadNearby(state.userLat, state.userLng, state.radiusKm);
+        } catch (e) {
+          console.error('loadNearby failed:', e);
+        } finally {
+          this.store.setState({ isLoading: false });
+        }
+      }
     }
 
     const app = new NearbypostApp();
