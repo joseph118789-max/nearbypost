@@ -18,15 +18,28 @@
 
 ---
 
-## Priority 2: Geo Data Quality Audit
+## Priority 2: Geo Data Quality Audit — CONFIRMED DEFECT
 
-**Goal:** Understand why `precision_type` is sparse and why nearby relies on `relevance_mode` as proxy.
+**Elevated from "audit" to confirmed defect investigation.**
 
-**Tasks:**
-- [ ] Measure row counts for `precision_type`, `coverage_type`, `latitude/longitude`, `relevance_mode` across `feed_ready_items`
-- [ ] Sample rows with good vs missing geo metadata
-- [ ] Trace which pipeline stage should populate `precision_type` and identify the gap
-- [ ] Identify what percentage of rows would pass a strict precision gate
+### Confirmed defect symptoms
+- All `feed_ready_items` rows have `lat=3.139, lng=101.6869` (KL center — same coords)
+- All `distance_km` values are `0`
+- All `location_label` values are `null`
+- No effective geographic discrimination in feed results
+- Upstream geo enrichment produces homogeneous coordinates
+
+### Root cause (suspected)
+One of: AI enrichment defaults to KL center, alias enrichment collapses to single place, geocoding falls back to a default, or location label never propagates to `feed_ready_items`.
+
+### Tasks
+- [ ] Count distinct `lat/lng` pairs in `feed_ready_items`
+- [ ] Count rows with null `location_label`, `precision_type`, `coverage_type`
+- [ ] Sample 3–5 feed rows and trace backward: `feed_ready_items` → `news_items` → AI/enrichment fields → promotion step
+- [ ] Identify where KL center default enters
+
+### Status
+**Confirmed defect.** Not a code bug — product-level geo enrichment failure.
 
 **Outcome:** Metrics snapshot + root cause summary of sparsity.
 
