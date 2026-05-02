@@ -130,7 +130,6 @@ class FeedController extends Controller
 
         $items = $this->cached($this->geoCacheKey($lat, $lng, $radius), function () use ($lat, $lng, $radius) {
             // Strict geo-serving: require is_active, lat/lng present, and geo-eligible precision.
-            // Only exact_area and approximate_area qualify for nearby distance queries.
             // category_only items are excluded because they have no geo data.
             $sql = "SELECT * FROM (
                 SELECT id, title, summary, source, published_at,
@@ -149,7 +148,7 @@ class FeedController extends Controller
                   AND is_article = true
                   AND lat IS NOT NULL
                   AND lng IS NOT NULL
-                  AND precision_type IN ('exact_area', 'approximate_area')
+                  AND relevance_mode != 'category_only'
             ) AS nearby
             WHERE distance_km <= :radius
             ORDER BY distance_km ASC, published_at DESC
@@ -219,7 +218,7 @@ class FeedController extends Controller
                 'is_article = true',
                 'lat IS NOT NULL',
                 'lng IS NOT NULL',
-                "precision_type IN ('exact_area', 'approximate_area')",
+                "relevance_mode != 'category_only'",
             ];
             $bindings = [
                 'lat'    => $lat,
