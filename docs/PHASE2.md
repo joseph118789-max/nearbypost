@@ -59,6 +59,23 @@ One of: AI enrichment defaults to KL center, alias enrichment collapses to singl
 
 ---
 
+## Closed Investigation: "Category Filter Not Working" (2026-05-02)
+
+**Finding:** Not a code bug. User error + strict matching.
+
+**Root causes identified:**
+1. Wrong parameter name: `category=sports` used instead of `primary_category=sports` — silently ignored, returns default feed
+2. Case sensitivity: `primary_category=Sports` → 0 results; `primary_category=sports` works
+
+**Resolution:** Filter logic is correct. No code fix required.
+
+**Backlog item for future improvement:**
+- Normalize `primary_category` input to lowercase before filtering
+- Consider rejecting unsupported `category` param with explicit error rather than silent fallback
+- Document accepted query parameter names
+
+---
+
 ## Priority 4: Production Branch Normalization
 
 **Goal:** Stop serving prod from `workspace-d16-d20-geo-fix`. Serve from `main`.
