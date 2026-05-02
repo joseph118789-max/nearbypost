@@ -39,6 +39,9 @@ class NewsItemObserver
             return;
         }
 
+        // Use AI-enriched category if available, otherwise fall back to RSS primary_category
+        $primaryCategory = $newsItem->ai_category ?: $newsItem->primary_category;
+
         FeedReadyItem::updateOrCreate(
             ['news_item_id' => $newsItem->id],
             [
@@ -47,7 +50,7 @@ class NewsItemObserver
                 'source' => $newsItem->source,
                 'url' => $newsItem->url,
                 'published_at' => $newsItem->published_at,
-                'primary_category' => $newsItem->primary_category,
+                'primary_category' => $primaryCategory,
                 'secondary_category' => $newsItem->secondary_category,
                 'location_label' => $newsItem->location_label,
                 'lat' => $newsItem->lat,

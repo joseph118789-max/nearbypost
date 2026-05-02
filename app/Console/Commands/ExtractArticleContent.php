@@ -25,7 +25,7 @@ class ExtractArticleContent extends Command
             $query->where('id', $newsItemId);
         }
 
-        $items = $query->whereNotNull('url')->limit(10)->get();
+        $items = $query->whereNotNull('url')->limit(100)->get();
 
         $this->info("Processing {$items->count()} items.");
 
@@ -54,6 +54,7 @@ class ExtractArticleContent extends Command
                     'extraction_method' => 'trafilatura',
                     'extracted_at' => now(),
                 ]);
+                $item->update(['status' => 'active']);
                 $this->info("✓ Extracted (trafilatura): {$item->id}");
             } else {
                 $this->useFallback($item, $job);
@@ -102,6 +103,10 @@ class ExtractArticleContent extends Command
                 'news_item_id' => $item->id,
                 'error' => $error,
             ]);
+        }
+
+        if ($summary) {
+            $item->update(['status' => 'active']);
         }
 
         $this->warn("↪ Fallback used for {$item->id}" . ($error ? " ({$error})" : ''));

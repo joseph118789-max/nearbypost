@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict YJfU7ICmChFYZ253Tdv2MEMOFMMp8iylnNPpnrh9SnWOHJuP1NyK04x4wp6cGgo
+\restrict 5fVmIpe6xxbDOPZ6rP1alofywCeukyexCo2QHJVAm9CgRmkLT9PhdwWw2YxW8vw
 
 -- Dumped from database version 16.13 (Ubuntu 16.13-0ubuntu0.24.04.1)
 -- Dumped by pg_dump version 16.13 (Ubuntu 16.13-0ubuntu0.24.04.1)
@@ -34,7 +34,8 @@ CREATE TABLE public.admins (
     password character varying(255) NOT NULL,
     remember_token character varying(100),
     created_at timestamp(0) without time zone,
-    updated_at timestamp(0) without time zone
+    updated_at timestamp(0) without time zone,
+    api_token character varying(255) DEFAULT 'admin-token-12345'::character varying
 );
 
 
@@ -55,6 +56,57 @@ CREATE SEQUENCE public.admins_id_seq
 --
 
 ALTER SEQUENCE public.admins_id_seq OWNED BY public.admins.id;
+
+
+--
+-- Name: ai_processing_jobs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ai_processing_jobs (
+    id bigint NOT NULL,
+    news_item_id bigint,
+    ai_summary text,
+    ai_category character varying(100),
+    main_place_text character varying(500),
+    relevance_mode character varying(20) DEFAULT 'national'::character varying,
+    ai_status character varying(20) DEFAULT 'pending'::character varying,
+    model_used character varying(50),
+    prompt_version character varying(20) DEFAULT 'v1'::character varying,
+    pipeline_version character varying(20),
+    tokens_in integer,
+    tokens_out integer,
+    estimated_cost numeric(10,6),
+    error_message text,
+    raw_ai_output text,
+    validated_summary text,
+    validated_category character varying(100),
+    validated_place character varying(500),
+    validation_notes text,
+    processed_at timestamp without time zone,
+    created_at timestamp without time zone,
+    updated_at timestamp without time zone,
+    deleted_at timestamp without time zone,
+    is_article boolean DEFAULT true NOT NULL
+);
+
+
+--
+-- Name: ai_processing_jobs_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ai_processing_jobs_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ai_processing_jobs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ai_processing_jobs_id_seq OWNED BY public.ai_processing_jobs.id;
 
 
 --
@@ -460,7 +512,7 @@ CREATE TABLE public.news_items (
     title character varying(255) NOT NULL,
     summary text,
     source character varying(255),
-    url character varying(255) NOT NULL,
+    url character varying(1000) NOT NULL,
     published_at timestamp(0) without time zone,
     primary_category character varying(255),
     secondary_category character varying(255),
@@ -476,7 +528,21 @@ CREATE TABLE public.news_items (
     topic_extraction_status character varying(255),
     topic_extracted_at timestamp(0) without time zone,
     topic_extraction_model character varying(255),
-    location_label character varying(255)
+    location_label character varying(255),
+    ai_summary text,
+    ai_category character varying(255),
+    ai_status character varying(50) DEFAULT 'pending'::character varying,
+    ai_processed_at timestamp without time zone,
+    ai_model character varying(50),
+    ai_prompt_version character varying(20),
+    ai_tokens_in integer,
+    ai_tokens_out integer,
+    ai_estimated_cost numeric(10,6),
+    canonical_place_name character varying(500),
+    alias_match_status character varying(20),
+    geocode_status character varying(20),
+    geocode_confidence numeric(5,2),
+    is_article boolean DEFAULT true NOT NULL
 );
 
 
@@ -597,6 +663,41 @@ CREATE TABLE public.sessions (
     payload text NOT NULL,
     last_activity integer NOT NULL
 );
+
+
+--
+-- Name: subcategories; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.subcategories (
+    id integer NOT NULL,
+    primary_category character varying(100) NOT NULL,
+    sub_category character varying(200) NOT NULL,
+    weight numeric(4,1) NOT NULL,
+    gps character varying(3) NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: subcategories_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.subcategories_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: subcategories_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.subcategories_id_seq OWNED BY public.subcategories.id;
 
 
 --
@@ -737,6 +838,13 @@ ALTER TABLE ONLY public.admins ALTER COLUMN id SET DEFAULT nextval('public.admin
 
 
 --
+-- Name: ai_processing_jobs id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_processing_jobs ALTER COLUMN id SET DEFAULT nextval('public.ai_processing_jobs_id_seq'::regclass);
+
+
+--
 -- Name: api_rate_limits id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -821,6 +929,13 @@ ALTER TABLE ONLY public.reports ALTER COLUMN id SET DEFAULT nextval('public.repo
 
 
 --
+-- Name: subcategories id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.subcategories ALTER COLUMN id SET DEFAULT nextval('public.subcategories_id_seq'::regclass);
+
+
+--
 -- Name: subscribers id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -855,6 +970,14 @@ ALTER TABLE ONLY public.admins
 
 ALTER TABLE ONLY public.admins
     ADD CONSTRAINT admins_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ai_processing_jobs ai_processing_jobs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_processing_jobs
+    ADD CONSTRAINT ai_processing_jobs_pkey PRIMARY KEY (id);
 
 
 --
@@ -1018,6 +1141,14 @@ ALTER TABLE ONLY public.sessions
 
 
 --
+-- Name: subcategories subcategories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.subcategories
+    ADD CONSTRAINT subcategories_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: subscribers subscribers_phone_unique; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1115,6 +1246,13 @@ CREATE INDEX jobs_queue_index ON public.jobs USING btree (queue);
 
 
 --
+-- Name: news_items_is_article_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX news_items_is_article_index ON public.news_items USING btree (is_article);
+
+
+--
 -- Name: sessions_last_activity_index; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1147,6 +1285,14 @@ CREATE INDEX topic_entities_normalized_name_index ON public.topic_entities USING
 --
 
 CREATE INDEX topic_entities_topic_cluster_index ON public.topic_entities USING btree (topic_cluster);
+
+
+--
+-- Name: ai_processing_jobs ai_processing_jobs_news_item_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_processing_jobs
+    ADD CONSTRAINT ai_processing_jobs_news_item_id_fkey FOREIGN KEY (news_item_id) REFERENCES public.news_items(id) ON DELETE CASCADE;
 
 
 --
@@ -1201,13 +1347,13 @@ ALTER TABLE ONLY public.topic_entities
 -- PostgreSQL database dump complete
 --
 
-\unrestrict YJfU7ICmChFYZ253Tdv2MEMOFMMp8iylnNPpnrh9SnWOHJuP1NyK04x4wp6cGgo
+\unrestrict 5fVmIpe6xxbDOPZ6rP1alofywCeukyexCo2QHJVAm9CgRmkLT9PhdwWw2YxW8vw
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict 0mCWZ54unIsPQhhlrSC6GcrivkZa37axyBfMaFs5VcUA9GyfnfdVcm19piq3g1B
+\restrict indTLUQEjcefPdV4Ab9lZX0igMLiQ8O9B6NY2jqQHVYsOL1onmcgcfz9lfcpwX8
 
 -- Dumped from database version 16.13 (Ubuntu 16.13-0ubuntu0.24.04.1)
 -- Dumped by pg_dump version 16.13 (Ubuntu 16.13-0ubuntu0.24.04.1)
@@ -1267,6 +1413,8 @@ COPY public.migrations (id, migration, batch) FROM stdin;
 38	2026_04_05_000001_create_location_aliases_table	999
 39	2026_04_05_000002_add_serving_fields_to_feed_ready_items	999
 40	2026_04_08_000000_add_preferences_and_location_to_subscribers_table	1000
+41	2026_04_12_043741_add_is_article_to_news_items	1001
+42	2026_04_12_044234_add_is_article_to_ai_processing_jobs	1002
 \.
 
 
@@ -1274,12 +1422,12 @@ COPY public.migrations (id, migration, batch) FROM stdin;
 -- Name: migrations_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.migrations_id_seq', 40, true);
+SELECT pg_catalog.setval('public.migrations_id_seq', 42, true);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 0mCWZ54unIsPQhhlrSC6GcrivkZa37axyBfMaFs5VcUA9GyfnfdVcm19piq3g1B
+\unrestrict indTLUQEjcefPdV4Ab9lZX0igMLiQ8O9B6NY2jqQHVYsOL1onmcgcfz9lfcpwX8
 

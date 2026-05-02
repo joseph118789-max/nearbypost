@@ -84,6 +84,6 @@ class NewsItem extends Model
 
     public function aiProcessingJob(): HasOne
     {
-        return $this->hasOne(AiProcessingJob::class);
+        return $this->hasOne(AiProcessingJob::class)->latestOfMany();
     }
 }

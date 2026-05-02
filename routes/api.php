@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('throttle:60,1')->group(function () {
     Route::get('/feed', [FeedController::class, 'index']);
     Route::get('/feed/default', [FeedController::class, 'default']);
+    Route::get('/feed/categories', [FeedController::class, 'categories']);
     Route::get('/feed/category/{slug}', [FeedController::class, 'byCategory']);
     Route::get('/feed/nearby', [FeedController::class, 'nearby']);
     Route::get('/feed/filter', [FeedController::class, 'filter']);
@@ -28,6 +29,7 @@ Route::middleware('throttle:60,1')->group(function () {
 Route::post('/report-content', [ReportController::class, 'store']);
 Route::post('/internal/ingest/news', [IngestController::class, 'ingest']);
 Route::post('/internal/ingest/batch', [IngestController::class, 'ingestBatch']);
+    Route::post('/internal/ingest/classify', [IngestController::class, 'classifyWithDeepSeek']);
 
 Route::prefix('admin')->group(function () {
     Route::get('/subscribers', [SubscriberController::class, 'index']);

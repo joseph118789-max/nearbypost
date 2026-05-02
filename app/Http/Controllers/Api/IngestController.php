@@ -397,6 +397,137 @@ class IngestController extends Controller
         ], 201);
     }
     
+
+    /**
+     * POST /api/internal/ingest/classify
+     * DeepSeek-powered Malaysia relevance + article classification + location extraction.
+     */
+    public function classifyWithDeepSeek(Request $request): JsonResponse
+    {
+        $items = $request->input('items', []);
+
+        if (!is_array($items) || empty($items)) {
+            return response()->json(['success' => false, 'message' => 'items must be a non-empty array'], 422);
+        }
+
+        $apiKey = env('DEEPSEEK_API_KEY');
+        if (empty($apiKey)) {
+            return response()->json(['success' => false, 'message' => 'DeepSeek API key not configured'], 500);
+        }
+
+        $systemPrompt = "You are an AI assistant for a Malaysia local news aggregation app called Nearbypost. Your task is to analyze news article metadata (title, summary, source URL) and classify each article.";
+
+        $results = [];
+        $client = new \GuzzleHttp\Client(['timeout' => 60]);
+
+        foreach ($items as $i => $item) {
+            $title = $this->stripHtml(($item['title'] ?? 'Untitled'));
+            $summary = $this->stripHtml(($item['summary'] ?? ''));
+            $url = $item['url'] ?? '';
+            $source = $item['source'] ?? '';
+
+            $userPrompt = "Analyze this article and return ONLY a valid JSON object (no markdown, no explanation). " . json_encode([
+                'index' => $i,
+                'url' => $url,
+                'source' => $source,
+                'title' => $title,
+                'summary' => substr($summary, 0, 300),
+            ]) . "\n\nFor this article, determine:\n1. is_malaysia_relevant (boolean): Is this article about Malaysia or Malaysians? Include Malaysian politics, economy, cities, states, events, companies, people, culture, sports, crime, etc. Exclude foreign news unless Malaysia has direct involvement.\n2. is_article (boolean): Is this a real news article with substantive content? Exclude tag/category/archive pages, promotional content, opinion pieces.\n3. primary_category (string): One of: business, crime, education, entertainment, features, health, nation, politics, sports, technology, weather, world. Pick the closest fit.\n4. secondary_category (string): A more specific sub-category, or general as fallback.\n5. location_text (string): Malaysian city, state, or region (e.g. Kuala Lumpur, Selangor, Penang, Johor, Sabah, Sarawak, Putrajaya, Perak, Kedah, Kelantan, Terengganu, Pahang, Melaka, Negeri Sembilan, Malaysia).\n6. confidence (float): 0.0 to 1.0, how confident are you in this classification?\n\nIf is_article is false OR is_malaysia_relevant is false, set confidence to 0.0.\nFor sports articles, include football, badminton, Malaysian leagues, athletes.\nFor business, include stock market, economy, banking, corporate news.\n\nReturn ONLY a JSON object like: {\"index\":0,\"is_malaysia_relevant\":true,\"is_article\":true,\"primary_category\":\"sports\",\"secondary_category\":\"football\",\"location_text\":\"Kuala Lumpur\",\"confidence\":0.95}";
+
+            try {
+                $response = $client->post('https://api.deepseek.com/v1/chat/completions', [
+                    'headers' => [
+                        'Authorization' => 'Bearer ' . $apiKey,
+                        'Content-Type' => 'application/json',
+                        'Accept' => 'application/json',
+                    ],
+                    'json' => [
+                        'model' => 'deepseek-chat',
+                        'messages' => [
+                            ['role' => 'system', 'content' => $systemPrompt],
+                            ['role' => 'user', 'content' => $userPrompt],
+                        ],
+                        'temperature' => 0.1,
+                        'max_tokens' => 256,
+                    ],
+                ]);
+
+                $body = json_decode($response->getBody()->getContents(), true);
+                $content_text = $body['choices'][0]['message']['content'] ?? '';
+                $parsed = $this->extractJson($content_text);
+
+                if ($parsed !== null && isset($parsed['index'])) {
+                    $results[] = $parsed;
+                } else {
+                    Log::warning('DeepSeek per-item: failed to parse item ' . $i, ['raw' => substr($content_text, 0, 200)]);
+                    $results[] = [
+                        'index' => $i,
+                        'is_malaysia_relevant' => false,
+                        'is_article' => false,
+                        'primary_category' => 'nation',
+                        'secondary_category' => 'general',
+                        'location_text' => 'Malaysia',
+                        'confidence' => 0.0,
+                        '_parse_error' => true,
+                    ];
+                }
+            } catch (\Exception $e) {
+                Log::error('DeepSeek per-item call failed for index ' . $i, ['error' => $e->getMessage()]);
+                $results[] = [
+                    'index' => $i,
+                    'is_malaysia_relevant' => false,
+                    'is_article' => false,
+                    'primary_category' => 'nation',
+                    'secondary_category' => 'general',
+                    'location_text' => 'Malaysia',
+                    'confidence' => 0.0,
+                    '_error' => $e->getMessage(),
+                ];
+            }
+        }
+
+        return response()->json(['success' => true, 'classifications' => $results], 200);
+    }
+
+
+    private function stripHtml(string $text): string
+    {
+        // First decode HTML entities (including numeric entities like &#8217;)
+        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        // Then strip HTML tags
+        return trim(preg_replace('/<[^>]*>/', ' ', str_replace(['&nbsp;'], [' '], $text)));
+    }
+
+    private function extractJson(string $text): ?array
+    {
+        $text = trim($text);
+        $decoded = json_decode($text, true);
+        if (is_array($decoded) && !empty($decoded)) {
+            return $decoded;
+        }
+        // Try to find JSON array in text
+        if (preg_match('/\[\s*\{/', $text, $m, PREG_OFFSET_CAPTURE)) {
+            $start = $m[0][1];
+            $jsonStr = substr($text, $start);
+            $depth = 0;
+            for ($i = 0; $i < strlen($jsonStr); $i++) {
+                if ($jsonStr[$i] === '{') $depth++;
+                elseif ($jsonStr[$i] === '}') {
+                    $depth--;
+                    if ($depth === 0) {
+                        $jsonStr = substr($jsonStr, 0, $i + 1);
+                        break;
+                    }
+                }
+            }
+            $decoded = json_decode($jsonStr, true);
+            if (is_array($decoded) && !empty($decoded)) {
+                return $decoded;
+            }
+        }
+        return null;
+    }
+
     /**
      * Store failed ingestion in dead-letter bucket
      */

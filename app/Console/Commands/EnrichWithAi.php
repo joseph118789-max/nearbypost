@@ -12,7 +12,8 @@ class EnrichWithAi extends Command
 {
     protected $signature = 'ingest:enrich
         {--news_item_id= : Process a specific news item}
-        {--force : Re-process even if already successfully processed}';
+        {--force : Re-process even if already processed}
+        {--limit=50 : Number of items to process per run}';
 
     protected $description = 'Enrich news items with AI: validates output, enforces controlled enums, preserves good output on retry';
 
@@ -64,24 +65,29 @@ class EnrichWithAi extends Command
         $force       = $this->option('force');
         $newsItemId  = $this->option('news_item_id');
 
+        // Prioritize items that are known to need processing (ai_status = pending)
         $query = NewsItem::whereHas('extractionJob', function ($q) {
             $q->whereIn('extraction_status', ['success', 'fallback_used']);
         });
 
         if ($newsItemId) {
             $query->where('id', $newsItemId);
-        }
-
-        if (!$force) {
-            // Skip items that already have a successful AI result for current pipeline version
-            $query->whereDoesntHave('aiProcessingJob', function ($q) {
-                $q->where('ai_status', 'success')
-                  ->where('pipeline_version', self::PIPELINE_VERSION);
+        } else {
+            // Normal run: skip items already successfully enriched
+            // Items with ai_status='pending' are primary targets
+            // Also skip items that have successful AI processing for current pipeline
+            $query->where(function ($q) {
+                $q->where('ai_status', 'pending')
+                  ->orWhereDoesntHave('aiProcessingJob', function ($q2) {
+                      $q2->where('ai_status', 'success')
+                         ->where('pipeline_version', self::PIPELINE_VERSION);
+                  });
             });
         }
 
-        $items = $query->limit(5)->get();
-        $this->info("AI Enrichment pipeline=" . self::PIPELINE_VERSION . " | processing {$items->count()} items.");
+        $limit = (int) ($this->option('limit') ?: 50);
+        $items = $query->limit($limit)->get();
+        $this->info("AI Enrichment pipeline=" . self::PIPELINE_VERSION . " | processing {$items->count()} items (limit={$limit}).");
 
         foreach ($items as $item) {
             $this->processItem($item, $apiKey, $force);
@@ -114,10 +120,12 @@ class EnrichWithAi extends Command
         ]);
 
         $extraction = $item->extractionJob;
-        $inputText  = $extraction->extracted_text
-                  ?? $extraction->extracted_summary
-                  ?? $item->summary
-                  ?? '';
+        // Use extracted_text, fall back to extracted_summary, then item summary
+        $rawText = $extraction->extracted_text ?? '';
+        if (empty($rawText) || strtoupper($rawText) === 'NONE') {
+            $rawText = $extraction->extracted_summary ?? $item->summary ?? '';
+        }
+        $inputText = $rawText;
         $title      = $extraction->extracted_title ?? $item->title;
 
         $prompt = $this->buildPrompt($title, $inputText, $item->source ?? '');
@@ -126,7 +134,7 @@ class EnrichWithAi extends Command
 
         while ($retries <= self::MAX_RETRIES) {
             try {
-                $response = $this->callOpenAi($apiKey, $prompt);
+                $response = $this->callDeepSeek($apiKey, $prompt);
                 $rawOutput = $response['raw_content'] ?? '';
                 $parsed    = $this->parseAiResponse($rawOutput);
 
@@ -173,13 +181,27 @@ class EnrichWithAi extends Command
                     $updateData['lat'] = $validation['lat'];
                     $updateData['lng'] = $validation['lng'];
                 }
-                // If is_article is true, set status to active
                 if ($validation['is_article'] ?? true) {
-                    $updateData['status'] = 'active';
+                    $relevanceMode = $validation['relevance_mode'] ?? 'category_only';
+                    $lat = $validation['lat'] ?? null;
+                    $lng = $validation['lng'] ?? null;
+                    // Malaysia bounding box: lat 0.5-7.5, lng 99.5-120
+                    $isMalaysia = $lat !== null && $lng !== null
+                        && $lat >= 0.5 && $lat <= 7.5
+                        && $lng >= 99.5 && $lng <= 120;
+                    if ($relevanceMode === 'category_only' || !$isMalaysia) {
+                        $updateData['status'] = 'international';
+                    } else {
+                        $updateData['status'] = 'active';
+                    }
+                    $updateData['relevance_mode'] = $relevanceMode;
                 }
-                if (!empty($updateData)) {
-                    $item->update($updateData);
-                }
+                // Always update ai_category, ai_summary, and ai_status
+                $updateData["ai_category"] = $validation["category"];
+                $updateData["ai_summary"] = $validation["summary"];
+                $updateData["ai_status"] = "success";
+
+                $item->update($updateData);
 
                 $this->info("  OK {$item->id} | mode={$validation['relevance_mode']} | cat={$validation['category']}");
                 Log::info('AI enrichment success', [
@@ -237,10 +259,13 @@ class EnrichWithAi extends Command
             $errors[] = 'summary_empty';
         }
 
-        // 2. category
-        $category = strtolower(trim($parsed['category'] ?? ''));
-        if (!in_array($category, self::VALID_CATEGORIES, true)) {
-            $errors[] = "category_unknown:{$category}";
+        // 2. category — case-insensitive match against VALID_CATEGORIES
+        $rawCat = trim($parsed['category'] ?? '');
+        $category = strtolower($rawCat);
+        // Build lowercase version of VALID_CATEGORIES for comparison
+        $validLower = array_map('strtolower', self::VALID_CATEGORIES);
+        if (!in_array($category, $validLower, true)) {
+            $errors[] = "category_unknown:{$rawCat}";
             $category = 'other'; // coerce to safe default
         }
 

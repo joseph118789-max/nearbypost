@@ -24,6 +24,7 @@ class FeedController extends Controller
     public function default(): JsonResponse
     {
         $items = FeedReadyItem::where('is_active', true)
+            ->where('relevance_mode', '!=', 'category_only')
             ->orderBy('published_at', 'desc')
             ->limit(20)
             ->get($this->baseFields());
@@ -34,12 +35,25 @@ class FeedController extends Controller
     public function byCategory(string $slug): JsonResponse
     {
         $items = FeedReadyItem::where('is_active', true)
+            ->where('relevance_mode', '!=', 'category_only')
             ->where('primary_category', $slug)
             ->orderBy('published_at', 'desc')
             ->limit(20)
             ->get($this->baseFields());
 
         return response()->json($items);
+    }
+
+    public function categories(): JsonResponse
+    {
+        $cats = FeedReadyItem::where('is_active', true)
+            ->select('primary_category')
+            ->distinct()
+            ->whereNotNull('primary_category')
+            ->orderBy('primary_category')
+            ->pluck('primary_category');
+
+        return response()->json($cats->values());
     }
 
     public function nearby(Request $request): JsonResponse
@@ -54,10 +68,9 @@ class FeedController extends Controller
         $lng    = (float) $validated['lng'];
         $radius = (float) $validated['radius'];
 
-        // Use subquery to avoid HAVING without GROUP BY in PostgreSQL
         $sql = "SELECT * FROM (
             SELECT id, title, summary, source, published_at,
-                   primary_category, secondary_category, url, location_label,
+                   primary_category, secondary_category, url, location_label, lat, lng,
                    ROUND(
                        (6371.0 * acos(
                            LEAST(1.0,
@@ -69,10 +82,10 @@ class FeedController extends Controller
                    ) AS distance_km
             FROM feed_ready_items
             WHERE is_active = true
+              AND is_article = true
               AND lat IS NOT NULL
               AND lng IS NOT NULL
               AND relevance_mode != 'category_only'
-              AND precision_type IN ('exact_area','approximate_area')
         ) AS nearby
         WHERE distance_km <= :radius
         ORDER BY distance_km
@@ -80,18 +93,22 @@ class FeedController extends Controller
 
         $rows = DB::select($sql, ['lat' => $lat, 'lng' => $lng, 'radius' => $radius]);
 
-        $items = array_map(fn($row) => (object)[
-            'id'                => $row->id,
-            'title'             => $row->title,
-            'summary'           => $row->summary,
-            'source'            => $row->source,
-            'published_at'      => $row->published_at,
-            'primary_category'  => $row->primary_category,
-            'secondary_category'=> $row->secondary_category,
-            'url'               => $row->url,
-            'location_label'    => $row->location_label,
-            'distance_km'       => (float) $row->distance_km,
-        ], $rows);
+        $items = array_map(function($row) {
+            return [
+                'id'                => (int) $row->id,
+                'title'             => $row->title,
+                'summary'           => $row->summary,
+                'source'            => $row->source,
+                'published_at'       => $row->published_at,
+                'primary_category'   => $row->primary_category,
+                'secondary_category'=> $row->secondary_category,
+                'url'               => $row->url,
+                'location_label'     => $row->location_label,
+                'lat'               => $row->lat !== null ? (float) $row->lat : null,
+                'lng'               => $row->lng !== null ? (float) $row->lng : null,
+                'distance_km'       => (float) $row->distance_km,
+            ];
+        }, $rows);
 
         return response()->json($items);
     }
@@ -126,7 +143,6 @@ class FeedController extends Controller
 
         $validated = validator($request->all(), $rules)->validate();
 
-        // ── Geo-radius path ───────────────────────────────────────────────
         if ($hasRadius) {
             $lat    = (float) $validated['lat'];
             $lng    = (float) $validated['lng'];
@@ -134,10 +150,10 @@ class FeedController extends Controller
 
             $where = [
                 'is_active = true',
+                'is_article = true',
                 'lat IS NOT NULL',
                 'lng IS NOT NULL',
                 "relevance_mode != 'category_only'",
-                "precision_type IN ('exact_area','approximate_area')",
             ];
             $bindings = [
                 'lat'    => $lat,
@@ -191,13 +207,14 @@ class FeedController extends Controller
                 'secondary_category'=> $row->secondary_category,
                 'url'               => $row->url,
                 'location_label'    => $row->location_label,
+                'lat'               => $row->lat !== null ? (float) $row->lat : null,
+                'lng'               => $row->lng !== null ? (float) $row->lng : null,
                 'distance_km'       => (float) $row->distance_km,
             ], $rows);
 
             return response()->json($items);
         }
 
-        // ── Non-geo path ────────────────────────────────────────────────
         $query = FeedReadyItem::where('is_active', true);
         if (!empty($validated['primary_category'])) {
             $query->where('primary_category', $validated['primary_category']);

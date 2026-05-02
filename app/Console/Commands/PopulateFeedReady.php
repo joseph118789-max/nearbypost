@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\NewsItem;
 use App\Models\FeedReadyItem;
+use App\Models\AiProcessingJob;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
@@ -52,6 +53,36 @@ class PopulateFeedReady extends Command
         return 0;
     }
 
+
+    /**
+     * Choose the best category for a feed_ready item.
+     * Prefers AI-enriched category, falls back intelligently.
+     */
+    private function bestCategory(NewsItem $item, $aiJob): string
+    {
+        $aiCategory = $item->ai_category;
+        $validatedCat = $aiJob?->validated_category;
+
+        // If NewsItem has a proper AI category (not 'others'/'other'), use it
+        if ($aiCategory && !in_array(strtolower($aiCategory), ['others', 'other', ''], true)) {
+            return $aiCategory;
+        }
+
+        // If AI job has a proper validated_category, use it
+        if ($validatedCat && !in_array(strtolower($validatedCat), ['others', 'other', ''], true)) {
+            return $validatedCat;
+        }
+
+        // Fall back to RSS primary_category only if it's a real category (not 'others'/'news')
+        $rssCat = $item->primary_category;
+        if ($rssCat && !in_array(strtolower($rssCat), ['others', 'other', 'news', ''], true)) {
+            return $rssCat;
+        }
+
+        // Last resort
+        return $aiCategory ?: $validatedCat ?: $rssCat ?: 'other';
+    }
+
     /**
      * Upsert a single feed_ready_item.
      * Returns 'created', 'updated', or 'skipped'.
@@ -82,14 +113,15 @@ class PopulateFeedReady extends Command
             'source'             => $item->source,
             'url'               => $item->url,
             'published_at'       => $item->published_at,
-            'primary_category'   => $aiJob->validated_category ?: $item->primary_category,
+            'primary_category'   => $this->bestCategory($item, $aiJob),
             'secondary_category' => $item->secondary_category,
             'location_label'     => $locationLabel,
-            'lat'                => $item->latitude,
-            'lng'                => $item->longitude,
+            'lat'                => $item->lat,
+            'lng'                => $item->lng,
             'precision_type'    => $precision,
             'distance_km'        => null,
             'relevance_mode'     => $aiJob->relevance_mode ?: $item->relevance_mode,
+            'is_article'         => $aiJob->is_article ?? true,
             'is_active'          => true,
             // Extended serving fields
             'canonical_place_name' => $item->canonical_place_name,

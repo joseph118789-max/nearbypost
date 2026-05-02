@@ -14,9 +14,6 @@ class FeedReadyItem extends Model
 
     protected $fillable = [
         'news_item_id',
-        'relevance_score',
-        'distance_km',
-        'calculated_at',
         'title',
         'summary',
         'source',
@@ -28,17 +25,23 @@ class FeedReadyItem extends Model
         'lat',
         'lng',
         'is_active',
+        'relevance_mode',
+        'precision_type',
+        'canonical_place_name',
+        'geo_confidence_score',
+        'coverage_type',
+        'sort_timestamp',
+        'is_article',
     ];
 
     protected $casts = [
         'news_item_id' => 'integer',
-        'relevance_score' => 'float',
-        'distance_km' => 'float',
-        'calculated_at' => 'datetime',
         'published_at' => 'datetime',
         'lat' => 'float',
         'lng' => 'float',
+        'geo_confidence_score' => 'float',
         'is_active' => 'boolean',
+        'is_article' => 'boolean',
     ];
 
     public function newsItem(): BelongsTo
