@@ -252,7 +252,8 @@ class FeedController extends Controller
             $sql = "SELECT * FROM (
                 SELECT id, title, summary, source, published_at,
                        primary_category, secondary_category, url,
-                       location_label, ({$haversine}) AS distance_km
+                       location_label, lat, lng,
+                       ({$haversine}) AS distance_km
                 FROM feed_ready_items
                 WHERE " . implode(' AND ', $where) . "
             ) AS filtered
