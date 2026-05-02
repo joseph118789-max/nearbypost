@@ -309,7 +309,7 @@ textarea { border-radius: 18px !important; resize: vertical; }
     <div class="form-group"><label>Primary Category</label><select id="newsPrimaryCat"></select></div>
     <div class="form-group"><label>Sub-Category</label><select id="newsSubCat"></select></div>
     <div class="form-group"><label>Status</label><select id="newsStatus"><option value="active">Active</option><option value="pending_extraction">Pending</option></select></div>
-    <div class="form-group"><label>Relevance Mode</label><select id="newsRelevanceMode"><option value="hybrid">Hybrid</option><option value="location_only">Location Only</option><option value="category_only">Category Only</option></select></div>
+    <div class="form-group"><label>Relevance Mode</label><select id="newsRelevanceMode"><option value="location_and_category">Location + Category</option><option value="location_only">Location Only</option><option value="category_only">Category Only</option></select></div>
     <div class="form-group"><label>Precision Type</label><select id="newsPrecisionType"><option value="exact_area">Exact Area</option><option value="approximate_area">Approximate Area</option><option value="state_center">State Center</option><option value="region">Region</option><option value="country">Country</option><option value="national">National</option><option value="unresolved">Unresolved</option></select></div>
     <div class="form-group"><label>Location Name</label><input type="text" id="newsMainPlaceText"></div>
     <div class="form-group"><label>OpenStreetMap Pin</label><div class="leaflet-map-wrap"><div id="newsMap"></div></div></div>

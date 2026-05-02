@@ -8,6 +8,30 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
 
+/**
+ * ═══════════════════════════════════════════════════════════════
+ * D11 AUTHORITATIVE AI ENRICHMENT PIPELINE
+ * ═══════════════════════════════════════════════════════════════
+ *
+ * This is the ONE authoritative D11 implementation.
+ * All AI enrichment MUST flow through this command.
+ *
+ * Run via: php artisan ingest:enrich
+ *
+ * Architectural guarantees:
+ * - Prompt + pipeline versioning (PROMPT_VERSION, PIPELINE_VERSION)
+ * - AiProcessingJob tracking for audit/replay
+ * - Controlled enums for categories and relevance modes
+ * - Validated output only — invalid responses are rejected, not coerced
+ * - Preserves good prior output on retry (idempotent, skip-known-good)
+ * - Failover to fallback_used status when AI is unavailable
+ *
+ * Legacy alternative: app/Jobs/EnrichArticleJob.php — DO NOT USE
+ * That job is blocked (fail-fast) and logs CRITICAL if dispatched.
+ *
+ * ═══════════════════════════════════════════════════════════════
+ */
+
 class EnrichWithAi extends Command
 {
     protected $signature = 'ingest:enrich

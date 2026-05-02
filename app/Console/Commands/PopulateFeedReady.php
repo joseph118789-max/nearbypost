@@ -12,6 +12,10 @@ use Illuminate\Support\Facades\Log;
  * Precompute feed_ready rows from fully-processed news_items.
  * Idempotent: upserts per news_item_id, only creates from items
  * that have passed through alias enrichment and precision interpretation.
+ *
+ * PROMOTION GATE — this command is the authoritative path from
+ * canonical pipeline state into public serving state.
+ * "When in doubt, skip."
  */
 class PopulateFeedReady extends Command
 {
@@ -20,6 +24,15 @@ class PopulateFeedReady extends Command
         {--limit=100    : Max items per run}';
 
     protected $description = 'Upsert feed_ready_items from processed news_items (idempotent)';
+
+    // ── Canonical relevance modes (D11 contract) ───────────────────────────
+    private const ALLOWED_RELEVANCE_MODES = ['category_only', 'location_only', 'location_and_category'];
+
+    // ── Valid geo precision types for geo-bearing items ─────────────────
+    private const VALID_PRECISION_TYPES = ['exact_area', 'approximate_area', 'region', 'broad'];
+
+    // ── Allowed AI job statuses for promotion ───────────────────────────
+    private const ALLOWED_AI_STATUSES = ['success', 'fallback_used'];
 
     public function handle(): int
     {
@@ -86,27 +99,54 @@ class PopulateFeedReady extends Command
     /**
      * Upsert a single feed_ready_item.
      * Returns 'created', 'updated', or 'skipped'.
+     *
+     * Promotion gate logic:
+     * 1. AI job must exist and have allowed status (success / fallback_used)
+     * 2. relevance_mode must be in the canonical set
+     * 3. category_only items: promote without geo requirements
+     * 4. location_only / location_and_category items: require location label
+     *    AND valid precision type — prevents half-baked geo rows reaching feed
+     * 5. category_only items: allowed without geo
+     * 6. location-bearing items: require location label + valid precision
      */
     private function upsert(NewsItem $item): string
     {
-        // ── Only serve items that have passed AI enrichment ─────────────
+        // ── Gate 1: AI enrichment must exist and be in allowed state ────
         $aiJob = $item->aiProcessingJob;
-        if (!$aiJob || !in_array($aiJob->ai_status, ['success', 'fallback_used'], true)) {
+        if (!$aiJob || !in_array($aiJob->ai_status, self::ALLOWED_AI_STATUSES, true)) {
+            // skipped_no_ai_job
             return 'skipped';
         }
 
-        // Determine location_label from canonical or raw place name
+        // ── Gate 2: relevance_mode must be in canonical set ────────────
+        $mode = $aiJob->relevance_mode ?: $item->relevance_mode;
+        if (!in_array($mode, self::ALLOWED_RELEVANCE_MODES, true)) {
+            // skipped_invalid_mode — coerce nothing, just skip
+            return 'skipped';
+        }
+
+        // ── Gate 3: location_label source must exist ───────────────────
         $locationLabel = $item->canonical_place_name ?: $item->main_place_text;
 
-        // precision_type: only pass through if it maps to a feed-serving precision
-        // (category_only items won't have geo data; that's fine)
+        // ── Gate 4: geo-bearing items require valid precision ───────────
+        // category_only: promoted without geo requirements
+        // location_only / location_and_category: require location label AND valid precision
+        if ($mode !== 'category_only') {
+            $precision = $item->precision_type ?? null;
+            $hasValidPrecision = in_array($precision, self::VALID_PRECISION_TYPES, true);
+
+            if (empty($locationLabel) || !$hasValidPrecision) {
+                // skipped_incomplete_geo — half-baked location row, do not serve
+                return 'skipped';
+            }
+        }
+
+        // ── All gates passed: build serving row ─────────────────────────
         $precision = $item->precision_type ?? null;
-        $validPrecisions = ['exact_area', 'approximate_area', 'region', 'broad'];
-        if ($precision && !in_array($precision, $validPrecisions, true)) {
+        if ($precision && !in_array($precision, self::VALID_PRECISION_TYPES, true)) {
             $precision = null;
         }
 
-        // Build the row data
         $row = [
             'title'              => $item->title,
             'summary'            => $aiJob->validated_summary ?: $item->summary,
@@ -115,12 +155,12 @@ class PopulateFeedReady extends Command
             'published_at'       => $item->published_at,
             'primary_category'   => $this->bestCategory($item, $aiJob),
             'secondary_category' => $item->secondary_category,
-            'location_label'     => $locationLabel,
-            'lat'                => $item->lat,
-            'lng'                => $item->lng,
+            'location_label'     => $locationLabel ?: null,
+            'lat'                => $item->latitude,
+            'lng'                => $item->longitude,
             'precision_type'    => $precision,
             'distance_km'        => null,
-            'relevance_mode'     => $aiJob->relevance_mode ?: $item->relevance_mode,
+            'relevance_mode'     => $mode,
             'is_article'         => $aiJob->is_article ?? true,
             'is_active'          => true,
             // Extended serving fields

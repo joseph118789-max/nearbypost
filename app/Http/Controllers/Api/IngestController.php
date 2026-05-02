@@ -340,8 +340,8 @@ class IngestController extends Controller
                 'category' => 'nullable|string|max:100',
                 'primary_category' => 'nullable|string|max:100',
                 'secondary_category' => 'nullable|string|max:100',
-                'lat' => 'nullable|numeric|between:-90,90',
-                'lng' => 'nullable|numeric|between:-180,180',
+                'latitude' => 'nullable|numeric|between:-90,90',
+                'longitude' => 'nullable|numeric|between:-180,180',
             ]);
 
             if ($validator->fails()) {
@@ -379,11 +379,11 @@ class IngestController extends Controller
                 'status' => 'pending_extraction',
             ];
 
-            if (array_key_exists('lat', $validated)) {
-                $createData['lat'] = $validated['lat'];
+            if (array_key_exists('latitude', $validated)) {
+                $createData['latitude'] = $validated['latitude'];
             }
-            if (array_key_exists('lng', $validated)) {
-                $createData['lng'] = $validated['lng'];
+            if (array_key_exists('longitude', $validated)) {
+                $createData['longitude'] = $validated['longitude'];
             }
 
             $newsItem = NewsItem::create($createData);
