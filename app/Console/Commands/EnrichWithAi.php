@@ -8,6 +8,30 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
 
+/**
+ * ═══════════════════════════════════════════════════════════════
+ * D11 AUTHORITATIVE AI ENRICHMENT PIPELINE
+ * ═══════════════════════════════════════════════════════════════
+ *
+ * This is the ONE authoritative D11 implementation.
+ * All AI enrichment MUST flow through this command.
+ *
+ * Run via: php artisan ingest:enrich
+ *
+ * Architectural guarantees:
+ * - Prompt + pipeline versioning (PROMPT_VERSION, PIPELINE_VERSION)
+ * - AiProcessingJob tracking for audit/replay
+ * - Controlled enums for categories and relevance modes
+ * - Validated output only — invalid responses are rejected, not coerced
+ * - Preserves good prior output on retry (idempotent, skip-known-good)
+ * - Failover to fallback_used status when AI is unavailable
+ *
+ * Legacy alternative: app/Jobs/EnrichArticleJob.php — DO NOT USE
+ * That job is blocked (fail-fast) and logs CRITICAL if dispatched.
+ *
+ * ═══════════════════════════════════════════════════════════════
+ */
+
 class EnrichWithAi extends Command
 {
     protected $signature = 'ingest:enrich
@@ -75,9 +99,11 @@ class EnrichWithAi extends Command
         } else {
             // Normal run: skip items already successfully enriched
             // Items with ai_status='pending' are primary targets
+            // Items with ai_status='insufficient_content' are retried after n8n fix
             // Also skip items that have successful AI processing for current pipeline
             $query->where(function ($q) {
                 $q->where('ai_status', 'pending')
+                  ->orWhere('ai_status', 'insufficient_content')
                   ->orWhereDoesntHave('aiProcessingJob', function ($q2) {
                       $q2->where('ai_status', 'success')
                          ->where('pipeline_version', self::PIPELINE_VERSION);
@@ -143,7 +169,7 @@ class EnrichWithAi extends Command
 
                 if (!$validation['valid']) {
                     $job->update([
-                        'ai_status'       => 'invalid_output',
+                        'ai_status'       => 'insufficient_content',
                         'raw_ai_output'   => $rawOutput,
                         'validation_notes' => implode('; ', $validation['errors']),
                         'processed_at'    => now(),

@@ -20,13 +20,13 @@ class NewsItemRequest extends FormRequest
             'primary_category' => 'sometimes|nullable|string|max:100',
             'sub_cat' => 'sometimes|nullable|string|max:100',
             'secondary_category' => 'sometimes|nullable|string|max:100',
-            'status' => 'sometimes|nullable|in:pending_extraction,active';,
-            'relevance_mode' => 'sometimes|nullable|in:hybrid,location_only,category_only',
+            'status' => 'sometimes|nullable|in:pending_extraction,active',
+            'relevance_mode' => 'sometimes|nullable|in:location_and_category,location_only,category_only',
             'precision_type' => 'sometimes|nullable|in:exact_area,approximate_area,state_center,region,country,national,unresolved',
             'main_place_text' => 'sometimes|nullable|string|max:255',
             'location_label' => 'sometimes|nullable|string|max:255',
-            'lat' => 'sometimes|nullable|numeric|between:-90,90',
-            'lng' => 'sometimes|nullable|numeric|between:-180,180',
+            'latitude'  => 'sometimes|nullable|numeric|between:-90,90',
+            'longitude' => 'sometimes|nullable|numeric|between:-180,180',
             'source_name' => 'sometimes|nullable|string|max:255',
             'source' => 'sometimes|nullable|string|max:255',
             'source_url' => 'sometimes|nullable|url|max:500',
@@ -68,9 +68,16 @@ class NewsItemRequest extends FormRequest
         if (isset($data['location_label']) && !isset($data['main_place_text'])) {
             $data['main_place_text'] = $data['location_label'];
         }
+        // Canonical geo field aliases: accept old lat/lng names and map to canonical latitude/longitude
+        if (isset($data['lat']) && !isset($data['latitude'])) {
+            $data['latitude'] = $data['lat'];
+        }
+        if (isset($data['lng']) && !isset($data['longitude'])) {
+            $data['longitude'] = $data['lng'];
+        }
 
         // Remove frontend alias fields
-        unset($data['headline'], $data['primary_cat'], $data['sub_cat'], $data['source_url'], $data['datetime'], $data['location_label']);
+        unset($data['headline'], $data['primary_cat'], $data['sub_cat'], $data['source_url'], $data['datetime'], $data['location_label'], $data['lat'], $data['lng']);
 
         return $data;
     }

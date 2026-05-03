@@ -177,6 +177,7 @@ class IngestController extends Controller
                 'category' => 'nullable|string|max:100',
                 'primary_category' => 'nullable|string|max:100',
                 'secondary_category' => 'nullable|string|max:100',
+                'location_text' => 'nullable|string|max:200',
             ]);
             
             if ($validator->fails()) {
@@ -241,7 +242,7 @@ class IngestController extends Controller
             // Create news item
             $categories = $this->normalizeCategories($data);
 
-            $newsItem = NewsItem::create([
+            $createData = [
                 'title' => $data['title'],
                 'url' => $data['url'],
                 'source' => $data['source'],
@@ -250,7 +251,11 @@ class IngestController extends Controller
                 'primary_category' => $categories['primary_category'],
                 'secondary_category' => $categories['secondary_category'],
                 'status' => 'pending_extraction',
-            ]);
+            ];
+            if (!empty($data['location_text'])) {
+                $createData['main_place_text'] = $data['location_text'];
+            }
+            $newsItem = NewsItem::create($createData);
             
             // Update raw ingest status
             $rawIngest->update(['processing_status' => 'processed']);
@@ -340,8 +345,8 @@ class IngestController extends Controller
                 'category' => 'nullable|string|max:100',
                 'primary_category' => 'nullable|string|max:100',
                 'secondary_category' => 'nullable|string|max:100',
-                'lat' => 'nullable|numeric|between:-90,90',
-                'lng' => 'nullable|numeric|between:-180,180',
+                'latitude' => 'nullable|numeric|between:-90,90',
+                'longitude' => 'nullable|numeric|between:-180,180',
             ]);
 
             if ($validator->fails()) {
@@ -379,11 +384,11 @@ class IngestController extends Controller
                 'status' => 'pending_extraction',
             ];
 
-            if (array_key_exists('lat', $validated)) {
-                $createData['lat'] = $validated['lat'];
+            if (array_key_exists('latitude', $validated)) {
+                $createData['latitude'] = $validated['latitude'];
             }
-            if (array_key_exists('lng', $validated)) {
-                $createData['lng'] = $validated['lng'];
+            if (array_key_exists('longitude', $validated)) {
+                $createData['longitude'] = $validated['longitude'];
             }
 
             $newsItem = NewsItem::create($createData);

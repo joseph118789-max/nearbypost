@@ -13,8 +13,9 @@ class NewsController extends Controller
 {
     private function feedQuery()
     {
-        return FeedReadyItem::where('is_active', true)
-            ->where('relevance_mode', '!=', 'category_only');
+        // Admin feed shows all promoted active rows — do not exclude category_only.
+        // All rows in feed_ready_items have passed the promotion gate.
+        return FeedReadyItem::where('is_active', true);
     }
 
     public function index(Request $request): JsonResponse

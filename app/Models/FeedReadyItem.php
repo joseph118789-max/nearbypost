@@ -12,6 +12,30 @@ class FeedReadyItem extends Model
 
     protected $table = 'feed_ready_items';
 
+    // ── D17: Feed cache invalidation on serving-layer changes ───────────────
+    protected static function booted(): void
+    {
+        // On create: invalidate home + categories + that category's feed
+        static::created(function (FeedReadyItem $item) {
+            app(\App\Services\FeedCacheService::class)
+                ->invalidateForCategory($item->primary_category);
+        });
+
+        // On update: invalidate home + categories + both old and new category
+        static::updated(function (FeedReadyItem $item) {
+            $oldCategory = $item->getOriginal('primary_category');
+            $newCategory = $item->primary_category;
+            app(\App\Services\FeedCacheService::class)
+                ->invalidateForCategory($newCategory, $oldCategory);
+        });
+
+        // On delete: same as update (invalidate home, categories, that category)
+        static::deleted(function (FeedReadyItem $item) {
+            app(\App\Services\FeedCacheService::class)
+                ->invalidateForCategory($item->primary_category);
+        });
+    }
+
     protected $fillable = [
         'news_item_id',
         'title',
