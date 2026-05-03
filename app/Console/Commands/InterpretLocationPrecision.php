@@ -36,17 +36,44 @@ class InterpretLocationPrecision extends Command
     private const CONF_HIGH   = 0.8;
     private const CONF_MEDIUM = 0.5;
 
+    private function backfillLegacyConfidence(): void
+    {
+        // Items with lat/lng but no geocode_confidence — these are legacy items
+        // that were geocoded by the old pipeline but never got a confidence score.
+        // Assign a default confidence of 0.6 (medium-high) as a reasonable proxy.
+        $updated = NewsItem::whereNull('geocode_confidence')
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->where(function ($q) {
+                $q->whereNull('geocode_status')
+                  ->orWhere('geocode_status', '');
+            })
+            ->update(['geocode_confidence' => 0.6]);
+        $this->info("Backfilled geocode_confidence=0.6 for {$updated} legacy items.");
+    }
+
     public function handle(): int
     {
         $newsItemId = $this->option('news_item_id');
         $limit     = (int) $this->option('limit');
 
+        // First pass: backfill geocode_confidence for legacy items
+        $this->backfillLegacyConfidence();
+
         $query = NewsItem::query()
-            ->where('geocode_status', 'success')
-            ->whereNotNull('latitude')
-            ->whereNotNull('longitude')
+            ->where(function ($q) {
+                // Items that went through the full pipeline
+                $q->where('geocode_status', 'success');
+                // OR items with legacy lat/lng that were geocoded but never marked
+                $q->orWhere(function ($q2) {
+                    $q2->whereNull('geocode_status')
+                       ->whereNotNull('latitude')
+                       ->whereNotNull('longitude');
+                });
+            })
             ->where(function ($q) {
                 $q->whereNull('coverage_status')
+                  ->orWhere('coverage_status', '')
                   ->orWhereNotIn('coverage_status', [self::COVERAGE_NEARBY, self::COVERAGE_BROADER]);
             });
 
