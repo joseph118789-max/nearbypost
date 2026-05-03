@@ -52,6 +52,8 @@ class NewsItem extends Model
         "coverage_type",
         "status",
         "is_active",
+        "enrichment_failure_reason",
+        "enrichment_failure_count",
     ];
 
     protected $casts = [

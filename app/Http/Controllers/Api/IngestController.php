@@ -177,6 +177,7 @@ class IngestController extends Controller
                 'category' => 'nullable|string|max:100',
                 'primary_category' => 'nullable|string|max:100',
                 'secondary_category' => 'nullable|string|max:100',
+                'location_text' => 'nullable|string|max:200',
             ]);
             
             if ($validator->fails()) {
@@ -241,7 +242,7 @@ class IngestController extends Controller
             // Create news item
             $categories = $this->normalizeCategories($data);
 
-            $newsItem = NewsItem::create([
+            $createData = [
                 'title' => $data['title'],
                 'url' => $data['url'],
                 'source' => $data['source'],
@@ -250,7 +251,11 @@ class IngestController extends Controller
                 'primary_category' => $categories['primary_category'],
                 'secondary_category' => $categories['secondary_category'],
                 'status' => 'pending_extraction',
-            ]);
+            ];
+            if (!empty($data['location_text'])) {
+                $createData['main_place_text'] = $data['location_text'];
+            }
+            $newsItem = NewsItem::create($createData);
             
             // Update raw ingest status
             $rawIngest->update(['processing_status' => 'processed']);

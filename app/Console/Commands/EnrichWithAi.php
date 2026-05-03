@@ -99,9 +99,11 @@ class EnrichWithAi extends Command
         } else {
             // Normal run: skip items already successfully enriched
             // Items with ai_status='pending' are primary targets
+            // Items with ai_status='insufficient_content' are retried after n8n fix
             // Also skip items that have successful AI processing for current pipeline
             $query->where(function ($q) {
                 $q->where('ai_status', 'pending')
+                  ->orWhere('ai_status', 'insufficient_content')
                   ->orWhereDoesntHave('aiProcessingJob', function ($q2) {
                       $q2->where('ai_status', 'success')
                          ->where('pipeline_version', self::PIPELINE_VERSION);
@@ -167,7 +169,7 @@ class EnrichWithAi extends Command
 
                 if (!$validation['valid']) {
                     $job->update([
-                        'ai_status'       => 'invalid_output',
+                        'ai_status'       => 'insufficient_content',
                         'raw_ai_output'   => $rawOutput,
                         'validation_notes' => implode('; ', $validation['errors']),
                         'processed_at'    => now(),
