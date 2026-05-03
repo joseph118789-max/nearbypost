@@ -16,7 +16,7 @@ class FeedController extends Controller
 
     private function baseFields(): array
     {
-        return ['id','title','summary','source','published_at','primary_category','secondary_category','url'];
+        return ['id','title','summary','source','published_at','primary_category','secondary_category','url','lat','lng','location_label','precision_type'];
     }
 
     // ── Cache key helpers ────────────────────────────────────────────────────
