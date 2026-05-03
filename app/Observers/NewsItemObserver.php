@@ -9,7 +9,8 @@ class NewsItemObserver
 {
     public function created(NewsItem $newsItem): void
     {
-        $this->syncToFeed($newsItem);
+        // No-op: feed_ready_items population is handled by PopulateFeedReady command
+        // after pipeline enrichment completes. Do not write un-enriched data on create.
     }
 
     public function updated(NewsItem $newsItem): void
