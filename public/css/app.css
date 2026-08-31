@@ -214,3 +214,19 @@ a { color: inherit; }
   * { transition: none !important; }
   .story-card:hover { transform: none; }
 }
+
+/* Section tabs shown only when the layout is stacked. */
+.mobile-tabs { display: none; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+
+@media (max-width: 1100px) {
+  .mobile-tabs { display: flex; }
+
+  /* Content first, filters next, the long link lists last. */
+  .desktop-main { order: 1; }
+  .desktop-right { order: 2; }
+  .desktop-sidebar { order: 3; }
+
+  /* The sidebar's own nav duplicates .mobile-tabs once stacked. */
+  .desktop-sidebar .desktop-nav,
+  .desktop-sidebar .site-tagline { display: none; }
+}

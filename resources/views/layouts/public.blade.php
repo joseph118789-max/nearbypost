@@ -35,7 +35,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="{{ asset('css/app.css') }}">
+  {{-- Versioned so an edit is not masked by the CDN's cached copy. --}}
+  <link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ @filemtime(public_path('css/app.css')) ?: '1' }}">
 
   @isset($jsonLd)
     <script type="application/ld+json">{!! json_encode($jsonLd, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}</script>
@@ -94,6 +95,15 @@
   </div>
 
   <main class="desktop-main" id="main">
+    {{-- Section tabs repeated at the top of the content on small screens.
+         Stacked, the sidebar would otherwise put thirty navigation links above
+         the first headline. --}}
+    <nav class="mobile-tabs" aria-label="Sections">
+      <a class="filter-chip {{ ($tab ?? '') === 'nearme' ? 'active' : '' }}" href="{{ route('home') }}">Near Me</a>
+      <a class="filter-chip {{ ($tab ?? '') === 'interest' ? 'active' : '' }}" href="{{ route('interest') }}">By Interest</a>
+      <a class="filter-chip {{ ($tab ?? '') === 'marketplace' ? 'active' : '' }}" href="{{ route('marketplace') }}">Marketplace</a>
+    </nav>
+
     @yield('main')
   </main>
 
