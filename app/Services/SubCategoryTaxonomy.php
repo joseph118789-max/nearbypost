@@ -105,4 +105,33 @@ class SubCategoryTaxonomy
 
         return implode("\n", $lines);
     }
+
+    /**
+     * The sub-category list with ids, for a prompt whose answer is keyed by id.
+     *
+     * Names alone would have to be matched back on return, and a near-miss
+     * would quietly become a different sub-category.
+     */
+    public function promptBlockWithIds(): string
+    {
+        $rows = \Illuminate\Support\Facades\DB::table('subcategories')
+            ->select('id', 'primary_category', 'sub_category', 'weight')
+            ->orderBy('primary_category')
+            ->orderByDesc('weight')
+            ->get();
+
+        $byPrimary = [];
+
+        foreach ($rows as $row) {
+            $byPrimary[$row->primary_category][] = $row->id . ':' . $row->sub_category;
+        }
+
+        $lines = [];
+
+        foreach ($byPrimary as $primary => $subs) {
+            $lines[] = $primary . ' -> ' . implode(', ', $subs);
+        }
+
+        return implode("\n", $lines);
+    }
 }

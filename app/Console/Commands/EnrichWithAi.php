@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
 use App\Services\SubCategoryTaxonomy;
 use App\Services\Classification\ContentPolicy;
+use App\Services\Classification\CategoryScorer;
+use App\Services\Classification\BatchSlots;
 
 /**
  * ═══════════════════════════════════════════════════════════════
@@ -44,7 +46,7 @@ class EnrichWithAi extends Command
     protected $description = 'Enrich news items with AI: validates output, enforces controlled enums, preserves good output on retry';
 
     // ── Versioning ───────────────────────────────────────────────────────────
-    private const PROMPT_VERSION    = 'v4';
+    private const PROMPT_VERSION    = 'v5';
     private const PIPELINE_VERSION  = 'v1.0';
     private const MODEL             = 'deepseek-chat';
     private const MAX_RETRIES       = 2;
@@ -175,7 +177,12 @@ class EnrichWithAi extends Command
         // half of all real Malay articles when it was measured.
         $newsValue = $policy->assessNewsValue($title, $inputText, $haveArticleBody);
 
-        $prompt = $this->buildPrompt($title, $inputText, $item->source ?? '');
+        // Spec 2.9: the model cannot know what it said about the previous
+        // forty-nine items, so the remaining allowance is handed to it.
+        $batchSlots = new BatchSlots();
+        $slots      = $batchSlots->remaining();
+
+        $prompt = $this->buildPrompt($title, $inputText, $item->source ?? '', $slots);
         $retries = 0;
         $lastException = null;
 
@@ -211,6 +218,77 @@ class EnrichWithAi extends Command
                     return; // Don't retry invalid output — it's not a transient error
                 }
 
+                // ── Spec 2.6: the model may refuse the item outright ──────
+                if ($validation['d'] === 1) {
+                    $this->refuse($item, $job, $validation['e'], 'classifier discard');
+                    return;
+                }
+
+                // ── Spec 6/9/10: the arithmetic happens here, not in the model
+                $scorer  = new CategoryScorer();
+                $outcome = $scorer->score($validation['rel'], $validation['sub'], [
+                    'gps'   => $validation['g'] === 1,
+                    'cap'   => $haveArticleBody ? $newsValue['cap'] : min($newsValue['cap'], 0.7),
+                    'slots' => $slots,
+                ]);
+
+                if (!($outcome['valid'] ?? false)) {
+                    $retries++;
+
+                    if ($retries <= self::MAX_RETRIES) {
+                        $this->warn("  RESCORE {$item->id}: " . ($outcome['reason'] ?? 'unscorable'));
+                        continue;
+                    }
+
+                    $this->refuse($item, $job, 'VALIDATION_FAILED', 'no scorable categories');
+                    return;
+                }
+
+                $ambiguous  = $outcome['ambiguous'] || $validation['a'] === 1;
+                $confidence = $policy->confidence([
+                    'url_used'   => $haveArticleBody,
+                    'word_count' => str_word_count((string) $inputText),
+                    'retries'    => $retries,
+                    'ambiguous'  => $ambiguous,
+                    'non_primary_language' => ($validation['source_language'] ?? 'en') !== 'en',
+                    'spam_signals' => $newsValue['reasons'] !== [],
+                ]);
+
+                // Spec 17: the production contract.
+                $contract = [
+                    'g'  => $validation['g'],
+                    'd'  => 0,
+                    'a'  => $ambiguous ? 1 : 0,
+                    'b'  => ($slots['relevance_1_slots'] ?? 1) === 0 ? 1 : 0,
+                    'u'  => $haveArticleBody ? 1 : 0,
+                    'c'  => $confidence,
+                    'e'  => null,
+                    'p'  => [$outcome['primary']['id'], $outcome['primary']['relevance'], $outcome['primary']['score']],
+                    's'  => $outcome['secondary']
+                        ? [$outcome['secondary']['id'], $outcome['secondary']['relevance'], $outcome['secondary']['score']]
+                        : null,
+                    'sc' => $outcome['sub']['id']
+                        ? [$outcome['sub']['id'], $outcome['sub']['relevance'], $outcome['sub']['score']]
+                        : null,
+                ];
+
+                // ── Spec 13: hard rejection, then retry rather than store ──
+                $specErrors = $scorer->validate($contract);
+
+                if ($specErrors !== []) {
+                    $retries++;
+
+                    if ($retries <= self::MAX_RETRIES) {
+                        $this->warn("  REVALIDATE {$item->id}: " . implode(', ', $specErrors));
+                        continue;
+                    }
+
+                    $this->refuse($item, $job, 'VALIDATION_FAILED', implode(', ', $specErrors));
+                    return;
+                }
+
+                $batchSlots->consume($outcome['primary']['relevance']);
+
                 // ── All good: persist validated fields ────────────────────
                 $job->update([
                     'ai_status'          => 'success',
@@ -232,20 +310,20 @@ class EnrichWithAi extends Command
                 // Update NewsItem with coordinates if available and set status
                 $updateData = [
                     'main_place_text'            => $validation['place'],
-                    'ai_category'                => $validation['category'],
-                    'sub_category'               => $validation['sub_category'],
+                    // The scorer's decision, not the model's opinion.
+                    'ai_category'                => mb_strtolower($outcome['primary']['name']),
+                    'secondary_category'         => $outcome['secondary']
+                        ? mb_strtolower($outcome['secondary']['name'])
+                        : null,
+                    'sub_category'               => $outcome['sub']['name'],
+                    'classification'             => json_encode($contract),
+                    'meta_confidence'            => $confidence,
+                    'ambiguous'                  => $ambiguous,
                     'source_language'            => $validation['source_language'],
                     'discarded'                  => false,
                     'error_code'                 => null,
                     'url_used'                   => $haveArticleBody,
-                    'gps_flag'                   => $validation['relevance_mode'] !== 'category_only',
-                    'meta_confidence'            => $policy->confidence([
-                        'url_used'   => $haveArticleBody,
-                        'word_count' => str_word_count((string) $inputText),
-                        'retries'    => $retries,
-                        'non_primary_language' => ($validation['source_language'] ?? 'en') !== 'en',
-                        'spam_signals' => $newsValue['reasons'] !== [],
-                    ]),
+                    'gps_flag'                   => $validation['g'] === 1,
                     'spec_version'               => self::PROMPT_VERSION,
                     'ai_summary'                 => $validation['summary'],
                     'ai_status'                  => 'success',
@@ -337,7 +415,12 @@ class EnrichWithAi extends Command
         $category = strtolower($rawCat);
         // Build lowercase version of VALID_CATEGORIES for comparison
         $validLower = array_map('strtolower', self::VALID_CATEGORIES);
-        if (!in_array($category, $validLower, true)) {
+        // The model is no longer asked to name a category: it supplies relevance
+        // per id and CategoryScorer decides. Only complain when relevance is
+        // missing too, which would mean a response in the older shape.
+        $hasRelevance = !empty($parsed['rel']);
+
+        if (!$hasRelevance && !in_array($category, $validLower, true)) {
             $errors[] = "category_unknown:{$rawCat}";
             $category = 'other'; // coerce to safe default
         }
@@ -369,18 +452,19 @@ class EnrichWithAi extends Command
             $lat = null;
             $lng = null;
         }
-        $relevanceMap = [
-            'local'   => 'location_and_category',
-            'national'=> 'category_only',
-            'global'  => 'category_only',
-        ];
-        if (isset($relevanceMap[$rawRelevance])) {
-            $relevanceMode = $relevanceMap[$rawRelevance];
-        } elseif (in_array($rawRelevance, self::RELEVANCE_MODES, true)) {
+        // Spec section 5 answers this with g, so read that rather than the
+        // free-text field the v5 prompt no longer asks for. Reading the old
+        // field made every story category_only - the one value the Nearby feed
+        // excludes - while the contract correctly recorded g:1.
+        $gpsFlag = (int) ($parsed['g'] ?? 0) === 1;
+
+        if ($gpsFlag && !empty($place)) {
+            $relevanceMode = 'location_and_category';
+        } elseif (in_array($rawRelevance, self::RELEVANCE_MODES, true) && empty($parsed['rel'])) {
+            // Older-shaped response, before g existed.
             $relevanceMode = $rawRelevance;
         } else {
-            // Infer from presence of place
-            $relevanceMode = !empty($place) ? 'location_and_category' : 'category_only';
+            $relevanceMode = 'category_only';
         }
 
         if (empty($place) && $relevanceMode === 'location_and_category') {
@@ -429,6 +513,13 @@ class EnrichWithAi extends Command
             'sub_category'  => $subCategory,
             'translations'  => $translations,
             'source_language' => $sourceLanguage,
+            // The spec's own fields, passed through untouched for the scorer.
+            'rel'           => $parsed['rel'] ?? [],
+            'sub'           => $parsed['sub'] ?? [],
+            'd'             => (int) ($parsed['d'] ?? 0),
+            'e'             => $parsed['e'] ?? null,
+            'g'             => (int) ($parsed['g'] ?? 0),
+            'a'             => (int) ($parsed['a'] ?? 0),
             'place'         => $place,
             'relevance_mode'=> $relevanceMode,
             'is_article'    => $isArticle,
@@ -534,7 +625,7 @@ class EnrichWithAi extends Command
         ]);
     }
 
-    private function buildPrompt(string $title, string $text, string $source): string
+    private function buildPrompt(string $title, string $text, string $source, array $slots = []): string
     {
         $truncated = mb_substr($text, 0, 3000);
         // Escape for safe embedding in prompt
@@ -543,33 +634,65 @@ class EnrichWithAi extends Command
         $safeText  = htmlspecialchars($truncated, ENT_NOQUOTES, 'UTF-8');
         $taxonomy  = (new SubCategoryTaxonomy())->promptBlock();
 
+        $categoryList = (new CategoryScorer())->promptCategories();
+        $subList      = (new SubCategoryTaxonomy())->promptBlockWithIds();
+        $slots        = json_encode($slots);
+
         return <<<PROMPT
-You are a precise news analyst. Given the article below, respond with ONLY valid JSON — no markdown fences, no explanation.
+You are an expert hyperlocal news classifier for nearbypost.com. Respond with
+ONLY valid JSON - no markdown fences, no commentary.
+
+You judge RELEVANCE. You do not choose the category: relevance is multiplied by
+each category's weight elsewhere, and the highest score wins. Do not try to
+predict that outcome.
 
 Return this exact shape:
 {
-  "is_article": true or false - is this content a genuine news article (true) or just a navigation page, tag page, category listing, or non-content page (false),
-  "summary": "2-3 sentence summary of the article (10-300 chars, omit if not an article)",
-  "category": "one of: Property & Real Estate, Food & Lifestyle, Infrastructure, Transport & Mobility, Crime & Safety, Environment, Education, Health, Travel, Entertainment / Arts & Culture, Charity & Nonprofits, Weather, Defense & Military, Markets & Finance, Business & Corporate, Technology & Digital, Automotive, Government & Policy, Science, Sports, Religion, other (omit if not an article)",
-  "place": "main specific location (city or state in Malaysia preferred, or null if not location-specific or not an article)",
-  "lat": "latitude of the place (number, e.g. 3.139, omit/null if not location-specific or cannot determine)",
-  "lng": "longitude of the place (number, e.g. 101.687, omit/null if not location-specific or cannot determine)",
-  "relevance": "location_and_category if place is a specific city/area, category_only if national/world-wide (omit if not an article)",
-  "sub_category": "exact sub-category name copied from the line below that matches your chosen category (omit if not an article)",
-  "lang": "ISO 639-1 code of the language the article is written in, e.g. en, ms, zh, ta, hi, ja, ko",
+  "is_article": true or false,
+  "d": 0 or 1,
+  "e": null or one of SPAM_DETECTED, OFF_TOPIC, INSUFFICIENT_CONTENT, INVALID_CONTENT, PAYWALL_BLOCKED, UNSUPPORTED_LANGUAGE,
+  "g": 0 or 1,
+  "a": 0 or 1,
+  "rel": {"<category id>": <relevance 0-1>, ...},
+  "sub": {"<sub-category id>": <relevance 0-1>, ...},
+  "summary": "2-3 sentence summary of the article",
+  "place": "the main specific location, or null if not tied to one place",
+  "lang": "ISO 639-1 code of the language the article is written in",
   "t": {
-    "en": {"title": "the headline in natural English", "summary": "the summary in natural English"},
-    "ms": {"title": "the headline in natural Malay", "summary": "the summary in natural Malay"},
-    "zh": {"title": "the headline in Simplified Chinese", "summary": "the summary in Simplified Chinese"}
+    "en": {"title": "headline in natural English", "summary": "summary in natural English"},
+    "ms": {"title": "headline in natural Malay", "summary": "summary in natural Malay"},
+    "zh": {"title": "headline in Simplified Chinese", "summary": "summary in Simplified Chinese"}
   }
 }
 
-Translate faithfully. Keep place names, people and organisations in the form a
-Malaysian reader would recognise; do not translate proper nouns that are
-normally left as they are. Do not add anything the article does not say.
+DISCARD (d = 1) if the item is not news: pure opinion or editorial, unconfirmed
+rumour, speculation ("might", "could", "possibly"), he-said-she-said with no
+resolution, clickbait without substance, or no actual event. Set e when a listed
+code applies. When d = 1, rel and sub may be empty.
 
-Sub-categories by category. Pick one from the line matching the category you chose:
-{$taxonomy}
+RELEVANCE
+- Include only categories with non-zero relevance. Omit the rest.
+- 1.0 is RARE: it needs a specific place, a specific action, and a verifiable
+  fact. At most one category may be 1.0.
+- At most one further category may be 0.8-0.9. All others 0.6 or below.
+- Opinion, speculation or an interview caps everything at 0.6.
+- Remaining high-confidence slots in this batch: {$slots}. If a slot is 0 you
+  may not use that level; choose the next one down.
+
+GPS (g = 1) only when a specific named place is given - a town, district,
+region or street. "Kuala Lumpur" and "KL" qualify. "urban areas", "some areas"
+and "city center" without a city do not.
+
+AMBIGUOUS (a = 1) when two categories are genuinely equally applicable.
+
+SUB-CATEGORIES: give relevance for any that apply, from any category - the
+correct one for the winning category is selected afterwards.
+
+Categories (id: name):
+{$categoryList}
+
+Sub-categories (id: name, grouped by category):
+{$subList}
 
 Article title: {$safeTitle}
 Source: {$safeSrc}
@@ -623,6 +746,13 @@ PROMPT;
             // Whitelist parser: a key omitted here never reaches validation.
             'sub_category' => $parsed['sub_category'] ?? null,
             'lang'         => $parsed['lang'] ?? null,
+            // Whitelist parser: a key omitted here never reaches validation.
+            'd'            => (int) ($parsed['d'] ?? 0),
+            'e'            => $parsed['e'] ?? null,
+            'g'            => (int) ($parsed['g'] ?? 0),
+            'a'            => (int) ($parsed['a'] ?? 0),
+            'rel'          => is_array($parsed['rel'] ?? null) ? $parsed['rel'] : [],
+            'sub'          => is_array($parsed['sub'] ?? null) ? $parsed['sub'] : [],
             't'            => is_array($parsed['t'] ?? null) ? $parsed['t'] : null,
             'place'     => $parsed['place']     ?? null,
             'relevance' => $parsed['relevance']  ?? 'category_only',
