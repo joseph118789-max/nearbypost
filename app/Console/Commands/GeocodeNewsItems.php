@@ -40,7 +40,9 @@ class GeocodeNewsItems extends Command
 
         $query = NewsItem::query()
             ->whereNotNull('canonical_place_name')
-            ->where('alias_match_status', 'matched')
+            // Alias matching normalises names; it does not decide what gets
+            // geocoded. 'passthrough' rows carry usable raw place text.
+            ->whereIn('alias_match_status', ['matched', 'passthrough'])
             ->where(function ($q) {
                 // Not yet geocoded, or previously failed (allow retry)
                 $q->whereNull('geocode_status')
@@ -101,6 +103,10 @@ class GeocodeNewsItems extends Command
                 $item->update([
                     'latitude'           => $result['lat'],
                     'longitude'          => $result['lng'],
+                    // Keep the legacy pair in step: a geocoded fix is
+                    // authoritative over any coordinate the AI guessed.
+                    'lat'                => $result['lat'],
+                    'lng'                => $result['lng'],
                     'geocode_status'     => 'success',
                     'geocode_provider'   => $this->geocoder->getProvider(),
                     'geocode_confidence' => $result['confidence'],

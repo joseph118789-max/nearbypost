@@ -7,11 +7,15 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use App\Models\FeedReadyItem;
 use Illuminate\Support\Facades\DB;
+use App\Services\LocationResolver;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
 
 class FeedController extends Controller
 {
+    /** Default Nearby time window, in days (Manual V6 s21). */
+    private const DEFAULT_WINDOW_DAYS = 7;
+
     private const CACHE_TTL_SECONDS = 300;
 
     private function baseFields(): array
@@ -64,9 +68,9 @@ class FeedController extends Controller
         return 'distance_km ASC, published_at DESC';
     }
 
-    private function geoCacheKey(float $lat, float $lng, float $radius): string
+    private function geoCacheKey(float $lat, float $lng, float $radius, int $days = self::DEFAULT_WINDOW_DAYS): string
     {
-        return 'feed:geo:' . $this->geoBucket($lat, $lng) . ':' . (int) $radius;
+        return 'feed:geo:' . $this->geoBucket($lat, $lng) . ':' . (int) $radius . ':d' . $days;
     }
 
     // ── Endpoints ──────────────────────────────────────────────────────────
@@ -119,16 +123,34 @@ class FeedController extends Controller
     public function nearby(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'lat'    => 'required|numeric|between:-90,90',
-            'lng'    => 'required|numeric|between:-180,180',
+            'lat'    => 'required_without:place|numeric|between:-90,90',
+            'lng'    => 'required_without:place|numeric|between:-180,180',
+            'place'  => 'required_without_all:lat,lng|string|max:120',
             'radius' => 'required|numeric|min:1|max:500',
+            'days'   => 'sometimes|integer|min:1|max:365',
         ]);
 
-        $lat    = (float) $validated['lat'];
-        $lng    = (float) $validated['lng'];
-        $radius = (float) $validated['radius'];
+        // Coordinates win when supplied; otherwise resolve the place name.
+        if (isset($validated['lat'], $validated['lng'])) {
+            $lat = (float) $validated['lat'];
+            $lng = (float) $validated['lng'];
+        } else {
+            $resolved = (new LocationResolver())->resolve($validated['place'] ?? null);
 
-        $items = $this->cached($this->geoCacheKey($lat, $lng, $radius), function () use ($lat, $lng, $radius) {
+            if (!$resolved) {
+                return response()->json([
+                    'error'   => 'unresolved_location',
+                    'message' => 'That place could not be located. Try a nearby town or city.',
+                ], 422);
+            }
+
+            $lat = $resolved['lat'];
+            $lng = $resolved['lng'];
+        }
+        $radius = (float) $validated['radius'];
+        $days   = (int) ($validated['days'] ?? self::DEFAULT_WINDOW_DAYS);
+
+        $items = $this->cached($this->geoCacheKey($lat, $lng, $radius, $days), function () use ($lat, $lng, $radius, $days) {
             // Strict geo-serving: require is_active, lat/lng present, and geo-eligible precision.
             // category_only items are excluded because they have no geo data.
             $sql = "SELECT * FROM (
@@ -149,12 +171,13 @@ class FeedController extends Controller
                   AND lat IS NOT NULL
                   AND lng IS NOT NULL
                   AND relevance_mode != 'category_only'
+                  AND published_at >= NOW() - make_interval(days => :days)
             ) AS nearby
             WHERE distance_km <= :radius
             ORDER BY distance_km ASC, published_at DESC
             LIMIT 20";
 
-            $rows = DB::select($sql, ['lat' => $lat, 'lng' => $lng, 'radius' => $radius]);
+            $rows = DB::select($sql, ['lat' => $lat, 'lng' => $lng, 'radius' => $radius, 'days' => $days]);
 
             return array_map(function($row) {
                 return [

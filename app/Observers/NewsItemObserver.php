@@ -53,9 +53,17 @@ class NewsItemObserver
                 'published_at' => $newsItem->published_at,
                 'primary_category' => $primaryCategory,
                 'secondary_category' => $newsItem->secondary_category,
-                'location_label' => $newsItem->location_label,
-                'lat' => $newsItem->lat,
-                'lng' => $newsItem->lng,
+                'location_label' => $newsItem->location_label
+                    ?: $newsItem->canonical_place_name,
+                // latitude/longitude is what the geocoder writes and what
+                // PopulateFeedReady serves from; lat/lng is the legacy pair
+                // kept only as a fallback for rows geocoded before May 2026.
+                'lat' => $newsItem->latitude ?? $newsItem->lat,
+                'lng' => $newsItem->longitude ?? $newsItem->lng,
+                'canonical_place_name' => $newsItem->canonical_place_name,
+                'geo_confidence_score' => $newsItem->geo_confidence_score,
+                'coverage_type' => $newsItem->coverage_type,
+                'sort_timestamp' => $newsItem->published_at,
                 'precision_type' => $newsItem->precision_type,
                 'relevance_mode' => $newsItem->relevance_mode,
                 'is_active' => true,

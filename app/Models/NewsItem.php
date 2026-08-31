@@ -39,6 +39,11 @@ class NewsItem extends Model
         "ai_estimated_cost",
         "latitude",
         "longitude",
+        // Legacy coordinate pair, kept in step with latitude/longitude.
+        // Omitting these silently discarded every write to them.
+        "lat",
+        "lng",
+        "location_label",
         "precision_type",
         "geocode_confidence",
         "geocode_confidence_score",

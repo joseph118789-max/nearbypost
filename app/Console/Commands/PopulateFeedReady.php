@@ -21,7 +21,8 @@ class PopulateFeedReady extends Command
 {
     protected $signature = 'ingest:populate-feed
         {--news_item_id= : Populate a specific item only}
-        {--limit=100    : Max items per run}';
+        {--limit=100    : Max items per run}
+        {--all          : Ignore the up-to-date check and re-sync everything}';
 
     protected $description = 'Upsert feed_ready_items from processed news_items (idempotent)';
 
@@ -46,6 +47,15 @@ class PopulateFeedReady extends Command
 
         if ($newsItemId) {
             $query->where('id', $newsItemId);
+        } elseif (!$this->option('all')) {
+            // Without this predicate the command re-processed the same first
+            // 100 ids on every run and never reached the rest of the table.
+            $query->whereNotExists(function ($q) {
+                $q->selectRaw('1')
+                  ->from('feed_ready_items')
+                  ->whereColumn('feed_ready_items.news_item_id', 'news_items.id')
+                  ->whereColumn('feed_ready_items.updated_at', '>=', 'news_items.updated_at');
+            });
         }
 
         $items = $query->limit($limit)->orderBy('id')->get();
@@ -174,20 +184,9 @@ class PopulateFeedReady extends Command
         $existing = FeedReadyItem::where('news_item_id', $item->id)->first();
 
         if ($existing) {
-            // Only update if source data has actually changed
-            $dirty = false;
-            foreach (['title','summary','primary_category','location_label','lat','lng',
-                       'precision_type','relevance_mode','canonical_place_name',
-                       'geo_confidence_score','coverage_type'] as $field) {
-                if ($existing->$field !== $row[$field]) { $dirty = true; break; }
-            }
-
-            if ($dirty) {
-                $existing->update($row);
-                Log::debug('FeedReady updated', ['news_item_id' => $item->id]);
-                return 'updated';
-            }
-            return 'skipped';
+            $existing->update($row);
+            Log::debug('FeedReady updated', ['news_item_id' => $item->id]);
+            return 'updated';
         }
 
         $row['news_item_id'] = $item->id;
