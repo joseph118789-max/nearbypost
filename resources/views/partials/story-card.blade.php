@@ -3,12 +3,11 @@
 @php
   $published = !empty($story['published_at']) ? strtotime((string) $story['published_at']) : null;
   $distance  = $story['distance_km'] ?? null;
+  $source    = $story['source'] ?? null;
 @endphp
 
 <article class="story-card">
   <div class="story-meta">
-    <span class="story-source">{{ $story['source'] ?? 'Unknown' }}</span>
-
     @if(!empty($story['primary_category']))
       <a class="story-category"
          href="{{ route('category', ['slug' => \App\Support\Slug::make($story['primary_category'])]) }}">{{ ucwords($story['primary_category']) }}</a>
@@ -24,7 +23,7 @@
   </div>
 
   <h2 class="story-title">
-    <a href="{{ $story['url'] }}" rel="noopener nofollow" target="_blank">{{ $story['title'] }}</a>
+    <a href="{{ $story['url'] }}" target="_blank" rel="noopener nofollow">{{ $story['title'] }}</a>
   </h2>
 
   @if(!empty($story['summary']))
@@ -32,11 +31,21 @@
   @endif
 
   <div class="story-footer">
-    @if($published)
-      <time datetime="{{ date('c', $published) }}">{{ \Carbon\Carbon::createFromTimestamp($published)->diffForHumans() }}</time>
-    @else
-      <span></span>
-    @endif
+    <div class="story-footer-left">
+      @if($published)
+        <time datetime="{{ date('c', $published) }}">{{ \Carbon\Carbon::createFromTimestamp($published)->diffForHumans() }}</time>
+      @endif
+
+      @if($source)
+        {{-- Attribution sits with the story and opens the publisher's own page.
+             We summarise other people's journalism, so the credit and the route
+             back to it belong on every card, not just on the headline. --}}
+        <a class="story-source-link" href="{{ $story['url'] }}" target="_blank" rel="noopener nofollow">
+          {{ $source }}<span class="external-mark" aria-hidden="true">&#8599;</span>
+          <span class="visually-hidden">(opens the original article on {{ $source }} in a new tab)</span>
+        </a>
+      @endif
+    </div>
 
     @if(!empty($story['location_label']))
       <a class="story-place"

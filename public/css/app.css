@@ -230,3 +230,22 @@ a { color: inherit; }
   .desktop-sidebar .desktop-nav,
   .desktop-sidebar .site-tagline { display: none; }
 }
+
+/* Source attribution sits in the card footer and opens the publisher. */
+.story-footer-left { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+.story-source-link {
+  font-weight: 700;
+  color: var(--color-accent-muted);
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-size: 0.72rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.story-source-link:hover { color: var(--color-accent); text-decoration: underline; }
+
+.external-mark { font-size: 0.85em; opacity: 0.7; }

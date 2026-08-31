@@ -207,12 +207,23 @@ class FetchNewsFeeds extends Command
 
             $published = (string) ($entry->pubDate ?? $entry->published ?? $entry->updated ?? '');
 
+            // Aggregators name the publisher behind each headline. Credit the
+            // publisher, not the aggregator, and remember the homepage so the
+            // discovery command can go and find their own feed.
+            $publisher = $this->publisherOf($entry);
+
+            if ($publisher !== null) {
+                $this->notePublisher($publisher, $source->name);
+            }
+
+            $credit = $publisher['name'] ?? $source->name;
+
             $items[] = [
                 'title'         => mb_substr($title, 0, 500),
                 'url'           => $url,
-                'source'        => $source->name,
-                'source_label'  => $source->name,
-                'source_name'   => $source->name,
+                'source'        => $credit,
+                'source_label'  => $credit,
+                'source_name'   => $credit,
                 'source_domain' => parse_url($source->base_url ?? $url, PHP_URL_HOST),
                 'published_at'  => $this->normalisePublishedAt($published),
                 'summary'       => mb_substr(
@@ -268,6 +279,45 @@ class FetchNewsFeeds extends Command
         }
 
         return gmdate('c', $ts);
+    }
+
+    /**
+     * The publisher an aggregator credits for this item, if it names one.
+     * Returns ['name' => string, 'homepage' => string] or null.
+     */
+    private function publisherOf(\SimpleXMLElement $entry): ?array
+    {
+        if (!isset($entry->source)) {
+            return null;
+        }
+
+        $name = trim((string) $entry->source);
+        $home = trim((string) ($entry->source['url'] ?? ''));
+
+        if ($name === '' || $home === '' || !str_starts_with($home, 'http')) {
+            return null;
+        }
+
+        return ['name' => $name, 'homepage' => rtrim($home, '/')];
+    }
+
+    /**
+     * Queue a publisher sighting for the discovery command to drain.
+     * Held in the cache so fetching stays fast and probing runs on its own
+     * schedule rather than inline with ingestion.
+     */
+    private function notePublisher(array $publisher, string $via): void
+    {
+        $seen = cache()->get('ingest:publisher_sightings', []);
+        $key  = $publisher['homepage'];
+
+        if (isset($seen[$key])) {
+            $seen[$key]['count']++;
+        } else {
+            $seen[$key] = ['name' => $publisher['name'], 'count' => 1, 'via' => $via];
+        }
+
+        cache()->put('ingest:publisher_sightings', $seen, now()->addDay());
     }
 
     private function isBlockedPath(string $url): bool
