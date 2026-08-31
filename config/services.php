@@ -39,6 +39,19 @@ return [
         'key' => env('DEEPSEEK_API_KEY'),
     ],
 
+    /*
+     | Where a first-time reader probably is, so the feed opens near them
+     | rather than always in Kuala Lumpur. Any provider returning JSON with a
+     | "city" field will do; {ip} is replaced with the address. Turn it off and
+     | the site simply falls back to its default place.
+     |
+     | ⚠ This sends the reader's IP to whoever is configured here.
+     */
+    'geoip' => [
+        'enabled' => (bool) env('GEOIP_ENABLED', true),
+        'url' => env('GEOIP_URL', 'https://ipwho.is/{ip}'),
+    ],
+
     'openai' => [
         'key' => env('OPENAI_API_KEY'),
     ],

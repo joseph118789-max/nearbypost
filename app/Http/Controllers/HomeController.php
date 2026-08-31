@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\LocationAlias;
 use App\Services\FeedQuery;
+use App\Services\GeoIp;
 use App\Services\LocationResolver;
 use App\Services\Seo;
 use App\Support\Loc;
@@ -77,7 +78,8 @@ class HomeController extends Controller
         $days     = $this->pick((int) $request->query('days', 7), array_keys(self::WINDOWS), 7);
         $category = $this->cleanCategory($request->query('category'));
         $sub      = $this->cleanSub($request->query('sub'), $category);
-        $stories  = $this->feed->latest($category, $days, 24, null, $sub);
+        $source   = $this->cleanSource($request->query('source'));
+        $stories  = $this->feed->latest($category, $days, 24, null, $sub, $source);
 
         $name = $this->feedName($category, $sub) ?? __('site.latest_news');
 
@@ -89,6 +91,7 @@ class HomeController extends Controller
             'days'        => $days,
             'category'    => $category,
             'sub'         => $sub,
+            'source'      => $source,
             'pageTitle'   => $name,
             'heading'     => $name,
             'intro'       => $this->intro($stories, null, $category, $days),
@@ -103,7 +106,8 @@ class HomeController extends Controller
         $category = $this->categoryFromSlug($slug);
         $days     = $this->pick((int) $request->query('days', 7), array_keys(self::WINDOWS), 7);
         $sub      = $this->cleanSub($request->query('sub'), $category);
-        $stories  = $this->feed->latest($category, $days, 24, null, $sub);
+        $source   = $this->cleanSource($request->query('source'));
+        $stories  = $this->feed->latest($category, $days, 24, null, $sub, $source);
 
         if ($stories === [] && $sub === null && !$this->categoryExists($category)) {
             throw new NotFoundHttpException('Unknown category');
@@ -119,6 +123,7 @@ class HomeController extends Controller
             'days'        => $days,
             'category'    => $category,
             'sub'         => $sub,
+            'source'      => $source,
             'pageTitle'   => $name,
             'heading'     => $name,
             'intro'       => $this->intro($stories, null, $category, $days),
@@ -166,13 +171,14 @@ class HomeController extends Controller
         $days   = $this->pick((int) $request->query('days', 7), array_keys(self::WINDOWS), 7);
         $category ??= $this->cleanCategory($request->query('category'));
         $sub       = $this->cleanSub($request->query('sub'), $category);
+        $source    = $this->cleanSource($request->query('source'));
 
         $coords  = $this->locations->resolve($place);
         $stories = [];
 
         if ($coords) {
             $stories = $this->feed->nearby(
-                $coords['lat'], $coords['lng'], (float) $radius, $days, 24, $category, null, $sub
+                $coords['lat'], $coords['lng'], (float) $radius, $days, 24, $category, null, $sub, $source
             );
         }
 
@@ -198,6 +204,7 @@ class HomeController extends Controller
             'days'        => $days,
             'category'    => $category,
             'sub'         => $sub,
+            'source'      => $source,
             'unresolved'  => $coords === null,
             'pageTitle'   => $name,
             'heading'     => $name,
@@ -338,7 +345,35 @@ class HomeController extends Controller
 
         $cookie = trim((string) $request->cookie(self::PLACE_COOKIE, ''));
 
-        return $cookie !== '' ? mb_substr($cookie, 0, 120) : self::DEFAULT_PLACE;
+        if ($cookie !== '') {
+            return mb_substr($cookie, 0, 120);
+        }
+
+        // Nothing chosen and nothing remembered, so this is a first visit.
+        // Opening every feed in Kuala Lumpur regardless of who is reading it is
+        // the wrong first impression for a site whose whole premise is
+        // distance, so the reader is placed by their IP and the answer is
+        // remembered like any other choice - one keystroke from being
+        // corrected, and never consulted again once it has been.
+        $located = app(GeoIp::class)->place($request->ip(), $request->userAgent());
+
+        if ($located !== null) {
+            Cookie::queue(self::PLACE_COOKIE, $located, 60 * 24 * 90);
+
+            return mb_substr($located, 0, 120);
+        }
+
+        return self::DEFAULT_PLACE;
+    }
+
+    /**
+     * Who wrote the stories: everyone, us, or other readers.
+     */
+    private function cleanSource(?string $source): ?string
+    {
+        $source = mb_strtolower(trim((string) $source));
+
+        return in_array($source, ['official', 'unofficial'], true) ? $source : null;
     }
 
     private function placeFromSlug(string $slug): string

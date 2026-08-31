@@ -191,6 +191,8 @@ class PopulateFeedReady extends Command
             'geo_confidence_score'=> $item->geo_confidence_score,
             'coverage_type'       => $item->coverage_type,
             'sort_timestamp'      => $item->published_at,
+            'origin'              => $item->origin ?: 'scraper',
+            'image_path'          => $item->image_path,
             'updated_at'          => now(),
         ];
 

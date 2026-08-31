@@ -104,6 +104,11 @@ class NewsItemObserver
                 'sort_timestamp' => $newsItem->published_at,
                 'precision_type' => $newsItem->precision_type,
                 'relevance_mode' => $newsItem->relevance_mode,
+                // Who wrote it, and the picture if they attached one. The
+                // reader's Source filter reads origin, so it has to survive
+                // the trip into the serving layer.
+                'origin' => $newsItem->origin ?: 'scraper',
+                'image_path' => $newsItem->image_path,
                 'is_active' => true,
             ]
         );

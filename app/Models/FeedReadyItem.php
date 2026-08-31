@@ -57,6 +57,12 @@ class FeedReadyItem extends Model
         'coverage_type',
         'sort_timestamp',
         'is_article',
+        // Who wrote it, and their picture. Both promotion paths write these and
+        // the Source filter reads them; omitted from this list, Eloquent
+        // discarded every write without raising anything and every reader post
+        // was served labelled 'scraper'.
+        'origin',
+        'image_path',
     ];
 
     protected $casts = [

@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\Auth\ContributorAuthController;
+use App\Http\Controllers\ContributeController;
+use App\Http\Controllers\PostController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\FeedController;
 use App\Http\Controllers\SitemapController;
@@ -82,4 +85,45 @@ Route::prefix('feed')->middleware(['throttle:60,1'])->group(function () {
 
 require __DIR__ . '/admin.php';
 
-Route::get('/login', fn () => redirect()->route('admin.login'))->name('login');
+/*
+|--------------------------------------------------------------------------
+| Signing in, and writing for the site
+|--------------------------------------------------------------------------
+|
+| Two kinds of account behind one door: administrators run the site, and
+| contributors write for it. Neither can reach the other's pages.
+|
+| These are not locale-prefixed. The reading languages exist so a story can be
+| read three ways; a submission form is a tool, not an article.
+|
+*/
+
+Route::get('/login', [ContributorAuthController::class, 'choose'])->name('login');
+
+Route::middleware('guest:web')->group(function () {
+    Route::get('/contributor/login', [ContributorAuthController::class, 'showLogin'])->name('contributor.login');
+    Route::post('/contributor/login', [ContributorAuthController::class, 'login'])
+        ->middleware('throttle:20,1');
+
+    Route::get('/contributor/register', [ContributorAuthController::class, 'showRegister'])->name('contributor.register');
+    Route::post('/contributor/register', [ContributorAuthController::class, 'register'])
+        ->middleware('throttle:10,60');
+});
+
+Route::middleware('auth:web')->group(function () {
+    Route::post('/contributor/logout', [ContributorAuthController::class, 'logout'])->name('contributor.logout');
+
+    Route::get('/contribute', [ContributeController::class, 'index'])->name('contribute.index');
+    Route::get('/contribute/new', [ContributeController::class, 'create'])->name('contribute.create');
+    Route::post('/contribute', [ContributeController::class, 'store'])->name('contribute.store');
+    Route::get('/contribute/{id}/edit', [ContributeController::class, 'edit'])
+        ->whereNumber('id')->name('contribute.edit');
+    Route::put('/contribute/{id}', [ContributeController::class, 'update'])
+        ->whereNumber('id')->name('contribute.update');
+    Route::delete('/contribute/{id}', [ContributeController::class, 'destroy'])
+        ->whereNumber('id')->name('contribute.destroy');
+});
+
+// A contributed story's own page. Gathered articles link out to their
+// publisher; these were written here, so here is where they live.
+Route::get('/post/{id}', [PostController::class, 'show'])->whereNumber('id')->name('post.show');

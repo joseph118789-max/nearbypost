@@ -59,6 +59,14 @@
   <nav class="header-actions" aria-label="Quick links">
     <a class="icon-btn" href="{{ \App\Support\Loc::route('interest') }}">{{ __('site.all_news') }}</a>
 
+    {{-- One door for both kinds of account. A reader clicking this should not
+         need to already know whether they are an administrator. --}}
+    @auth('web')
+      <a class="icon-btn" href="{{ route('contribute.index') }}">{{ __('site.my_posts') }}</a>
+    @else
+      <a class="icon-btn" href="{{ route('login') }}">{{ __('site.login') }}</a>
+    @endauth
+
     {{-- Language switcher. Real links, so each language is crawlable and a
          reader can share the version they read. Query parameters are kept so
          the radius and period survive the switch. --}}
@@ -101,8 +109,27 @@
                value="{{ $place ?? '' }}" placeholder="e.g. Shah Alam" maxlength="120">
         <input type="hidden" name="days" value="{{ $days }}">
         <input type="hidden" name="radius" value="{{ $radius }}">
-        <button class="desktop-action-btn primary" type="submit">{{ __('site.show_news_here') }}</button>
+        @if(!empty($source))
+          <input type="hidden" name="source" value="{{ $source }}">
+        @endif
+        {{-- A single-field form submits on Enter, and a phone keyboard offers
+             Go, so the button was the only thing removed here. --}}
+        <p class="field-hint">{{ __('site.press_enter') }}</p>
       </form>
+
+      {{-- Who wrote it. Official is gathered by Nearbypost from news
+           publishers; Unofficial is sent in by readers. --}}
+      <section class="nav-section" aria-labelledby="nav-source">
+        <h2 id="nav-source">{{ __('site.source') }}</h2>
+        <div class="filter-chips">
+          <a class="filter-chip {{ empty($source) ? 'active' : '' }}"
+             href="{{ request()->fullUrlWithQuery(['source' => null]) }}">{{ __('site.all') }}</a>
+          <a class="filter-chip {{ ($source ?? '') === 'official' ? 'active' : '' }}"
+             href="{{ request()->fullUrlWithQuery(['source' => 'official']) }}">{{ __('site.official') }}</a>
+          <a class="filter-chip {{ ($source ?? '') === 'unofficial' ? 'active' : '' }}"
+             href="{{ request()->fullUrlWithQuery(['source' => 'unofficial']) }}">{{ __('site.unofficial') }}</a>
+        </div>
+      </section>
 
       @if(!empty($showRadius))
         <section class="nav-section" aria-labelledby="nav-radius">

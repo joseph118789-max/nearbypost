@@ -30,6 +30,22 @@ class NewsItem extends Model
         "gps_flag",
         "malaysia_relevant",
         "relevance_reason",
+        // Contributed posts. Eloquent discards a write to any column missing
+        // from this list without raising anything, which has cost this project
+        // three separate afternoons already.
+        "origin",
+        "contributor_id",
+        "section",
+        "body",
+        "image_path",
+        "review_status",
+        "review_reason",
+        "status",
+        "location_label",
+        "canonical_place_name",
+        "precision_type",
+        "geocode_status",
+        "geocoded_at",
         "url_used",
         "ambiguous",
         "classification",

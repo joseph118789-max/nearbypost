@@ -26,3 +26,6 @@ Thumbs.db
 
 # The raw-Blade file nginx was serving as the homepage, kept on disk for reference.
 public/index.html.broken-rawblade.*.bak
+
+# Contributor uploads are user data, not source.
+public/uploads/

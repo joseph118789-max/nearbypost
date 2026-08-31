@@ -34,6 +34,7 @@ class FeedQuery
             'id', 'title', 'summary', 'source', 'published_at',
             'primary_category', 'secondary_category', 'sub_category',
             'url', 'lat', 'lng', 'location_label', 'precision_type',
+            'origin', 'image_path',
         ];
     }
 
@@ -58,7 +59,8 @@ class FeedQuery
         int $days = self::DEFAULT_WINDOW_DAYS,
         int $limit = 20,
         ?string $locale = null,
-        ?string $sub = null
+        ?string $sub = null,
+        ?string $source = null
     ): array {
         $locale = $locale ?? Loc::current();
 
@@ -80,6 +82,15 @@ class FeedQuery
             $query->whereRaw('LOWER(feed_ready_items.sub_category) = ?', [mb_strtolower($sub)]);
         }
 
+        // Who wrote it. "Official" is anything but a reader, rather than
+        // 'scraper' exactly, so a story from a future third origin is still
+        // counted as ours rather than quietly vanishing from both filters.
+        if ($source === 'official') {
+            $query->where('feed_ready_items.origin', '<>', 'user');
+        } elseif ($source === 'unofficial') {
+            $query->where('feed_ready_items.origin', '=', 'user');
+        }
+
         $rows = $query
             ->orderByRaw($this->defaultOrderBy())
             ->limit($limit)
@@ -97,6 +108,8 @@ class FeedQuery
                 'feed_ready_items.lng',
                 'feed_ready_items.location_label',
                 'feed_ready_items.precision_type',
+                'feed_ready_items.origin',
+                'feed_ready_items.image_path',
             ]);
 
         return $rows->map(fn ($row) => $row->toArray())->all();
@@ -116,7 +129,8 @@ class FeedQuery
         int $limit = 20,
         ?string $category = null,
         ?string $locale = null,
-        ?string $sub = null
+        ?string $sub = null,
+        ?string $source = null
     ): array {
         $locale = $locale ?? Loc::current();
 
@@ -139,6 +153,12 @@ class FeedQuery
             $bindings['sub'] = mb_strtolower($sub);
         }
 
+        if ($source === 'official') {
+            $categoryClause .= " AND f.origin <> 'user'";
+        } elseif ($source === 'unofficial') {
+            $categoryClause .= " AND f.origin = 'user'";
+        }
+
         $sql = "SELECT * FROM (
             SELECT f.id,
                    COALESCE(t.title, f.title) AS title,
@@ -146,6 +166,7 @@ class FeedQuery
                    f.source, f.published_at,
                    f.primary_category, f.secondary_category, f.sub_category,
                    f.url, f.location_label, f.lat, f.lng,
+                   f.origin, f.image_path,
                    ROUND(
                        (6371.0 * acos(
                            LEAST(1.0,
