@@ -20,6 +20,7 @@ class NewsItem extends Model
         "summary",
         "primary_category",
         "secondary_category",
+        "sub_category",
         "extracted_title",
         "extracted_summary",
         "extracted_text",

@@ -53,6 +53,7 @@ class NewsItemObserver
                 'published_at' => $newsItem->published_at,
                 'primary_category' => $primaryCategory,
                 'secondary_category' => $newsItem->secondary_category,
+                'sub_category' => $newsItem->sub_category,
                 'location_label' => $newsItem->location_label
                     ?: $newsItem->canonical_place_name,
                 // latitude/longitude is what the geocoder writes and what

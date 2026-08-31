@@ -26,11 +26,9 @@ class ApiAnalyticsMiddleware
         $apiKey = $request->bearerToken() ?? $request->header('X-API-Key', 'anonymous');
         $endpoint = $request->routeIs('api.*') ? $request->path() : $request->path();
 
-        $response = $next($request);
-
-        $elapsedMs = (int) ((hrtime(true) - $startMs) / 1_000_000);
-
-        // Rate-limit check (before logging if already over limit)
+        // Check first. Running this after $next paid the full cost of every
+        // request it then rejected, and returned 429 for writes that had
+        // already been applied.
         $limitResult = $this->analytics->checkRateLimit($apiKey, '/' . $endpoint);
 
         if (!$limitResult['allowed']) {
@@ -39,6 +37,10 @@ class ApiAnalyticsMiddleware
                 'message' => $limitResult['reason'],
             ], 429);
         }
+
+        $response = $next($request);
+
+        $elapsedMs = (int) ((hrtime(true) - $startMs) / 1_000_000);
 
         // Log the request
         try {

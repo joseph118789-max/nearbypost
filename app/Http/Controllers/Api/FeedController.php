@@ -188,6 +188,7 @@ class FeedController extends Controller
                     'published_at'       => $row->published_at,
                     'primary_category'   => $row->primary_category,
                     'secondary_category'=> $row->secondary_category,
+                    'sub_category'      => $row->sub_category ?? null,
                     'url'               => $row->url,
                     'location_label'     => $row->location_label,
                     'lat'               => $row->lat !== null ? (float) $row->lat : null,

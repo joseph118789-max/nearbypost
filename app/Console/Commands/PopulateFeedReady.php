@@ -165,6 +165,7 @@ class PopulateFeedReady extends Command
             'published_at'       => $item->published_at,
             'primary_category'   => $this->bestCategory($item, $aiJob),
             'secondary_category' => $item->secondary_category,
+            'sub_category'       => $item->sub_category,
             'location_label'     => $locationLabel ?: null,
             'lat'                => $item->latitude,
             'lng'                => $item->longitude,

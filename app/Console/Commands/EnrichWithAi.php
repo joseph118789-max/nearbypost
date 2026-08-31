@@ -7,6 +7,7 @@ use App\Models\AiProcessingJob;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
+use App\Services\SubCategoryTaxonomy;
 
 /**
  * ═══════════════════════════════════════════════════════════════
@@ -42,7 +43,7 @@ class EnrichWithAi extends Command
     protected $description = 'Enrich news items with AI: validates output, enforces controlled enums, preserves good output on retry';
 
     // ── Versioning ───────────────────────────────────────────────────────────
-    private const PROMPT_VERSION    = 'v2';
+    private const PROMPT_VERSION    = 'v3';
     private const PIPELINE_VERSION  = 'v1.0';
     private const MODEL             = 'deepseek-chat';
     private const MAX_RETRIES       = 2;
@@ -207,6 +208,7 @@ class EnrichWithAi extends Command
                 $updateData = [
                     'main_place_text'            => $validation['place'],
                     'ai_category'                => $validation['category'],
+                    'sub_category'               => $validation['sub_category'],
                     'ai_summary'                 => $validation['summary'],
                     'ai_status'                  => 'success',
                     'ai_processed_at'            => now(),
@@ -346,10 +348,18 @@ class EnrichWithAi extends Command
             $relevanceMode = 'category_only';
         }
 
+        // Spec s10: the sub-category must belong to the chosen primary;
+        // anything else is forced to that primary's "Others".
+        $subCategory = (new SubCategoryTaxonomy())->validate(
+            $rawCat !== '' ? $rawCat : $category,
+            $parsed['sub_category'] ?? null
+        );
+
         return [
             'valid'         => empty($errors),
             'summary'       => $summary ?: ($parsed['summary'] ?? ''), // keep raw if passes
             'category'      => $category,
+            'sub_category'  => $subCategory,
             'place'         => $place,
             'relevance_mode'=> $relevanceMode,
             'is_article'    => $isArticle,
@@ -399,6 +409,7 @@ class EnrichWithAi extends Command
         $safeTitle = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
         $safeSrc   = htmlspecialchars($source, ENT_QUOTES, 'UTF-8');
         $safeText  = htmlspecialchars($truncated, ENT_NOQUOTES, 'UTF-8');
+        $taxonomy  = (new SubCategoryTaxonomy())->promptBlock();
 
         return <<<PROMPT
 You are a precise news analyst. Given the article below, respond with ONLY valid JSON — no markdown fences, no explanation.
@@ -411,8 +422,12 @@ Return this exact shape:
   "place": "main specific location (city or state in Malaysia preferred, or null if not location-specific or not an article)",
   "lat": "latitude of the place (number, e.g. 3.139, omit/null if not location-specific or cannot determine)",
   "lng": "longitude of the place (number, e.g. 101.687, omit/null if not location-specific or cannot determine)",
-  "relevance": "location_and_category if place is a specific city/area, category_only if national/world-wide (omit if not an article)"
+  "relevance": "location_and_category if place is a specific city/area, category_only if national/world-wide (omit if not an article)",
+  "sub_category": "exact sub-category name copied from the line below that matches your chosen category (omit if not an article)"
 }
+
+Sub-categories by category. Pick one from the line matching the category you chose:
+{$taxonomy}
 
 Article title: {$safeTitle}
 Source: {$safeSrc}
@@ -463,6 +478,8 @@ PROMPT;
         return [
             'summary'   => $parsed['summary']   ?? null,
             'category'  => $parsed['category']  ?? null,
+            // Whitelist parser: a key omitted here never reaches validation.
+            'sub_category' => $parsed['sub_category'] ?? null,
             'place'     => $parsed['place']     ?? null,
             'relevance' => $parsed['relevance']  ?? 'category_only',
             'is_article'=> isset($parsed['is_article']) ? (bool) $parsed['is_article'] : true,

@@ -44,6 +44,7 @@ class FeedReadyItem extends Model
         'published_at',
         'primary_category',
         'secondary_category',
+        'sub_category',
         'url',
         'location_label',
         'lat',

@@ -46,11 +46,13 @@ class ApiAnalyticsService
         $windowEnd   = $now->copy()->startOfMinute()->addMinutes(1);
 
         // Count requests in sliding 2-minute window
+        // Count only what happened in the last minute. Filtering on
+        // window_start_minute alone matched the same minute of every hour
+        // of every past day, so counts only ever grew.
         $count = DB::table('api_rate_limits')
             ->where('api_key', $apiKey ?: 'anonymous')
             ->where('endpoint', $endpoint)
-            ->where('window_start_minute', '>=', (int) $windowStart->format('i'))
-            ->where('window_start_minute', '<', (int) $windowEnd->format('i'))
+            ->where('updated_at', '>=', $now->copy()->subMinute())
             ->sum('request_count');
 
         if ($count >= self::RATE_LIMIT_PER_MINUTE) {
@@ -66,6 +68,7 @@ class ApiAnalyticsService
                 ->where('api_key', $apiKey ?: 'anonymous')
                 ->where('endpoint', $endpoint)
                 ->where('window_start_minute', $minuteKey)
+                ->where('updated_at', '>=', $now->copy()->startOfMinute())
                 ->first();
 
             if ($existing) {
@@ -87,6 +90,14 @@ class ApiAnalyticsService
             }
         } catch (\Exception $e) {
             Log::warning('Rate limit counter failed', ['error' => $e->getMessage()]);
+        }
+
+        // Keep the table from growing without bound; anything older than an
+        // hour can never affect a one-minute window again.
+        if (random_int(1, 200) === 1) {
+            DB::table('api_rate_limits')
+                ->where('updated_at', '<', $now->copy()->subHour())
+                ->delete();
         }
 
         return ['allowed' => true, 'reason' => null];
