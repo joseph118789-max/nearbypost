@@ -123,7 +123,9 @@ class SubCategoryTaxonomy
         $byPrimary = [];
 
         foreach ($rows as $row) {
-            $byPrimary[$row->primary_category][] = $row->id . ':' . $row->sub_category;
+            // S-prefixed: category ids and sub-category ids overlap below 22,
+            // and the model conflated them when both were bare numbers.
+            $byPrimary[$row->primary_category][] = 'S' . $row->id . ':' . $row->sub_category;
         }
 
         $lines = [];

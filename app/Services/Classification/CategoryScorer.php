@@ -297,8 +297,10 @@ class CategoryScorer
         $subcategories = $this->subcategories();
         $best = null;
 
-        foreach ($subRelevance as $id => $value) {
-            $id = (int) $id;
+        foreach ($subRelevance as $rawId => $value) {
+            // Ids arrive as S124. A bare number is still accepted, since an
+            // answer that gets it right the old way should not be discarded.
+            $id = (int) ltrim((string) $rawId, 'Ss');
 
             if (!isset($subcategories[$id])) {
                 continue;

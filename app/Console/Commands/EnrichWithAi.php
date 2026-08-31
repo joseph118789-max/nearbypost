@@ -654,7 +654,7 @@ Return this exact shape:
   "g": 0 or 1,
   "a": 0 or 1,
   "rel": {"<category id>": <relevance 0-1>, ...},
-  "sub": {"<sub-category id>": <relevance 0-1>, ...},
+  "sub": {"S<sub-category id>": <relevance 0-1>, ...},
   "summary": "2-3 sentence summary of the article",
   "place": "the main specific location, or null if not tied to one place",
   "lang": "ISO 639-1 code of the language the article is written in",
@@ -685,8 +685,11 @@ and "city center" without a city do not.
 
 AMBIGUOUS (a = 1) when two categories are genuinely equally applicable.
 
-SUB-CATEGORIES: give relevance for any that apply, from any category - the
-correct one for the winning category is selected afterwards.
+SUB-CATEGORIES: keys are the S-prefixed ids below, e.g. "S124". Never put a
+category id in "sub" - they are separate numbering systems. Give relevance for
+the sub-categories of every category you scored 0.4 or above, not only your
+favourite: the winning category is decided by weight afterwards, and if you
+supply sub-categories for one category only, the winner may have none.
 
 Categories (id: name):
 {$categoryList}
