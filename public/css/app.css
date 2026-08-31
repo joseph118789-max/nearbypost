@@ -312,3 +312,13 @@ a { color: inherit; }
 
 /* The change-location form sits in the left column with the other controls. */
 .desktop-sidebar form.nav-section .modal-input { margin-bottom: 10px; }
+
+/* Back out of a topic to the full list. A link, because the level shown is
+   just what is in the URL. */
+.topic-back {
+  display: inline-flex; align-items: center; gap: 6px; margin-bottom: 10px;
+  font-size: 0.78rem; font-weight: 600; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--color-text-tertiary); text-decoration: none;
+}
+.topic-back:hover { color: var(--color-accent); }
+.chip-note { margin-top: 10px; font-size: 0.82rem; color: var(--color-text-tertiary); }

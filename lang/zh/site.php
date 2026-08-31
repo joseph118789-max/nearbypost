@@ -11,6 +11,7 @@ return [
     'topics'         => '主题',
     'side_panel'     => '更多选项',
     'subtopics'      => '子主题',
+    'no_subtopics'   => '这里暂时没有更细的主题。',
     'all_subtopics'  => '所有子主题',
     'reading_language' => '阅读语言',
 

@@ -6,6 +6,7 @@ use App\Models\LocationAlias;
 use App\Services\FeedQuery;
 use App\Services\LocationResolver;
 use App\Services\Seo;
+use App\Support\Loc;
 use App\Support\Slug;
 use App\Support\Taxonomy;
 use Illuminate\Http\Request;
@@ -211,14 +212,35 @@ class HomeController extends Controller
     {
         $data['categories'] = $this->feed->categories();
 
-        // Sub-topics of the chosen topic, so the label on every card becomes
-        // somewhere a reader can go. By Interest only: Near Me is sorted by
-        // distance and carries no topic controls at all.
-        //
-        // Counted over the same window as the feed below, so a chip reading "3"
-        // returns three stories.
-        $data['subCategories'] = $category && ($data['tab'] ?? '') === 'interest'
-            ? $this->feed->subCategories($category, $data['days'] ?? FeedQuery::DEFAULT_WINDOW_DAYS)
+        // The topic browser in the right column: the main categories, and one
+        // level down, the sub-categories of whichever is open. Both modes get
+        // it, but the links differ because the modes do - on Near Me a topic
+        // keeps you at your place, on By Interest it goes to that topic's own
+        // indexable page.
+        $nearMe = ($data['tab'] ?? '') === 'nearme';
+
+        $data['topicsRootUrl'] = $nearMe
+            ? request()->fullUrlWithQuery(['category' => null, 'sub' => null])
+            : Loc::route('interest');
+
+        $data['topicUrls'] = [];
+
+        foreach ($data['categories'] as $known) {
+            $data['topicUrls'][$known] = $nearMe
+                ? request()->fullUrlWithQuery(['category' => $known, 'sub' => null])
+                : Loc::route('category', ['slug' => Slug::make($known)]);
+        }
+
+        // Counted over the same window as the feed beside them - and, on Near
+        // Me, within the same radius - so a chip reading "3" returns three
+        // stories rather than three somewhere in the country.
+        $data['subCategories'] = $category
+            ? $this->feed->subCategories(
+                $category,
+                $data['days'] ?? FeedQuery::DEFAULT_WINDOW_DAYS,
+                $nearMe ? ($data['coords'] ?? null) : null,
+                (float) ($data['radius'] ?? self::DEFAULT_RADIUS)
+            )
             : [];
 
         $data['windows']    = self::WINDOWS;

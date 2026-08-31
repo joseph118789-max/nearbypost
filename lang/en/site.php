@@ -17,6 +17,7 @@ return [
     'topics'         => 'Topics',
     'side_panel'     => 'More options',
     'subtopics'      => 'Sub-topics',
+    'no_subtopics'   => 'No narrower topics here yet.',
     'all_subtopics'  => 'all sub-topics',
     'reading_language' => 'Reading language',
 

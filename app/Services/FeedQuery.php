@@ -186,8 +186,18 @@ class FeedQuery
      *
      * @return list<array{name: string, count: int}>
      */
-    public function subCategories(string $category, int $days = 30): array
-    {
+    public function subCategories(
+        string $category,
+        int $days = 30,
+        ?array $coords = null,
+        float $radiusKm = 20.0
+    ): array {
+        // Beside a Near Me feed the count has to mean what that feed will
+        // return, so it is taken within the radius rather than nationally.
+        if ($coords !== null) {
+            return $this->subCategoriesNear($category, $days, $coords, $radiusKm);
+        }
+
         return FeedReadyItem::query()
             ->where('is_active', true)
             ->where('published_at', '>=', now()->subDays($days))
@@ -201,6 +211,54 @@ class FeedQuery
             ->get()
             ->map(fn ($row) => ['name' => $row->name, 'count' => (int) $row->n])
             ->all();
+    }
+
+    /**
+     * The same list, counted only over stories the Near Me feed would show.
+     *
+     * The filters below mirror nearby() exactly. If that query gains a
+     * condition, this one needs it too, or the counts drift from the feed
+     * standing next to them.
+     *
+     * @param  array{lat: float, lng: float}  $coords
+     * @return list<array{name: string, count: int}>
+     */
+    private function subCategoriesNear(string $category, int $days, array $coords, float $radiusKm): array
+    {
+        $sql = "SELECT name, count(*) AS n FROM (
+            SELECT f.sub_category AS name,
+                   (6371.0 * acos(
+                       LEAST(1.0,
+                           cos(radians(:lat)) * cos(radians(f.lat)) *
+                           cos(radians(f.lng) - radians(:lng)) +
+                           sin(radians(:lat)) * sin(radians(f.lat))
+                       )
+                   )) AS distance_km
+            FROM feed_ready_items f
+            WHERE f.is_active = true
+              AND f.is_article = true
+              AND f.lat IS NOT NULL
+              AND f.lng IS NOT NULL
+              AND f.relevance_mode != 'category_only'
+              AND f.published_at >= NOW() - make_interval(days => :days)
+              AND LOWER(f.primary_category) = :category
+              AND f.sub_category IS NOT NULL
+              AND f.sub_category NOT IN ('Others', 'General')
+        ) AS s
+        WHERE distance_km <= :radius
+        GROUP BY name
+        ORDER BY count(*) DESC
+        LIMIT 14";
+
+        $rows = DB::select($sql, [
+            'lat'      => $coords['lat'],
+            'lng'      => $coords['lng'],
+            'days'     => $days,
+            'category' => mb_strtolower($category),
+            'radius'   => $radiusKm,
+        ]);
+
+        return array_map(fn ($row) => ['name' => $row->name, 'count' => (int) $row->n], $rows);
     }
 
     /** Distinct primary categories currently present in the feed. */

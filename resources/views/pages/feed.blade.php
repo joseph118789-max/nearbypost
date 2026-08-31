@@ -46,20 +46,38 @@
 @endsection
 
 @section('aside')
-  {{-- The sub-topics of whichever topic is on screen. The master topic list is
-       in the left column; drawing it here as well was the same control twice,
-       and Near Me has no use for either. --}}
-  @if(!empty($subCategories))
+  {{-- The topic browser: the main categories, and one level down, the
+       sub-categories of whichever one is open. The level shown is derived
+       entirely from the URL, so back is a link and there is no state to keep. --}}
+  @if(!empty($categories))
     <div class="info-card">
-      <h3>{{ __('site.subtopics') }}</h3>
-      <div class="filter-chips">
-        <a class="filter-chip {{ empty($sub) ? 'active' : '' }}"
-           href="{{ request()->fullUrlWithQuery(['sub' => null]) }}">{{ __('site.all') }}</a>
-        @foreach($subCategories as $s)
-          <a class="filter-chip {{ !empty($sub) && mb_strtolower($sub) === mb_strtolower($s['name']) ? 'active' : '' }}"
-             href="{{ request()->fullUrlWithQuery(['sub' => $s['name']]) }}">{{ \App\Support\Taxonomy::subCategory($s['name']) }}<span class="chip-count">{{ $s['count'] }}</span></a>
-        @endforeach
-      </div>
+      @if(empty($category))
+        <h3>{{ __('site.topics') }}</h3>
+        <div class="filter-chips">
+          @foreach($categories as $cat)
+            <a class="filter-chip" href="{{ $topicUrls[$cat] ?? '#' }}">{{ \App\Support\Taxonomy::category($cat) }}</a>
+          @endforeach
+        </div>
+      @else
+        <a class="topic-back" href="{{ $topicsRootUrl }}">
+          <span aria-hidden="true">&#8592;</span> {{ __('site.topics') }}
+        </a>
+
+        <h3>{{ \App\Support\Taxonomy::category($category) }}</h3>
+
+        <div class="filter-chips">
+          <a class="filter-chip {{ empty($sub) ? 'active' : '' }}"
+             href="{{ request()->fullUrlWithQuery(['sub' => null]) }}">{{ __('site.all') }}</a>
+          @foreach($subCategories as $s)
+            <a class="filter-chip {{ !empty($sub) && mb_strtolower($sub) === mb_strtolower($s['name']) ? 'active' : '' }}"
+               href="{{ request()->fullUrlWithQuery(['sub' => $s['name']]) }}">{{ \App\Support\Taxonomy::subCategory($s['name']) }}<span class="chip-count">{{ $s['count'] }}</span></a>
+          @endforeach
+        </div>
+
+        @if(empty($subCategories))
+          <p class="chip-note">{{ __('site.no_subtopics') }}</p>
+        @endif
+      @endif
     </div>
   @endif
 @endsection

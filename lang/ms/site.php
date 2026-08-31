@@ -11,6 +11,7 @@ return [
     'topics'         => 'Topik',
     'side_panel'     => 'Pilihan lain',
     'subtopics'      => 'Sub-topik',
+    'no_subtopics'   => 'Belum ada topik yang lebih khusus di sini.',
     'all_subtopics'  => 'semua sub-topik',
     'reading_language' => 'Bahasa bacaan',
 

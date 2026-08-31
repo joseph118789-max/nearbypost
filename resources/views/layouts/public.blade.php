@@ -89,10 +89,11 @@
       <a class="desktop-nav-item {{ ($tab ?? '') === 'marketplace' ? 'active' : '' }}" href="{{ \App\Support\Loc::route('marketplace') }}">{{ __('site.marketplace') }}</a>
     </nav>
 
-    {{-- Each mode carries its own controls and only its own. Near Me asks where
-         you are and how far out to look; topics belong to By Interest and were
-         only ever noise here. --}}
-    @if(($tab ?? '') === 'nearme' && isset($windows))
+    {{-- Controls only. The topics moved to the right column, where choosing
+         one opens its sub-topics; keeping a copy here would be the same
+         control twice again. Story radius appears only where distance is what
+         the feed is sorted by. --}}
+    @isset($windows)
       <form class="nav-section" method="get" action="{{ \App\Support\Loc::route('home') }}">
         <h2>{{ __('site.change_location') }}</h2>
         <label class="visually-hidden" for="place-input">{{ __('site.town_or_city') }}</label>
@@ -124,36 +125,8 @@
           @endforeach
         </div>
       </section>
-    @endif
+    @endisset
 
-    {{-- By Interest asks what you want to read. The master topics live here and
-         only here; they were also drawn as chips on the right, which was one
-         control shown twice. Their sub-topics take the right column instead. --}}
-    @if(($tab ?? '') === 'interest' && !empty($categories))
-      <section class="nav-section" aria-labelledby="nav-topics">
-        <h2 id="nav-topics">{{ __('site.topics') }}</h2>
-        <ul class="nav-links">
-          <li><a class="{{ empty($category) ? 'active' : '' }}"
-                 href="{{ \App\Support\Loc::route('interest') }}">{{ __('site.all') }}</a></li>
-          @foreach($categories as $cat)
-            <li><a class="{{ !empty($category) && mb_strtolower($category) === mb_strtolower($cat) ? 'active' : '' }}"
-                   href="{{ \App\Support\Loc::route('category', ['slug' => \App\Support\Slug::make($cat)]) }}">{{ \App\Support\Taxonomy::category($cat) }}</a></li>
-          @endforeach
-        </ul>
-      </section>
-
-      @isset($windows)
-        <section class="nav-section" aria-labelledby="nav-time">
-          <h2 id="nav-time">{{ __('site.time_range') }}</h2>
-          <div class="filter-chips">
-            @foreach($windows as $value => $label)
-              <a class="filter-chip {{ $value === $days ? 'active' : '' }}"
-                 href="{{ request()->fullUrlWithQuery(['days' => $value]) }}">{{ $label }}</a>
-            @endforeach
-          </div>
-        </section>
-      @endisset
-    @endif
 
     <div class="desktop-legal-footer">
       <div class="legal-links">
