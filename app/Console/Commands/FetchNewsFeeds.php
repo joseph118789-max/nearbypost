@@ -148,7 +148,13 @@ class FetchNewsFeeds extends Command
             $query->whereIn('priority_tier', ['primary', 'secondary']);
         }
 
-        return $query->orderBy('name')->get()->filter(fn ($s) => $this->isDue($s))->values();
+        $blocklist = new \App\Services\SourceBlocklist();
+
+        return $query->orderBy('name')->get()
+            // Told not to visit is told not to visit, whatever the schedule says.
+            ->reject(fn ($s) => $blocklist->blocksSource($s))
+            ->filter(fn ($s) => $this->isDue($s))
+            ->values();
     }
 
     /**
@@ -236,6 +242,7 @@ class FetchNewsFeeds extends Command
             return $this->recordFailure($source, 'exception');
         }
 
+        if (!$this->option('dry-run')) {
         DB::table('sources')->where('id', $source->id)->update([
             'last_fetched_at'      => now(),
             'last_status'          => 'ok',
@@ -243,6 +250,7 @@ class FetchNewsFeeds extends Command
             'consecutive_failures' => 0,
             'updated_at'           => now(),
         ]);
+        }
 
         $this->line(sprintf('  %-32s %3d items', $source->name, count($items)));
 
@@ -298,6 +306,7 @@ class FetchNewsFeeds extends Command
             ];
         }
 
+        if (!$this->option('dry-run')) {
         DB::table('sources')->where('id', $source->id)->update([
             'last_fetched_at'      => now(),
             'last_status'          => 'ok',
@@ -305,6 +314,7 @@ class FetchNewsFeeds extends Command
             'consecutive_failures' => 0,
             'updated_at'           => now(),
         ]);
+        }
 
         $this->line(sprintf('  %-32s %3d items (index)', $source->name, count($items)));
 
@@ -322,6 +332,7 @@ class FetchNewsFeeds extends Command
 
     private function recordFailure(object $source, string $status): array
     {
+        if (!$this->option('dry-run')) {
         DB::table('sources')->where('id', $source->id)->update([
             'last_fetched_at'      => now(),
             'last_status'          => $status,
@@ -329,6 +340,7 @@ class FetchNewsFeeds extends Command
             'consecutive_failures' => DB::raw('consecutive_failures + 1'),
             'updated_at'           => now(),
         ]);
+        }
 
         $this->noteQuirk($source->id, 'failure:' . $status);
         $this->warn(sprintf('  %-32s FAILED (%s)', $source->name, $status));

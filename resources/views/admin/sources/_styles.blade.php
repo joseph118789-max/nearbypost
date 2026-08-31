@@ -53,4 +53,7 @@
   .btn { border: none; font-weight: 600; padding: 9px 22px; border-radius: 40px; cursor: pointer;
          background: #f0f4f9; color: #1f5679; font-size: 0.84rem; font-family: inherit; }
   .btn-primary { background: #1c5a7f; color: #fff; }
+
+  .reason { border:1px solid #d4e2ef;border-radius:40px;padding:9px 16px;font-size:0.84rem;
+            font-family:inherit; }
 </style>

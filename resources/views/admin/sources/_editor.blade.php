@@ -80,3 +80,52 @@
     </div>
   </div>
 </form>
+
+{{-- Outside the form above, because a nested form is not valid HTML and the
+     browser silently drops it. --}}
+<div class="srccard" style="margin-top:-8px;padding-top:14px;">
+  @if(!empty($probe) && ($probe['id'] ?? null) === $s->id)
+    {{-- What actually happened when we read it, in the words an editor needs:
+         a moved feed, a publisher refusing our crawler and an address that was
+         never a feed all look identical until something tries. --}}
+    <div class="{{ $probe['ok'] ? 'flash' : 'warn' }}" style="margin-bottom:12px;">
+      <strong>{{ $probe['ok'] ? 'Read it.' : 'Could not use it.' }}</strong>
+      {{ $probe['message'] }}
+      @if($probe['title'])<br><span class="dim">Called itself: {{ $probe['title'] }}</span>@endif
+      @foreach($probe['samples'] as $sample)
+        <br><span class="dim">&mdash; {{ $sample }}</span>
+      @endforeach
+    </div>
+  @elseif($s->probe_notes)
+    <div class="srcmeta" style="margin-bottom:10px;">
+      Last tested {{ $s->last_probed_at ? \Carbon\Carbon::parse($s->last_probed_at)->diffForHumans() : 'never' }}:
+      {{ $s->probe_notes }}
+    </div>
+  @endif
+
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+    <form method="post" action="{{ route('admin.sources.test', ['id' => $s->id]) }}">
+      @csrf
+      <button class="btn" type="submit">Test this address</button>
+    </form>
+
+    <form method="post" action="{{ route('admin.sources.destroy', ['id' => $s->id]) }}"
+          onsubmit="return confirm('Remove this source?');"
+          style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      @csrf @method('DELETE')
+      <input class="reason inp" type="text" name="reason" maxlength="300"
+             placeholder="Why remove it? (optional)" style="min-width:200px;">
+      <select class="inp" name="scope" style="max-width:190px;">
+        <option value="url">Never visit this address</option>
+        <option value="host">Never visit this whole site</option>
+      </select>
+      <label class="chk"><input type="checkbox" name="block" value="1" checked> Never visit again</label>
+      <button class="btn btn-danger" type="submit">Remove</button>
+    </form>
+  </div>
+
+  <p class="hint" style="margin-top:8px;">
+    Removing alone does not stick: new sources are found automatically from what the aggregator
+    cites, so a junk address deleted today comes back. &ldquo;Never visit again&rdquo; is what stops it.
+  </p>
+</div>

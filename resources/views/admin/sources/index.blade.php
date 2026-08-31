@@ -8,7 +8,11 @@
 
 @section('content')
 <div class="srcpage">
-  <h1>Where the news comes from</h1>
+  @if($canLeave)
+    <a class="back" href="{{ route('admin.sources.countries') }}">&larr; All countries</a>
+  @endif
+
+  <h1>{{ $name }}</h1>
   <p class="lede">
     One row per publisher. Open one to see its section feeds &mdash; sports, business,
     property &mdash; and what we know about reading each of them: what to expect, how to get the
@@ -17,10 +21,6 @@
 
   @if(session('status'))
     <div class="flash">{{ session('status') }}</div>
-  @endif
-
-  @if($orphans > 0)
-    <div class="warn">{{ $orphans }} section feed(s) have no parent publisher and appear nowhere below.</div>
   @endif
 
   <table class="srctable">
@@ -71,5 +71,37 @@
       @endforeach
     </tbody>
   </table>
+
+  <h2>Add a publisher</h2>
+  <p class="lede">
+    Give the feed address if the publisher has one, or a section page if it does not. It is added
+    switched off, so you can test it and write the notes before it starts being read.
+  </p>
+
+  <form class="srccard" method="post" action="{{ route('admin.sources.publishers.add') }}">
+    @csrf
+    <input type="hidden" name="country" value="{{ $country }}">
+
+    <div class="srcrow">
+      <div>
+        <label class="lbl" for="pname">Publisher</label>
+        <input class="inp" id="pname" type="text" name="name" required maxlength="120"
+               placeholder="The Guardian">
+      </div>
+      <div style="flex:2 1 320px;">
+        <label class="lbl" for="purl">Address</label>
+        <input class="inp" id="purl" type="url" name="url" required maxlength="900"
+               placeholder="https://www.theguardian.com/uk/rss">
+      </div>
+      <div>
+        <label class="lbl" for="pkind">Kind</label>
+        <select class="inp" id="pkind" name="kind">
+          <option value="rss">A feed (RSS or Atom)</option>
+          <option value="index">A section page to crawl</option>
+        </select>
+      </div>
+      <div class="onoff"><button class="btn btn-primary" type="submit">Add</button></div>
+    </div>
+  </form>
 </div>
 @endsection

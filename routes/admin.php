@@ -93,10 +93,26 @@ Route::prefix("admin")->name("admin.")->group(function () {
             ->whereNumber("id")->name("rules.destroy");
 
         // Where the news comes from, and what we know about reading it.
-        Route::get("/sources", [SourceController::class, "index"])->name("sources.index");
+        // Country, then publisher, then that publisher's section feeds.
+        Route::get("/sources", [SourceController::class, "countries"])->name("sources.countries");
+        Route::post("/sources/country", [SourceController::class, "addCountry"])->name("sources.countries.add");
+        Route::get("/sources/list", [SourceController::class, "index"])->name("sources.index");
+        Route::post("/sources/publishers", [SourceController::class, "addPublisher"])->name("sources.publishers.add");
+
+        Route::get("/sources/blocked", [SourceController::class, "blocked"])->name("sources.blocked");
+        Route::post("/sources/blocked", [SourceController::class, "block"])->name("sources.block");
+        Route::delete("/sources/blocked/{id}", [SourceController::class, "unblock"])
+            ->whereNumber("id")->name("sources.unblock");
+
         Route::get("/sources/{id}", [SourceController::class, "show"])
             ->whereNumber("id")->name("sources.show");
         Route::put("/sources/{id}", [SourceController::class, "update"])
             ->whereNumber("id")->name("sources.update");
+        Route::post("/sources/{id}/test", [SourceController::class, "test"])
+            ->whereNumber("id")->name("sources.test");
+        Route::post("/sources/{id}/sections", [SourceController::class, "addSection"])
+            ->whereNumber("id")->name("sources.sections.add");
+        Route::delete("/sources/{id}", [SourceController::class, "destroy"])
+            ->whereNumber("id")->name("sources.destroy");
     });
 });

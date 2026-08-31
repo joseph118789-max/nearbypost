@@ -54,8 +54,13 @@ class DiscoverSources extends Command
         parent::__construct();
     }
 
+    /** Addresses an editor has told us never to visit again. */
+    private \App\Services\SourceBlocklist $blocklist;
+
     public function handle(): int
     {
+        $this->blocklist = new \App\Services\SourceBlocklist();
+
         $this->recordSightings();
 
         $probed = $this->probeCandidates();
@@ -91,6 +96,13 @@ class DiscoverSources extends Command
                     'sightings'  => $existing->sightings + $info['count'],
                     'updated_at' => now(),
                 ]);
+                continue;
+            }
+
+            // An editor removed this and said never again. Discovery learning
+            // it back from the next aggregator citation is the software
+            // ignoring them.
+            if ($this->blocklist->isBlocked($homepage)) {
                 continue;
             }
 
@@ -217,7 +229,7 @@ class DiscoverSources extends Command
             foreach ($sections as $section => $found) {
                 $exists = DB::table('sources')->where('rss_url', $found['url'])->exists();
 
-                if ($exists) {
+                if ($exists || $this->blocklist->isBlocked($found['url'])) {
                     continue;
                 }
 

@@ -41,6 +41,38 @@
     @include('admin.sources._editor', ['s' => $section, 'intervals' => $intervals, 'isRoot' => false])
   @endforeach
 
+  <div class="srccard">
+    <h3 style="font-size:0.95rem;color:#1c5a7f;margin-bottom:4px;">Add a section feed</h3>
+    <p class="hint" style="margin-bottom:12px;">
+      A publisher's sports or business feed, or a section page to crawl. Added switched off so you
+      can test it first.
+    </p>
+
+    <form method="post" action="{{ route('admin.sources.sections.add', ['id' => $root->id]) }}">
+      @csrf
+      <div class="srcrow">
+        <div>
+          <label class="lbl" for="sec">Section</label>
+          <input class="inp" id="sec" type="text" name="section" required maxlength="40"
+                 placeholder="sports">
+        </div>
+        <div style="flex:2 1 320px;">
+          <label class="lbl" for="securl">Address</label>
+          <input class="inp" id="securl" type="url" name="url" required maxlength="900"
+                 placeholder="https://example.com/sports/feed">
+        </div>
+        <div>
+          <label class="lbl" for="seckind">Kind</label>
+          <select class="inp" id="seckind" name="kind">
+            <option value="rss">A feed (RSS or Atom)</option>
+            <option value="index">A section page to crawl</option>
+          </select>
+        </div>
+        <div class="onoff"><button class="btn btn-primary" type="submit">Add</button></div>
+      </div>
+    </form>
+  </div>
+
   <h2>What actually arrived</h2>
   <p class="lede">
     The notes above say what to expect. This is what turned up. When the two disagree, the notes
