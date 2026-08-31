@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\FeedReadyItem;
 use App\Support\Loc;
+use App\Support\Taxonomy;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -169,11 +170,17 @@ class FeedQuery
     {
         // Fold case: the same category has been written both title-cased and
         // lower-cased, which would otherwise list "Crime & Safety" twice.
-        return FeedReadyItem::where('is_active', true)
+        $present = FeedReadyItem::where('is_active', true)
             ->whereNotNull('primary_category')
             ->selectRaw('DISTINCT LOWER(primary_category) AS c')
             ->orderBy('c')
             ->pluck('c')
             ->all();
+
+        // Only the twenty-one real categories are browsable. Older stories
+        // carry values from before the taxonomy was enforced - 'nation'
+        // covers thousands of rows, and a bare 'business' sat in the
+        // navigation beside the real 'business & corporate'.
+        return array_values(array_filter($present, fn ($c) => Taxonomy::isCanonical($c)));
     }
 }

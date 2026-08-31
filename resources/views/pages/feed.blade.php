@@ -58,7 +58,7 @@
     @endif
     <div class="info-row"><span>{{ __('site.period') }}</span><span>{{ $windows[$days] ?? $days . 'd' }}</span></div>
     @if(!empty($category))
-      <div class="info-row"><span>{{ __('site.topic') }}</span><span>{{ ucwords($category) }}</span></div>
+      <div class="info-row"><span>{{ __('site.topic') }}</span><span>{{ \App\Support\Taxonomy::category($category) }}</span></div>
     @endif
   </div>
 
@@ -102,7 +102,7 @@
            href="{{ request()->fullUrlWithQuery(['category' => null]) }}">{{ __('site.all') }}</a>
         @foreach($categories as $cat)
           <a class="filter-chip {{ !empty($category) && mb_strtolower($category) === mb_strtolower($cat) ? 'active' : '' }}"
-             href="{{ request()->fullUrlWithQuery(['category' => $cat]) }}">{{ ucwords($cat) }}</a>
+             href="{{ request()->fullUrlWithQuery(['category' => $cat]) }}">{{ \App\Support\Taxonomy::category($cat) }}</a>
         @endforeach
       </div>
     </div>

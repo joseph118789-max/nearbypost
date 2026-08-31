@@ -89,7 +89,7 @@
         <h2 id="nav-topics">{{ __('site.topics') }}</h2>
         <ul class="nav-links">
           @foreach(array_slice($categories, 0, 14) as $cat)
-            <li><a href="{{ \App\Support\Loc::route('category', ['slug' => \App\Support\Slug::make($cat)]) }}">{{ ucwords($cat) }}</a></li>
+            <li><a href="{{ \App\Support\Loc::route('category', ['slug' => \App\Support\Slug::make($cat)]) }}">{{ \App\Support\Taxonomy::category($cat) }}</a></li>
           @endforeach
         </ul>
       </section>

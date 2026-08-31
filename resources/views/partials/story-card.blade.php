@@ -8,13 +8,15 @@
 
 <article class="story-card">
   <div class="story-meta">
-    @if(!empty($story['primary_category']))
+    {{-- Only the twenty-one real categories get a label. Legacy values from
+         before the taxonomy was enforced would otherwise show as "OTHERS". --}}
+    @if(!empty($story['primary_category']) && \App\Support\Taxonomy::isCanonical($story['primary_category']))
       <a class="story-category"
-         href="{{ \App\Support\Loc::route('category', ['slug' => \App\Support\Slug::make($story['primary_category'])]) }}">{{ ucwords($story['primary_category']) }}</a>
+         href="{{ \App\Support\Loc::route('category', ['slug' => \App\Support\Slug::make($story['primary_category'])]) }}">{{ \App\Support\Taxonomy::category($story['primary_category']) }}</a>
     @endif
 
     @if(!empty($story['sub_category']) && $story['sub_category'] !== 'Others')
-      <span class="story-category">{{ $story['sub_category'] }}</span>
+      <span class="story-category">{{ \App\Support\Taxonomy::subCategory($story['sub_category']) }}</span>
     @endif
 
     @if($distance !== null)

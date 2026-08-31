@@ -7,6 +7,7 @@ use App\Services\FeedQuery;
 use App\Services\LocationResolver;
 use App\Services\Seo;
 use App\Support\Slug;
+use App\Support\Taxonomy;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\View\View;
@@ -77,7 +78,7 @@ class HomeController extends Controller
         $stories  = $this->feed->latest($category, $days, 24);
 
         $name = $category
-            ? __('site.category_news', ['category' => ucwords($category)])
+            ? __('site.category_news', ['category' => Taxonomy::category($category)])
             : __('site.latest_news');
 
         return $this->feedView([
@@ -106,7 +107,7 @@ class HomeController extends Controller
             throw new NotFoundHttpException('Unknown category');
         }
 
-        $name = __('site.category_news', ['category' => ucwords($category)]);
+        $name = __('site.category_news', ['category' => Taxonomy::category($category)]);
 
         return $this->feedView([
             'tab'         => 'interest',
@@ -176,7 +177,7 @@ class HomeController extends Controller
         }
 
         $name = $category
-            ? __('site.category_in', ['category' => ucwords($category), 'place' => $place])
+            ? __('site.category_in', ['category' => Taxonomy::category($category), 'place' => $place])
             : __('site.news_near', ['place' => $place]);
 
         return $this->feedView([
@@ -230,7 +231,7 @@ class HomeController extends Controller
             : __('site.window_days', ['days' => $days]);
 
         $what = $category
-            ? __('site.category_stories', ['category' => mb_strtolower($category)])
+            ? __('site.category_stories', ['category' => Taxonomy::category($category)])
             : __('site.stories');
 
         if ($count === 0) {
@@ -246,7 +247,7 @@ class HomeController extends Controller
 
     private function description(?string $place, ?string $category, int $days): string
     {
-        $what = $category ? ucwords($category) . ' news' : 'Local news';
+        $what = $category ? Taxonomy::category($category) . ' news' : 'Local news';
 
         return $place
             ? "{$what} near {$place}, Malaysia. Updated continuously from Malaysian news sources."

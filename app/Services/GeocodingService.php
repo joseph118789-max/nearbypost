@@ -125,7 +125,88 @@ class GeocodingService
         self::$lastLiveCallAt = microtime(true);
     }
 
+    /**
+     * Resolve a place, preferring Malaysia but not requiring it.
+     *
+     * Malaysia is tried first because most place text here is Malaysian and
+     * much of it is ambiguous worldwide - Sepang, Kuantan and Victoria all
+     * exist in other countries. When that finds nothing the name is resolved
+     * globally, so a story from Henan or Jakarta is placed where it actually
+     * happened instead of failing or landing on a Malaysian near-match.
+     *
+     * Distance then does the rest: a Henan story is four thousand kilometres
+     * from a Kuala Lumpur reader and simply falls outside their radius.
+     */
     private function geocodeNominatim(string $placeName): array
+    {
+        // Only qualify names the gazetteer recognises as Malaysian. Everything
+        // else is resolved as written, so a story from Henan is in Henan.
+        if ($this->isKnownMalaysianPlace($placeName)) {
+            try {
+                return $this->queryNominatim($placeName . ', Malaysia');
+            } catch (GeocodingRateLimitedException $e) {
+                throw $e;
+            } catch (GeocodingException $e) {
+                // Not in Malaysia, or not disambiguated by it. Try the world.
+            }
+        }
+
+        return $this->queryNominatim($placeName);
+    }
+
+    /**
+     * Is this a place the Malaysian gazetteer knows?
+     *
+     * location_aliases is the list of Malaysian places this pipeline has been
+     * taught. A name in it is unambiguously Malaysian, so the query can say so
+     * - which is what stops Klang resolving to a commune in France. A name not
+     * in it is resolved as written, which is what lets Tokyo be in Japan.
+     */
+    private function isKnownMalaysianPlace(string $placeName): bool
+    {
+        $key = mb_strtolower(trim($placeName));
+
+        if ($key === '') {
+            return false;
+        }
+
+        if (str_contains($key, 'malaysia')) {
+            return true;
+        }
+
+        static $known = null;
+
+        if ($known === null) {
+            $known = [];
+
+            try {
+                $rows = DB::table('location_aliases')->where('is_active', true)
+                    ->get(['alias_text', 'canonical_name']);
+
+                foreach ($rows as $row) {
+                    $known[mb_strtolower($row->alias_text)] = true;
+                    $known[mb_strtolower($row->canonical_name)] = true;
+                }
+            } catch (\Throwable $e) {
+                $known = [];
+            }
+        }
+
+        if (isset($known[$key])) {
+            return true;
+        }
+
+        // "Sentul, Kuala Lumpur" is Malaysian if any of its parts are.
+        foreach (explode(',', $key) as $part) {
+            if (isset($known[trim($part)])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function queryNominatim(string $query): array
     {
         $this->throttle();
 
@@ -135,11 +216,13 @@ class GeocodingService
         ])
         ->timeout(10)
         ->get("{$this->baseUrl}/search", [
-            'q'              => $placeName . ', Malaysia',
+            'q'              => $query,
             'format'         => 'json',
             'limit'          => 1,
             'addressdetails' => 1,
         ]);
+
+        $placeName = $query;
 
         if ($response->status() === 429) {
             throw new GeocodingRateLimitedException("Nominatim rate limited for: {$placeName}");

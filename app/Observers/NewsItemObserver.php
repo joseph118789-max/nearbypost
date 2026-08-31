@@ -40,6 +40,21 @@ class NewsItemObserver
             return;
         }
 
+        // Wait for classification before a story's first appearance.
+        //
+        // PopulateFeedReady gates on enrichment; this observer did not, so a
+        // story reached the feed at ingestion time wearing the default category
+        // 'others' and kept it until enrichment caught up. Those are the newest
+        // stories on the site, so they are the ones a reader sees first.
+        //
+        // Updates to a story already in the feed still flow immediately, so a
+        // re-classification or correction is never delayed.
+        $alreadyServed = FeedReadyItem::where('news_item_id', $newsItem->id)->exists();
+
+        if (!$alreadyServed && !in_array($newsItem->ai_status, ['success', 'fallback_used'], true)) {
+            return;
+        }
+
         // Use AI-enriched category if available, otherwise fall back to RSS primary_category
         $primaryCategory = $newsItem->ai_category ?: $newsItem->primary_category;
 
