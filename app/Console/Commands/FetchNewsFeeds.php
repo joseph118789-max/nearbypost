@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use App\Services\Classification\ContentPolicy;
 
 /**
  * Fetch every registered feed, reconcile what comes back, then submit it.
@@ -53,6 +54,14 @@ class FetchNewsFeeds extends Command
 
     /** Quirks observed this run, per source id. */
     private array $observedQuirks = [];
+
+    private ContentPolicy $policy;
+
+    public function __construct()
+    {
+        parent::__construct();
+        $this->policy = new ContentPolicy();
+    }
 
     public function handle(): int
     {
@@ -216,6 +225,15 @@ class FetchNewsFeeds extends Command
                 continue;
             }
 
+            $rawSummary = $this->cleanText((string) ($entry->description ?? $entry->summary ?? ''));
+
+            // An index of stories is not a story. Rejecting it here means it is
+            // never stored, never classified and never served.
+            if ($this->policy->isListingPage($title, $rawSummary)) {
+                $this->noteQuirk($source->id, 'listing_pages_present');
+                continue;
+            }
+
             $publisher = $this->publisherOf($entry);
 
             if ($publisher !== null) {
@@ -234,11 +252,10 @@ class FetchNewsFeeds extends Command
                 'source_name'   => $credit,
                 'source_domain' => parse_url($source->base_url ?? $url, PHP_URL_HOST),
                 'published_at'  => $published,
-                'summary'       => mb_substr(
-                    $this->cleanText((string) ($entry->description ?? $entry->summary ?? '')),
-                    0,
-                    800
-                ),
+                // Publishing-system leftovers - bylines, desk emails, CMS node
+                // references - are stripped rather than treated as grounds to
+                // reject the article. Enrichment writes a real summary anyway.
+                'summary'       => mb_substr((string) $this->policy->cleanSummary($rawSummary), 0, 800),
                 // No category is guessed here. Classification belongs to the AI
                 // enrichment stage, which validates against a controlled list.
 
