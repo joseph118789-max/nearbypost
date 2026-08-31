@@ -250,7 +250,7 @@ class ContributionController extends Controller
     public function unpublish(Request $request, int $id): RedirectResponse
     {
         $data = $request->validate([
-            'reason' => ['nullable', 'string', 'max:280'],
+            'reason' => ['required', 'string', 'min:3', 'max:280'],
         ]);
 
         $post = $this->anyStory($id);
@@ -269,7 +269,31 @@ class ContributionController extends Controller
 
         $post->update($changes);
 
-        return back()->with('status', 'Removed from the feed.');
+        $this->recordRemoval($post, $data['reason'] ?? null);
+
+        return back()->with('status', 'Removed from the feed, and the reason is on the Removed page.');
+    }
+
+    /**
+     * Keep the removal as its own fact.
+     *
+     * Written flat rather than as a join so it survives the story being
+     * deleted, and read in aggregate on the Removed page, which is the only
+     * form in which "why we took things down" is any use.
+     */
+    private function recordRemoval(NewsItem $post, ?string $reason): void
+    {
+        DB::table('removals')->insert([
+            'news_item_id'     => $post->id,
+            'title'            => mb_substr((string) $post->title, 0, 500),
+            'origin'           => $post->origin ?: 'scraper',
+            'source'           => mb_substr((string) $post->source, 0, 250),
+            'primary_category' => mb_substr((string) $post->primary_category, 0, 100),
+            'reason'           => trim((string) ($reason ?: 'Removed by an editor, no reason given.')),
+            'removed_by'       => Auth::guard('admin')->id(),
+            'created_at'       => now(),
+            'updated_at'       => now(),
+        ]);
     }
 
     /** Put a taken-down story back. */

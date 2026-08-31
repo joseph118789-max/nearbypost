@@ -1,9 +1,11 @@
 <?php
 
+use App\Http\Controllers\Admin\CaseStudyController;
 use App\Http\Controllers\Admin\ContributionController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\IntelController;
 use App\Http\Controllers\Admin\NewsController;
+use App\Http\Controllers\Admin\RemovalController;
 use App\Http\Controllers\Admin\RuleController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\SourceController;
@@ -57,6 +59,29 @@ Route::prefix("admin")->name("admin.")->group(function () {
             ->whereNumber("id")->name("contributions.destroy");
         Route::post("/contributors/{id}/untrust", [ContributionController::class, "untrust"])
             ->whereNumber("id")->name("contributions.untrust");
+
+        // What was taken down, and what it should teach the reviewer.
+        Route::get("/removals", [RemovalController::class, "index"])->name("removals.index");
+        Route::post("/removals/suggest", [RemovalController::class, "suggest"])->name("removals.suggest");
+        Route::post("/removals/accept", [RemovalController::class, "accept"])->name("removals.accept");
+        Route::post("/removals/dismiss", [RemovalController::class, "dismiss"])->name("removals.dismiss");
+
+        // One story happening in many places at once.
+        Route::get("/cases", [CaseStudyController::class, "index"])->name("cases.index");
+        Route::get("/cases/new", [CaseStudyController::class, "create"])->name("cases.create");
+        Route::post("/cases", [CaseStudyController::class, "store"])->name("cases.store");
+        Route::get("/cases/{id}", [CaseStudyController::class, "show"])
+            ->whereNumber("id")->name("cases.show");
+        Route::post("/cases/{id}/places", [CaseStudyController::class, "addPlace"])
+            ->whereNumber("id")->name("cases.places.add");
+        Route::delete("/cases/{id}/places/{placeId}", [CaseStudyController::class, "removePlace"])
+            ->whereNumber("id")->whereNumber("placeId")->name("cases.places.remove");
+        Route::post("/cases/{id}/geocode", [CaseStudyController::class, "geocode"])
+            ->whereNumber("id")->name("cases.geocode");
+        Route::post("/cases/{id}/publish", [CaseStudyController::class, "publish"])
+            ->whereNumber("id")->name("cases.publish");
+        Route::post("/cases/{id}/unpublish", [CaseStudyController::class, "unpublish"])
+            ->whereNumber("id")->name("cases.unpublish");
 
         // Editorial policy, in the newsroom's own words.
         Route::get("/rules", [RuleController::class, "index"])->name("rules.index");

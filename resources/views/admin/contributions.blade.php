@@ -231,13 +231,14 @@
             <a class="btn" href="{{ $post->url }}" target="_blank" rel="noopener">View</a>
 
             @if($live)
+              {{-- The reason is required on every removal, not only on reader
+                   posts: it is what the Removed page reads to work out which
+                   rules are missing, and a blank one teaches nothing. --}}
               <form method="post" action="{{ route('admin.contributions.unpublish', ['id' => $post->id]) }}">
                 @csrf
-                @if($post->origin === 'user')
-                  <input class="reason" type="text" name="reason" maxlength="280"
-                         placeholder="Reason (the contributor reads this)">
-                @endif
-                <button class="btn btn-danger" type="submit">Take down</button>
+                <input class="reason" type="text" name="reason" maxlength="280" required
+                       placeholder="{{ $post->origin === 'user' ? 'Why? The contributor reads this.' : 'Why is it coming down?' }}">
+                <button class="btn btn-danger" type="submit">Remove</button>
               </form>
             @elseif($held)
               {{-- Taking down without a way back is a trap. --}}
