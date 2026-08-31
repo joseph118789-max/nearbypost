@@ -22,6 +22,16 @@ class NewsController extends Controller
     {
         $query = $this->feedQuery();
 
+        // Who wrote it. "Official" is everything not written by a reader
+        // rather than 'scraper' exactly, matching the reader's own filter, so a
+        // story from a future third origin stays ours instead of vanishing
+        // from both lists.
+        if ($request->filled('origin') && $request->origin !== 'all') {
+            $request->origin === 'unofficial'
+                ? $query->where('origin', '=', 'user')
+                : $query->where('origin', '<>', 'user');
+        }
+
         if ($request->filled('primary_cat') && $request->primary_cat !== 'all') {
             $query->where('primary_category', $request->primary_cat);
         }

@@ -49,6 +49,8 @@ Route::prefix("admin")->name("admin.")->group(function () {
             ->whereNumber("id")->name("contributions.reject");
         Route::post("/contributions/{id}/unpublish", [ContributionController::class, "unpublish"])
             ->whereNumber("id")->name("contributions.unpublish");
+        Route::post("/contributions/{id}/republish", [ContributionController::class, "republish"])
+            ->whereNumber("id")->name("contributions.republish");
         Route::delete("/contributions/{id}", [ContributionController::class, "destroy"])
             ->whereNumber("id")->name("contributions.destroy");
         Route::post("/contributors/{id}/untrust", [ContributionController::class, "untrust"])
