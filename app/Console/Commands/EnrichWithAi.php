@@ -97,18 +97,14 @@ class EnrichWithAi extends Command
         if ($newsItemId) {
             $query->where('id', $newsItemId);
         } else {
-            // Normal run: skip items already successfully enriched
-            // Items with ai_status='pending' are primary targets
-            // Items with ai_status='insufficient_content' are retried after n8n fix
-            // Also skip items that have successful AI processing for current pipeline
-            $query->where(function ($q) {
-                $q->where('ai_status', 'pending')
-                  ->orWhere('ai_status', 'insufficient_content')
-                  ->orWhereDoesntHave('aiProcessingJob', function ($q2) {
-                      $q2->where('ai_status', 'success')
-                         ->where('pipeline_version', self::PIPELINE_VERSION);
+            // Normal run must be conservative: only process rows explicitly marked pending.
+            // Do NOT automatically resend previously processed/backfilled items to DeepSeek.
+            // Do NOT reprocess earlier successful pipeline versions unless --force is used.
+            // Do NOT auto-retry insufficient_content in scheduled runs.
+            $query->where('ai_status', 'pending')
+                  ->whereDoesntHave('aiProcessingJob', function ($q2) {
+                      $q2->where('ai_status', 'success');
                   });
-            });
         }
 
         $limit = (int) ($this->option('limit') ?: 50);
@@ -128,7 +124,6 @@ class EnrichWithAi extends Command
         if (!$force) {
             $existing = AiProcessingJob::where('news_item_id', $item->id)
                 ->where('ai_status', 'success')
-                ->where('pipeline_version', self::PIPELINE_VERSION)
                 ->first();
             if ($existing) {
                 $this->line("  SKIP {$item->id}: already processed, good output preserved.");
@@ -168,11 +163,18 @@ class EnrichWithAi extends Command
                 $validation = $this->validateAiOutput($parsed, $rawOutput);
 
                 if (!$validation['valid']) {
+                    $notes = implode('; ', $validation['errors']);
                     $job->update([
-                        'ai_status'       => 'insufficient_content',
-                        'raw_ai_output'   => $rawOutput,
-                        'validation_notes' => implode('; ', $validation['errors']),
-                        'processed_at'    => now(),
+                        'ai_status'        => 'insufficient_content',
+                        'raw_ai_output'    => $rawOutput,
+                        'validation_notes' => $notes,
+                        'processed_at'     => now(),
+                    ]);
+                    $item->update([
+                        'ai_status'                 => 'insufficient_content',
+                        'ai_processed_at'           => now(),
+                        'enrichment_failure_reason' => $notes,
+                        'enrichment_failure_count'  => (int) ($item->enrichment_failure_count ?? 0) + 1,
                     ]);
                     $this->warn("  INVALID {$item->id}: " . implode(', ', $validation['errors']));
                     Log::warning('AI enrichment invalid output', [
@@ -202,7 +204,14 @@ class EnrichWithAi extends Command
                 ]);
 
                 // Update NewsItem with coordinates if available and set status
-                $updateData = [];
+                $updateData = [
+                    'main_place_text'            => $validation['place'],
+                    'ai_category'                => $validation['category'],
+                    'ai_summary'                 => $validation['summary'],
+                    'ai_status'                  => 'success',
+                    'ai_processed_at'            => now(),
+                    'enrichment_failure_reason'  => null,
+                ];
                 if ($validation['lat'] !== null && $validation['lng'] !== null) {
                     $updateData['lat'] = $validation['lat'];
                     $updateData['lng'] = $validation['lng'];
@@ -222,10 +231,6 @@ class EnrichWithAi extends Command
                     }
                     $updateData['relevance_mode'] = $relevanceMode;
                 }
-                // Always update ai_category, ai_summary, and ai_status
-                $updateData["ai_category"] = $validation["category"];
-                $updateData["ai_summary"] = $validation["summary"];
-                $updateData["ai_status"] = "success";
 
                 $item->update($updateData);
 

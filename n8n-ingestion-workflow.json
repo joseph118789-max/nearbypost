@@ -6,9 +6,8 @@
         "rule": {
           "interval": [
             {
-              "triggerAtHour": 0,
-              "triggerAtMinute": 0,
-              "hoursInterval": 12
+              "field": "minutes",
+              "minutesInterval": 15
             }
           ]
         }
@@ -38,7 +37,7 @@
     },
     {
       "parameters": {
-        "url": "https://www.bernama.com/en/rss.php?id=news",
+        "url": "https://www.bernama.com/en/rssfeed.php",
         "options": {}
       },
       "id": "bernama-rss",
@@ -66,35 +65,7 @@
     },
     {
       "parameters": {
-        "url": "https://news.google.com/rss/search?q=Malaysia&hl=en-MY&gl=MY&ceid=MY:en",
-        "options": {}
-      },
-      "id": "google-malaysia-rss",
-      "name": "Google News Malaysia RSS",
-      "type": "n8n-nodes-base.rssFeedRead",
-      "typeVersion": 1,
-      "position": [
-        320,
-        560
-      ]
-    },
-    {
-      "parameters": {
-        "url": "https://news.google.com/rss/search?q=site:reuters.com+Malaysia+OR+site:bbc.com+Malaysia+OR+site:cnn.com+Malaysia+OR+site:bloomberg.com+Malaysia+OR+site:straitstimes.com+Malaysia+OR+site:scmp.com+Malaysia+OR+site:channelnewsasia.com+Malaysia&hl=en-MY&gl=MY&ceid=MY:en",
-        "options": {}
-      },
-      "id": "google-foreign-discovery-rss",
-      "name": "Google News Foreign Discovery RSS",
-      "type": "n8n-nodes-base.rssFeedRead",
-      "typeVersion": 1,
-      "position": [
-        320,
-        640
-      ]
-    },
-    {
-      "parameters": {
-        "functionCode": "return items.map(item => ({ json: { ...item.json, source_mode: 'direct_seed', source_label: 'Free Malaysia Today', source_name: 'Free Malaysia Today', source_domain: 'freemalaysiatoday.com' } }));"
+        "functionCode": "return items.map(item => ({ json: { ...item.json, source_mode: 'rss', source_label: 'FMT Nation', source_name: 'Free Malaysia Today', source_domain: 'www.freemalaysiatoday.com' } }));"
       },
       "id": "tag-fmt",
       "name": "Tag FMT",
@@ -107,7 +78,7 @@
     },
     {
       "parameters": {
-        "functionCode": "return items.map(item => ({ json: { ...item.json, source_mode: 'direct_seed', source_label: 'Bernama', source_name: 'Bernama', source_domain: 'bernama.com' } }));"
+        "functionCode": "return items.map(item => ({ json: { ...item.json, source_mode: 'rss', source_label: 'Bernama', source_name: 'Bernama', source_domain: 'www.bernama.com' } }));"
       },
       "id": "tag-bernama",
       "name": "Tag Bernama",
@@ -120,7 +91,7 @@
     },
     {
       "parameters": {
-        "functionCode": "return items.map(item => ({ json: { ...item.json, source_mode: 'direct_seed', source_label: 'Malay Mail', source_name: 'Malay Mail', source_domain: 'malaymail.com' } }));"
+        "functionCode": "return items.map(item => ({ json: { ...item.json, source_mode: 'rss', source_label: 'Malay Mail', source_name: 'Malay Mail', source_domain: 'www.malaymail.com' } }));"
       },
       "id": "tag-malaymail",
       "name": "Tag Malay Mail",
@@ -129,32 +100,6 @@
       "position": [
         540,
         360
-      ]
-    },
-    {
-      "parameters": {
-        "functionCode": "return items.map(item => ({ json: { ...item.json, source_mode: 'google_discovery', source_label: 'Google News Malaysia', source_name: 'Google News Malaysia', source_domain: 'news.google.com' } }));"
-      },
-      "id": "tag-google-malaysia",
-      "name": "Tag Google Malaysia",
-      "type": "n8n-nodes-base.function",
-      "typeVersion": 1,
-      "position": [
-        540,
-        560
-      ]
-    },
-    {
-      "parameters": {
-        "functionCode": "return items.map(item => ({ json: { ...item.json, source_mode: 'google_discovery', source_label: 'Google News Foreign Discovery', source_name: 'Google News Foreign Discovery', source_domain: 'news.google.com' } }));"
-      },
-      "id": "tag-google-foreign",
-      "name": "Tag Google Foreign",
-      "type": "n8n-nodes-base.function",
-      "typeVersion": 1,
-      "position": [
-        540,
-        640
       ]
     },
     {
