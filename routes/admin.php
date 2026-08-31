@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\ContributionController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\IntelController;
 use App\Http\Controllers\Admin\NewsController;
+use App\Http\Controllers\Admin\RuleController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\SourceController;
 use App\Http\Controllers\Admin\SubscriberController;
@@ -56,6 +57,15 @@ Route::prefix("admin")->name("admin.")->group(function () {
             ->whereNumber("id")->name("contributions.destroy");
         Route::post("/contributors/{id}/untrust", [ContributionController::class, "untrust"])
             ->whereNumber("id")->name("contributions.untrust");
+
+        // Editorial policy, in the newsroom's own words.
+        Route::get("/rules", [RuleController::class, "index"])->name("rules.index");
+        Route::post("/rules", [RuleController::class, "store"])->name("rules.store");
+        Route::post("/rules/seed", [RuleController::class, "seed"])->name("rules.seed");
+        Route::put("/rules/{id}", [RuleController::class, "update"])
+            ->whereNumber("id")->name("rules.update");
+        Route::delete("/rules/{id}", [RuleController::class, "destroy"])
+            ->whereNumber("id")->name("rules.destroy");
 
         // Where the news comes from, and what we know about reading it.
         Route::get("/sources", [SourceController::class, "index"])->name("sources.index");

@@ -169,6 +169,14 @@
       @endif
     </form>
 
+    {{-- Read the list in any of the three languages the site serves. --}}
+    <div class="tabs" style="margin-bottom:16px;">
+      @foreach(['en' => 'English', 'ms' => 'Bahasa Melayu', 'zh' => '中文'] as $code => $label)
+        <a class="{{ $lang === $code ? 'on' : '' }}"
+           href="{{ request()->fullUrlWithQuery(['lang' => $code]) }}">{{ $label }}</a>
+      @endforeach
+    </div>
+
     @forelse($rows as $post)
       @php
         $writer = $contributors[$post->contributor_id] ?? null;
@@ -188,7 +196,10 @@
       <div class="sub">
         <div class="row-compact">
           <div style="min-width:0;flex:1;">
-            <div class="t">{{ $post->title }}</div>
+            <div class="t">{{ $translations[$post->id] ?? $post->title }}</div>
+            @if($lang !== 'en' && !isset($translations[$post->id]))
+              <div class="s" style="opacity:0.7;">not translated yet — showing the original</div>
+            @endif
             <div class="s">
               @if($post->origin === 'user')
                 <span class="badge badge-reader">reader</span>

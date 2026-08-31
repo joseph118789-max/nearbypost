@@ -11,6 +11,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -44,6 +45,13 @@ class ContributionController extends Controller
 
         $search = trim((string) $request->query('q', ''));
 
+        // Which language to read the listed stories in. The site serves three;
+        // an editor checking a translation should not have to open the public
+        // page in three tabs to see them.
+        $lang = in_array($request->query('lang'), ['ms', 'zh'], true)
+            ? $request->query('lang')
+            : 'en';
+
         $waiting = NewsItem::query()
             ->where('origin', 'user')
             ->where('review_status', 'pending_review')
@@ -65,6 +73,8 @@ class ContributionController extends Controller
             'served'       => $this->servedIds($rows),
             'tab'          => $tab,
             'search'       => $search,
+            'lang'         => $lang,
+            'translations' => $this->translationsFor($rows, $lang),
             'waiting'      => $waiting,
             'rows'         => $rows,
             'contributors' => $contributors,
@@ -126,6 +136,35 @@ class ContributionController extends Controller
             ->pluck('news_item_id')
             ->flip()
             ->map(fn () => true)
+            ->all();
+    }
+
+    /**
+     * The listed stories' headlines in one reading language.
+     *
+     * English is the stored original for most stories, so it needs no lookup;
+     * the other two come from news_translations, and a story with no
+     * translation yet simply keeps its original headline - the same fallback
+     * the public feed makes.
+     *
+     * @return array<int, string>
+     */
+    private function translationsFor($rows, string $lang): array
+    {
+        if ($rows === null || $lang === 'en') {
+            return [];
+        }
+
+        $ids = collect($rows->items())->pluck('id')->all();
+
+        if ($ids === []) {
+            return [];
+        }
+
+        return DB::table('news_translations')
+            ->whereIn('news_item_id', $ids)
+            ->where('locale', $lang)
+            ->pluck('title', 'news_item_id')
             ->all();
     }
 
