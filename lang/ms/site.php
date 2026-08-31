@@ -10,6 +10,10 @@ return [
     'sections'       => 'Bahagian',
     'topics'         => 'Topik',
     'places'         => 'Tempat',
+    'places_near'    => 'Tempat berhampiran anda',
+    'places_active'  => 'Di mana ada berita',
+    'subtopics'      => 'Sub-topik',
+    'all_subtopics'  => 'semua sub-topik',
     'reading_language' => 'Bahasa bacaan',
 
     'current_settings' => 'Tetapan semasa',

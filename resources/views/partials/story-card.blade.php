@@ -15,8 +15,16 @@
          href="{{ \App\Support\Loc::route('category', ['slug' => \App\Support\Slug::make($story['primary_category'])]) }}">{{ \App\Support\Taxonomy::category($story['primary_category']) }}</a>
     @endif
 
-    @if(!empty($story['sub_category']) && $story['sub_category'] !== 'Others')
-      <span class="story-category">{{ \App\Support\Taxonomy::subCategory($story['sub_category']) }}</span>
+    {{-- The sub-category is a filter, not a decoration. Clicking it narrows
+         the topic it belongs to, which is what its presence here has always
+         implied. --}}
+    @if(!empty($story['sub_category']) && !in_array($story['sub_category'], ['Others', 'General'], true))
+      @if(!empty($story['primary_category']) && \App\Support\Taxonomy::isCanonical($story['primary_category']))
+        <a class="story-category story-subcategory"
+           href="{{ \App\Support\Loc::route('category', ['slug' => \App\Support\Slug::make($story['primary_category'])]) }}?sub={{ urlencode($story['sub_category']) }}">{{ \App\Support\Taxonomy::subCategory($story['sub_category']) }}</a>
+      @else
+        <span class="story-category">{{ \App\Support\Taxonomy::subCategory($story['sub_category']) }}</span>
+      @endif
     @endif
 
     @if($distance !== null)

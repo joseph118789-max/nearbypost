@@ -57,7 +57,8 @@ class FeedQuery
         ?string $category = null,
         int $days = self::DEFAULT_WINDOW_DAYS,
         int $limit = 20,
-        ?string $locale = null
+        ?string $locale = null,
+        ?string $sub = null
     ): array {
         $locale = $locale ?? Loc::current();
 
@@ -72,6 +73,11 @@ class FeedQuery
         if ($category !== null && $category !== '' && $category !== 'all') {
             // Categories are stored lower-case; accept any casing from the URL.
             $query->whereRaw('LOWER(feed_ready_items.primary_category) = ?', [mb_strtolower($category)]);
+        }
+
+        // A sub-category narrows within its parent: Sports, then Badminton.
+        if ($sub !== null && $sub !== '' && $sub !== 'all') {
+            $query->whereRaw('LOWER(feed_ready_items.sub_category) = ?', [mb_strtolower($sub)]);
         }
 
         $rows = $query
@@ -109,7 +115,8 @@ class FeedQuery
         int $days = self::DEFAULT_WINDOW_DAYS,
         int $limit = 20,
         ?string $category = null,
-        ?string $locale = null
+        ?string $locale = null,
+        ?string $sub = null
     ): array {
         $locale = $locale ?? Loc::current();
 
@@ -125,6 +132,11 @@ class FeedQuery
         if ($category !== null && $category !== '' && $category !== 'all') {
             $categoryClause = ' AND LOWER(f.primary_category) = :category';
             $bindings['category'] = mb_strtolower($category);
+        }
+
+        if ($sub !== null && $sub !== '' && $sub !== 'all') {
+            $categoryClause .= ' AND LOWER(f.sub_category) = :sub';
+            $bindings['sub'] = mb_strtolower($sub);
         }
 
         $sql = "SELECT * FROM (
@@ -163,6 +175,32 @@ class FeedQuery
             fn ($row) => (array) $row,
             DB::select($sql, $bindings)
         );
+    }
+
+    /**
+     * The sub-categories of one category that actually carry stories.
+     *
+     * Offered rather than the whole taxonomy branch: a reader choosing Sports
+     * should be shown Football and Badminton because there is something behind
+     * them, not all eighteen because the table defines eighteen.
+     *
+     * @return list<array{name: string, count: int}>
+     */
+    public function subCategories(string $category, int $days = 30): array
+    {
+        return FeedReadyItem::query()
+            ->where('is_active', true)
+            ->where('published_at', '>=', now()->subDays($days))
+            ->whereRaw('LOWER(primary_category) = ?', [mb_strtolower($category)])
+            ->whereNotNull('sub_category')
+            ->whereNotIn('sub_category', ['Others', 'General'])
+            ->selectRaw('sub_category AS name, count(*) AS n')
+            ->groupBy('sub_category')
+            ->orderByRaw('count(*) DESC')
+            ->limit(14)
+            ->get()
+            ->map(fn ($row) => ['name' => $row->name, 'count' => (int) $row->n])
+            ->all();
     }
 
     /** Distinct primary categories currently present in the feed. */

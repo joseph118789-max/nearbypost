@@ -87,20 +87,34 @@
     @if(!empty($categories))
       <section class="nav-section" aria-labelledby="nav-topics">
         <h2 id="nav-topics">{{ __('site.topics') }}</h2>
+        {{-- Every topic, not the first fourteen. The cap was there because a
+             sticky column taller than the screen cannot be scrolled past; the
+             column scrolls within itself now, and the cap was quietly hiding
+             Travel and Weather from every page on the site. --}}
         <ul class="nav-links">
-          @foreach(array_slice($categories, 0, 14) as $cat)
+          @foreach($categories as $cat)
             <li><a href="{{ \App\Support\Loc::route('category', ['slug' => \App\Support\Slug::make($cat)]) }}">{{ \App\Support\Taxonomy::category($cat) }}</a></li>
           @endforeach
         </ul>
       </section>
     @endif
 
-    @if(!empty($places))
+    @if(!empty($placeList))
+      {{-- Places that have news, nearest first where the page knows where the
+           reader is and busiest first where it does not, each showing how many
+           stories sit behind it. This was an alphabetical slice of the
+           gazetteer, which is why it opened with Alor Gajah and Alor Setar
+           while Kuala Lumpur was nowhere in it. --}}
       <section class="nav-section" aria-labelledby="nav-places">
-        <h2 id="nav-places">{{ __('site.places') }}</h2>
+        <h2 id="nav-places">{{ !empty($placesNear) ? __('site.places_near') : __('site.places_active') }}</h2>
         <ul class="nav-links">
-          @foreach(array_slice($places, 0, 18) as $p)
-            <li><a href="{{ \App\Support\Loc::route('place', ['slug' => \App\Support\Slug::make($p)]) }}">{{ $p }}</a></li>
+          @foreach(array_slice($placeList, 0, 24) as $p)
+            <li>
+              <a class="place-link" href="{{ \App\Support\Loc::route('place', ['slug' => \App\Support\Slug::make($p['name'])]) }}">
+                <span class="place-name">{{ $p['name'] }}</span>
+                <span class="place-count">{{ $p['count'] }}</span>
+              </a>
+            </li>
           @endforeach
         </ul>
       </section>

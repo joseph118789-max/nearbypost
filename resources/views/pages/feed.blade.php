@@ -27,8 +27,11 @@
           @if(!empty($showRadius))
             {{ __('site.or') }} <a href="{{ request()->fullUrlWithQuery(['radius' => 50]) }}">{{ __('site.wider_radius') }}</a>
           @endif
+          @if(!empty($sub))
+            {{ __('site.or') }} <a href="{{ request()->fullUrlWithQuery(['sub' => null]) }}">{{ __('site.all_subtopics') }}</a>
+          @endif
           @if(!empty($category))
-            {{ __('site.or') }} <a href="{{ request()->fullUrlWithQuery(['category' => null]) }}">{{ __('site.all_topics') }}</a>
+            {{ __('site.or') }} <a href="{{ request()->fullUrlWithQuery(['category' => null, 'sub' => null]) }}">{{ __('site.all_topics') }}</a>
           @endif.
         </p>
       </div>
@@ -59,6 +62,9 @@
     <div class="info-row"><span>{{ __('site.period') }}</span><span>{{ $windows[$days] ?? $days . 'd' }}</span></div>
     @if(!empty($category))
       <div class="info-row"><span>{{ __('site.topic') }}</span><span>{{ \App\Support\Taxonomy::category($category) }}</span></div>
+    @endif
+    @if(!empty($sub))
+      <div class="info-row"><span>{{ __('site.subtopics') }}</span><span>{{ \App\Support\Taxonomy::subCategory($sub) }}</span></div>
     @endif
   </div>
 
@@ -98,13 +104,33 @@
     <div class="info-card">
       <h3>{{ __('site.topics') }}</h3>
       <div class="filter-chips">
+        {{-- Changing topic clears the sub-topic: Badminton does not survive a
+             move from Sports to Health. --}}
         <a class="filter-chip {{ empty($category) ? 'active' : '' }}"
-           href="{{ request()->fullUrlWithQuery(['category' => null]) }}">{{ __('site.all') }}</a>
+           href="{{ request()->fullUrlWithQuery(['category' => null, 'sub' => null]) }}">{{ __('site.all') }}</a>
         @foreach($categories as $cat)
           <a class="filter-chip {{ !empty($category) && mb_strtolower($category) === mb_strtolower($cat) ? 'active' : '' }}"
-             href="{{ request()->fullUrlWithQuery(['category' => $cat]) }}">{{ \App\Support\Taxonomy::category($cat) }}</a>
+             href="{{ request()->fullUrlWithQuery(['category' => $cat, 'sub' => null]) }}">{{ \App\Support\Taxonomy::category($cat) }}</a>
         @endforeach
       </div>
+
+      @if(!empty($subCategories))
+        {{-- Every card already carries a sub-category. Until now it described a
+             filter that did not exist: choosing Sports gave no way to reach
+             Badminton. Only sub-topics with stories behind them are offered,
+             with the count, so nothing here leads to an empty page. --}}
+        <div class="subcat-row">
+          <h4 class="subcat-heading">{{ __('site.subtopics') }}</h4>
+          <div class="filter-chips">
+            <a class="filter-chip {{ empty($sub) ? 'active' : '' }}"
+               href="{{ request()->fullUrlWithQuery(['sub' => null]) }}">{{ __('site.all') }}</a>
+            @foreach($subCategories as $s)
+              <a class="filter-chip {{ !empty($sub) && mb_strtolower($sub) === mb_strtolower($s['name']) ? 'active' : '' }}"
+                 href="{{ request()->fullUrlWithQuery(['sub' => $s['name']]) }}">{{ \App\Support\Taxonomy::subCategory($s['name']) }}<span class="chip-count">{{ $s['count'] }}</span></a>
+            @endforeach
+          </div>
+        </div>
+      @endif
     </div>
   @endif
 @endsection

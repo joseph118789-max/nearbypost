@@ -23,3 +23,6 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# The raw-Blade file nginx was serving as the homepage, kept on disk for reference.
+public/index.html.broken-rawblade.*.bak

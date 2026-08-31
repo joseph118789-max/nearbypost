@@ -16,6 +16,10 @@ return [
     'sections'       => 'Sections',
     'topics'         => 'Topics',
     'places'         => 'Places',
+    'places_near'    => 'Places near you',
+    'places_active'  => 'Where the news is',
+    'subtopics'      => 'Sub-topics',
+    'all_subtopics'  => 'all sub-topics',
     'reading_language' => 'Reading language',
 
     'current_settings' => 'Current settings',

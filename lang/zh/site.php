@@ -10,6 +10,10 @@ return [
     'sections'       => '栏目',
     'topics'         => '主题',
     'places'         => '地点',
+    'places_near'    => '附近地区',
+    'places_active'  => '新闻集中的地区',
+    'subtopics'      => '子主题',
+    'all_subtopics'  => '所有子主题',
     'reading_language' => '阅读语言',
 
     'current_settings' => '当前设置',
