@@ -63,6 +63,12 @@ class ExtractArticleContent extends Command
             $extracted = $this->extractWithTrafilatura($item->url);
 
             if ($extracted && !empty($extracted['text'])) {
+                // Prefer the article's own publication time over whatever the
+                // feed or section page implied.
+                if (!empty($extracted['date'])) {
+                    $item->update(['published_at' => $extracted['date']]);
+                }
+
                 $job->update([
                     'extracted_title' => mb_substr((string) ($extracted['title'] ?? $item->title), 0, 250),
                     'extracted_summary' => $extracted['summary'] ?? $item->summary,
@@ -158,10 +164,42 @@ class ExtractArticleContent extends Command
             'title'   => $decoded['title'] ?: null,
             'summary' => null,
             'text'    => $text,
+            'date'    => $this->plausibleDate($decoded['date'] ?? null),
         ];
     }
 
     /** Run trafilatura over HTML supplied on stdin. */
+    /**
+     * The article's stated publication time, when it is believable.
+     *
+     * A page claiming tomorrow, or 1970, is reporting broken metadata rather
+     * than a publication time, and the ingested date is the better guess.
+     */
+    private function plausibleDate($raw): ?string
+    {
+        if (!is_string($raw) || trim($raw) === '') {
+            return null;
+        }
+
+        $ts = strtotime($raw);
+
+        if ($ts === false) {
+            return null;
+        }
+
+        $now = time();
+
+        if ($ts > $now + 3600) {
+            return null;
+        }
+
+        if ($ts < $now - (400 * 86400)) {
+            return null;
+        }
+
+        return gmdate('c', $ts);
+    }
+
     private function runExtractor(string $html): ?array
     {
         $script = <<<'PY'
@@ -169,7 +207,7 @@ import json, sys
 import trafilatura
 
 html = sys.stdin.read()
-out = {"text": None, "title": None}
+out = {"text": None, "title": None, "date": None}
 
 if html.strip():
     out["text"] = trafilatura.extract(
@@ -182,6 +220,9 @@ if html.strip():
         meta = trafilatura.extract_metadata(html)
         if meta is not None:
             out["title"] = meta.title
+            # The article's own publication time. Authoritative: a section page
+            # has none, and some feeds mislabel their offset.
+            out["date"] = meta.date
     except Exception:
         pass
 
