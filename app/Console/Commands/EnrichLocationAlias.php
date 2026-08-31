@@ -78,16 +78,28 @@ class EnrichLocationAlias extends Command
     {
         $rawPlace = trim($item->main_place_text ?? '');
 
-        $result = LocationAlias::resolve($rawPlace);
+        $result     = LocationAlias::resolve($rawPlace);
+        $normalized = LocationAlias::normalize($rawPlace);
+
+        // An alias match on a trailing segment coarsens the location instead of
+        // normalising it. "Desa ParkCity, Kuala Lumpur" matched only on "Kuala
+        // Lumpur", which pinned the story 8 km from where it happened and hid
+        // it from anyone searching Desa ParkCity. The alias is preferred only
+        // when it matched the whole place text - which is what turns "PJ" into
+        // "Petaling Jaya" - and otherwise the specific text is kept for the
+        // geocoder, which resolves it precisely.
+        if ($result['status'] === 'matched'
+            && $normalized !== ''
+            && mb_strtolower((string) $result['matched_on']) !== mb_strtolower($normalized)) {
+            $result['status']     = 'passthrough';
+            $result['canonical']  = $normalized;
+            $result['alias_type'] = null;
+        }
 
         // Unmatched but non-empty place text still deserves a geocode attempt.
-        if ($result['status'] === 'unmatched') {
-            $normalized = LocationAlias::normalize($rawPlace);
-
-            if ($normalized !== '') {
-                $result['status']    = 'passthrough';
-                $result['canonical'] = $normalized;
-            }
+        if ($result['status'] === 'unmatched' && $normalized !== '') {
+            $result['status']    = 'passthrough';
+            $result['canonical'] = $normalized;
         }
 
         $item->update([

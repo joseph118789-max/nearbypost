@@ -4,6 +4,7 @@ namespace App\Observers;
 
 use App\Models\NewsItem;
 use App\Models\FeedReadyItem;
+use App\Services\DuplicateGuard;
 
 class NewsItemObserver
 {
@@ -53,6 +54,27 @@ class NewsItemObserver
 
         if (!$alreadyServed && !in_array($newsItem->ai_status, ['success', 'fallback_used'], true)) {
             return;
+        }
+
+        // Same check the bulk path makes: is this story already being served
+        // from another source? Only asked on a story's first appearance, so a
+        // later correction to an already-served story is never blocked.
+        if (!$alreadyServed) {
+            $guard = new DuplicateGuard();
+            $twin  = $guard->findPublished($newsItem->title, (string) $newsItem->published_at, $newsItem->id);
+
+            if ($twin) {
+                $incoming = (object) [
+                    'source'  => $newsItem->source,
+                    'summary' => $newsItem->ai_summary ?: $newsItem->summary,
+                ];
+
+                if (!$guard->preferIncoming($incoming, $twin)) {
+                    return;
+                }
+
+                FeedReadyItem::where('id', $twin->id)->update(['is_active' => false]);
+            }
         }
 
         // Use AI-enriched category if available, otherwise fall back to RSS primary_category

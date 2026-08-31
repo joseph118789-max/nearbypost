@@ -44,7 +44,14 @@ class FetchNewsFeeds extends Command
     private const INGEST_URL  = 'http://127.0.0.1:8080/api/internal/ingest/batch';
     private const INGEST_HOST = 'ingest.nearbypost.com';
     private const USER_AGENT  = 'Mozilla/5.0 (compatible; Nearbypost/1.0; +https://nearbypost.com)';
-    private const BATCH_SIZE  = 25;
+    /**
+     * Items per submission.
+     *
+     * 25 meant 31 requests for a normal run, which brushes the 60/min
+     * ingest limit as soon as two runs land in the same minute. Larger
+     * batches do the same work in a tenth of the requests.
+     */
+    private const BATCH_SIZE  = 100;
 
     /**
      * Headlines this alike are the same story.

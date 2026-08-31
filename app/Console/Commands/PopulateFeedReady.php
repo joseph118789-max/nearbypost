@@ -7,6 +7,7 @@ use App\Models\FeedReadyItem;
 use App\Models\AiProcessingJob;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
+use App\Services\DuplicateGuard;
 
 /**
  * Precompute feed_ready rows from fully-processed news_items.
@@ -188,6 +189,28 @@ class PopulateFeedReady extends Command
         ];
 
         $existing = FeedReadyItem::where('news_item_id', $item->id)->first();
+
+        // Last check before serving: does the reader already have this story
+        // from another source? Batch de-duplication cannot see across runs.
+        if (!$existing) {
+            $guard = new DuplicateGuard();
+            $twin  = $guard->findPublished($item->title, (string) $item->published_at, $item->id);
+
+            if ($twin) {
+                if (!$guard->preferIncoming((object) $row, $twin)) {
+                    return 'skipped';
+                }
+
+                // The incoming version is better: take over the served slot so
+                // the reader's link points at the article, not a redirect.
+                FeedReadyItem::where('id', $twin->id)->update(['is_active' => false]);
+                Log::info('Duplicate superseded', [
+                    'kept'      => $item->id,
+                    'superseded'=> $twin->news_item_id,
+                    'title'     => mb_substr($item->title, 0, 80),
+                ]);
+            }
+        }
 
         if ($existing) {
             $existing->update($row);
