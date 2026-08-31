@@ -77,6 +77,14 @@ class NewsItemObserver
             }
         }
 
+        // A multi-point story has one serving row per place, written by the
+        // case-study panel. updateOrCreate below keys on news_item_id alone, so
+        // letting it run here would quietly collapse twenty places into one on
+        // the next save. Withdrawal is handled above and still applies.
+        if ($newsItem->is_multi_point) {
+            return;
+        }
+
         // Use AI-enriched category if available, otherwise fall back to RSS primary_category
         $primaryCategory = $newsItem->ai_category ?: $newsItem->primary_category;
 

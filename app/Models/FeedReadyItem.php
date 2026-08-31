@@ -63,6 +63,7 @@ class FeedReadyItem extends Model
         // was served labelled 'scraper'.
         'origin',
         'image_path',
+        'is_primary_location',
     ];
 
     protected $casts = [

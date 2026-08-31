@@ -42,6 +42,7 @@ class NewsItem extends Model
         "review_reason",
         "approved_by",
         "approved_at",
+        "is_multi_point",
         "status",
         "location_label",
         "canonical_place_name",

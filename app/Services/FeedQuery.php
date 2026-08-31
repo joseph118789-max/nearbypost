@@ -70,6 +70,10 @@ class FeedQuery
                      ->where('t.locale', '=', $locale);
             })
             ->where('feed_ready_items.is_active', true)
+            // One row per story. A multi-point story has one row per place, and
+            // a feed that does not sort by distance has no reason to prefer any
+            // of them - so exactly one carries this flag.
+            ->where('feed_ready_items.is_primary_location', true)
             ->where('feed_ready_items.published_at', '>=', now()->subDays($days));
 
         if ($category !== null && $category !== '' && $category !== 'all') {
@@ -159,8 +163,16 @@ class FeedQuery
             $categoryClause .= " AND f.origin = 'user'";
         }
 
+        // DISTINCT ON keeps one row per story - the nearest, because the inner
+        // ORDER BY sorts by distance within each story. A multi-point story is
+        // therefore shown to each reader at whichever of its places is closest
+        // to them, and shown once.
+        //
+        // The key is COALESCE(news_item_id, -id) because news_item_id is
+        // nullable: on a bare news_item_id every row with a null id would fold
+        // into one and most of the feed would vanish.
         $sql = "SELECT * FROM (
-            SELECT f.id,
+            SELECT DISTINCT ON (COALESCE(f.news_item_id, -f.id)) f.id,
                    COALESCE(t.title, f.title) AS title,
                    COALESCE(t.summary, f.summary) AS summary,
                    f.source, f.published_at,
@@ -187,6 +199,7 @@ class FeedQuery
               AND f.relevance_mode != 'category_only'
               AND f.published_at >= NOW() - make_interval(days => :days)
               {$categoryClause}
+            ORDER BY COALESCE(f.news_item_id, -f.id), distance_km ASC
         ) AS nearby
         WHERE distance_km <= :radius
         ORDER BY distance_km ASC, published_at DESC
@@ -221,6 +234,7 @@ class FeedQuery
 
         return FeedReadyItem::query()
             ->where('is_active', true)
+            ->where('is_primary_location', true)
             ->where('published_at', '>=', now()->subDays($days))
             ->whereRaw('LOWER(primary_category) = ?', [mb_strtolower($category)])
             ->whereNotNull('sub_category')
@@ -288,6 +302,7 @@ class FeedQuery
         // Fold case: the same category has been written both title-cased and
         // lower-cased, which would otherwise list "Crime & Safety" twice.
         $present = FeedReadyItem::where('is_active', true)
+            ->where('is_primary_location', true)
             ->whereNotNull('primary_category')
             ->selectRaw('DISTINCT LOWER(primary_category) AS c')
             ->orderBy('c')
