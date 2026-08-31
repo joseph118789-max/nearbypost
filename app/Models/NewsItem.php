@@ -22,6 +22,16 @@ class NewsItem extends Model
         "secondary_category",
         "sub_category",
         "source_language",
+        // Spec v2.0 policy output. Omitting any of these would make
+        // Eloquent discard the write silently.
+        "discarded",
+        "error_code",
+        "meta_confidence",
+        "gps_flag",
+        "url_used",
+        "ambiguous",
+        "classification",
+        "spec_version",
         "translated_at",
         "extracted_title",
         "extracted_summary",

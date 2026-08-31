@@ -121,6 +121,11 @@ class PopulateFeedReady extends Command
      */
     private function upsert(NewsItem $item): string
     {
+        // ── Gate 0: an item refused by policy is never served ───────────
+        if ($item->discarded) {
+            return 'skipped';
+        }
+
         // ── Gate 1: AI enrichment must exist and be in allowed state ────
         $aiJob = $item->aiProcessingJob;
         if (!$aiJob || !in_array($aiJob->ai_status, self::ALLOWED_AI_STATUSES, true)) {

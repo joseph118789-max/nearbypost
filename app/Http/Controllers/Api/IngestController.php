@@ -8,6 +8,7 @@ use App\Models\RawIngest;
 use App\Models\FailedIngest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use App\Services\Classification\ContentPolicy;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -163,6 +164,13 @@ class IngestController extends Controller
 
         if ($url === '') {
             return [false, 'missing_url'];
+        }
+
+        // Spec 4.2: judge the URL before spending anything on it. This is
+        // the cheapest refusal available and the one that matters most now
+        // that sources are discovered without a person reviewing them.
+        if ($spam = (new ContentPolicy())->screenUrl($url)) {
+            return [false, $spam];
         }
 
         if ($mode === 'direct_seed') {

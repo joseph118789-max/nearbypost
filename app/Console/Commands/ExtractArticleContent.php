@@ -13,6 +13,18 @@ class ExtractArticleContent extends Command
     protected $signature = 'ingest:extract {--news_item_id=}';
     protected $description = 'Extract content from news items';
 
+    /** Manual V6 section 9: keep roughly the first 500 words. */
+    private const MAX_WORDS = 500;
+
+    /** A page that has not answered in this long is not worth waiting for. */
+    private const EXTRACT_TIMEOUT_SECONDS = 25;
+
+    /** Below this, whatever came back is not an article body. */
+    private const MIN_EXTRACT_CHARS = 200;
+
+    /** The same voice the RSS fetcher uses, which these sites answer. */
+    private const USER_AGENT = 'Mozilla/5.0 (compatible; Nearbypost/1.0; +https://nearbypost.com)';
+
     public function handle()
     {
         $newsItemId = $this->option('news_item_id');
@@ -25,7 +37,12 @@ class ExtractArticleContent extends Command
             $query->where('id', $newsItemId);
         }
 
-        $items = $query->whereNotNull('url')->limit(100)->get();
+        // Newest first. The feed serves recent stories, so extracting a
+        // two-month-old article before today's is work nobody reads.
+        $items = $query->whereNotNull('url')
+            ->orderByDesc('published_at')
+            ->limit(100)
+            ->get();
 
         $this->info("Processing {$items->count()} items.");
 
@@ -47,7 +64,7 @@ class ExtractArticleContent extends Command
 
             if ($extracted && !empty($extracted['text'])) {
                 $job->update([
-                    'extracted_title' => $extracted['title'] ?? $item->title,
+                    'extracted_title' => mb_substr((string) ($extracted['title'] ?? $item->title), 0, 250),
                     'extracted_summary' => $extracted['summary'] ?? $item->summary,
                     'extracted_text' => $extracted['text'],
                     'extraction_status' => 'success',
@@ -64,24 +81,146 @@ class ExtractArticleContent extends Command
         }
     }
 
+    /**
+     * Fetch and extract an article body.
+     *
+     * One process, not two. The previous version fetched the page in one
+     * process and tried to read it from the stdin of another, which nothing
+     * piped into - so extraction always received an empty string, always
+     * returned None, and stored the literal text 'NONE' as a success.
+     *
+     * The URL is passed as an argument rather than interpolated into the Python
+     * source: feed URLs come from third parties and a quote in one would
+     * otherwise break out of the shell string.
+     */
+    /**
+     * Fetch an article and extract its body.
+     *
+     * The page is fetched here rather than by trafilatura, because
+     * trafilatura.fetch_url() sends its own user agent and several Malaysian
+     * publishers - Malay Mail among them, the largest source we have - answer
+     * it with nothing. The RSS fetcher reaches those same sites without
+     * trouble, so the extractor now asks in the same voice.
+     *
+     * The HTML goes to trafilatura over stdin, so the URL never reaches a shell
+     * command at all.
+     */
     private function extractWithTrafilatura(string $url): ?array
     {
-        // Use trafilatura via CLI
-        $cmd = "python3 -c \"import trafilatura; result = trafilatura.fetch_url('{$url}'); print(result) if result else print('NONE')\"";
-        $output = shell_exec($cmd);
+        try {
+            $response = Http::withHeaders([
+                'User-Agent'      => self::USER_AGENT,
+                'Accept'          => 'text/html,application/xhtml+xml',
+                'Accept-Language' => 'en-MY,en;q=0.9,ms;q=0.8',
+            ])
+                ->timeout(self::EXTRACT_TIMEOUT_SECONDS)
+                ->withOptions(['allow_redirects' => ['max' => 5]])
+                ->get($url);
 
-        if (!$output || trim($output) === 'NONE' || trim($output) === 'None') {
+            if (!$response->successful()) {
+                return null;
+            }
+
+            $html = $response->body();
+
+        } catch (\Throwable $e) {
             return null;
         }
 
-        $cmd2 = "python3 -c \"import trafilatura, sys; html=sys.stdin.read(); meta=trafilatura.extract(html); print(meta) if meta else print('NONE')\"";
-        $text = shell_exec($cmd2);
+        if (trim($html) === '') {
+            return null;
+        }
+
+        $decoded = $this->runExtractor($html);
+
+        if (!is_array($decoded) || empty($decoded['text'])) {
+            return null;
+        }
+
+        $text = trim((string) $decoded['text']);
+
+        // A single stray character is not an article. Without this guard the
+        // same shape of bug as the original 'NONE' recurs: a technically
+        // non-empty string recorded as a successful extraction.
+        if (mb_strlen($text) < self::MIN_EXTRACT_CHARS) {
+            return null;
+        }
+
+        // Manual V6 section 9: keep roughly the first 500 words. The inverted
+        // pyramid puts the facts at the top, and the rest is prompt cost.
+        $words = preg_split('/\s+/u', $text, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        if (count($words) > self::MAX_WORDS) {
+            $text = implode(' ', array_slice($words, 0, self::MAX_WORDS));
+        }
 
         return [
-            'title' => null,
+            'title'   => $decoded['title'] ?: null,
             'summary' => null,
-            'text' => trim($text) ?: null,
+            'text'    => $text,
         ];
+    }
+
+    /** Run trafilatura over HTML supplied on stdin. */
+    private function runExtractor(string $html): ?array
+    {
+        $script = <<<'PY'
+import json, sys
+import trafilatura
+
+html = sys.stdin.read()
+out = {"text": None, "title": None}
+
+if html.strip():
+    out["text"] = trafilatura.extract(
+        html,
+        include_comments=False,
+        include_tables=False,
+        favor_precision=True,
+    )
+    try:
+        meta = trafilatura.extract_metadata(html)
+        if meta is not None:
+            out["title"] = meta.title
+    except Exception:
+        pass
+
+print(json.dumps(out))
+PY;
+
+        $descriptors = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+
+        $command = sprintf(
+            'timeout %d python3 -c %s',
+            self::EXTRACT_TIMEOUT_SECONDS,
+            escapeshellarg($script)
+        );
+
+        $process = proc_open($command, $descriptors, $pipes);
+
+        if (!is_resource($process)) {
+            return null;
+        }
+
+        fwrite($pipes[0], $html);
+        fclose($pipes[0]);
+
+        $output = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        proc_close($process);
+
+        if (!is_string($output) || trim($output) === '') {
+            return null;
+        }
+
+        $decoded = json_decode(trim($output), true);
+
+        return is_array($decoded) ? $decoded : null;
     }
 
     private function useFallback(NewsItem $item, ExtractionJob $job, string $error = null)

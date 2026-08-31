@@ -8,6 +8,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
 use App\Services\SubCategoryTaxonomy;
+use App\Services\Classification\ContentPolicy;
 
 /**
  * ═══════════════════════════════════════════════════════════════
@@ -153,6 +154,27 @@ class EnrichWithAi extends Command
         $inputText = $rawText;
         $title      = $extraction->extracted_title ?? $item->title;
 
+        // Spec 4.3/4.4 and 2.6/2.7. Refusing here rather than after the
+        // model call is the difference between a policy that costs nothing
+        // and one that costs a request per rejected item.
+        $policy = new ContentPolicy();
+
+        // Spec 3.6/3.7: an unreadable page falls back to title-only with a
+        // capped confidence. It is not a refusal. Only a page we did fetch and
+        // found too thin is INSUFFICIENT_CONTENT (spec 4.3).
+        $haveArticleBody = ($extraction->extraction_status ?? '') === 'success'
+            && str_word_count((string) $extraction->extracted_text) >= 50;
+
+        if ($haveArticleBody && $code = $policy->screenContent($inputText)) {
+            $this->refuse($item, $job, $code, 'content screening');
+            return;
+        }
+
+        // Advisory: a ceiling and the reasons for it, handed to the classifier
+        // rather than acted on here. Judging news value with a regex discarded
+        // half of all real Malay articles when it was measured.
+        $newsValue = $policy->assessNewsValue($title, $inputText, $haveArticleBody);
+
         $prompt = $this->buildPrompt($title, $inputText, $item->source ?? '');
         $retries = 0;
         $lastException = null;
@@ -213,6 +235,18 @@ class EnrichWithAi extends Command
                     'ai_category'                => $validation['category'],
                     'sub_category'               => $validation['sub_category'],
                     'source_language'            => $validation['source_language'],
+                    'discarded'                  => false,
+                    'error_code'                 => null,
+                    'url_used'                   => $haveArticleBody,
+                    'gps_flag'                   => $validation['relevance_mode'] !== 'category_only',
+                    'meta_confidence'            => $policy->confidence([
+                        'url_used'   => $haveArticleBody,
+                        'word_count' => str_word_count((string) $inputText),
+                        'retries'    => $retries,
+                        'non_primary_language' => ($validation['source_language'] ?? 'en') !== 'en',
+                        'spam_signals' => $newsValue['reasons'] !== [],
+                    ]),
+                    'spec_version'               => self::PROMPT_VERSION,
                     'ai_summary'                 => $validation['summary'],
                     'ai_status'                  => 'success',
                     'ai_processed_at'            => now(),
@@ -463,6 +497,41 @@ class EnrichWithAi extends Command
         }
 
         $item->update(['translated_at' => now()]);
+    }
+
+    /**
+     * Spec section 8: refuse an item, and record why.
+     *
+     * A refusal is written down rather than merely skipped. An item that is
+     * simply absent cannot be explained later, and this pipeline now accepts
+     * publishers nobody has reviewed - the reasons are how that stays
+     * accountable.
+     */
+    private function refuse(NewsItem $item, AiProcessingJob $job, ?string $errorCode, string $why): void
+    {
+        $job->update([
+            'ai_status'        => 'insufficient_content',
+            'validation_notes' => 'policy: ' . $why . ($errorCode ? " ({$errorCode})" : ''),
+            'processed_at'     => now(),
+        ]);
+
+        $item->update([
+            'discarded'       => true,
+            'error_code'      => $errorCode,
+            'meta_confidence' => 0.0,
+            'ai_status'       => 'discarded',
+            'ai_processed_at' => now(),
+            'status'          => 'rejected',
+            'spec_version'    => self::PROMPT_VERSION,
+        ]);
+
+        $this->warn("  DISCARD {$item->id}: {$why}" . ($errorCode ? " [{$errorCode}]" : ''));
+
+        Log::info('Policy discard', [
+            'news_item_id' => $item->id,
+            'error_code'   => $errorCode,
+            'why'          => $why,
+        ]);
     }
 
     private function buildPrompt(string $title, string $text, string $source): string
