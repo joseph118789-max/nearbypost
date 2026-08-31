@@ -8,29 +8,26 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Fetch RSS feeds and hand them to the ingestion endpoint.
+ * Fetch every registered feed, reconcile what comes back, then submit it.
  *
- * This replaces both the n8n workflow and scripts/rss_ingest_recovery.php.
+ * The order matters. Sources are read first, all of them, and only then is the
+ * combined result de-duplicated and posted. Doing it the other way round - post
+ * as you go - means the same story enters the database several times, once per
+ * feed that carried it, and no later stage can tell which copy is canonical.
+ * That matters more with every source added: an aggregator and a publisher's own
+ * feed carry the same article under different URLs by design.
  *
- * Two faults in the script it replaces are worth remembering, because both were
- * silent:
+ * What is learnt about reading a source is written back to its fetch_recipe, so
+ * a quirk discovered once is applied from then on rather than rediscovered.
+ * Three that cost real debugging time:
  *
- *   - It fetched with simplexml_load_file(), which follows no redirects and
- *     sends no user agent. Two of its three feeds answered 301 and 404, so for
- *     months every article on the site came from the one remaining source and
- *     nothing reported a problem.
- *   - It hard-coded primary_category = 'nation' on every item, which is why
- *     that value dominates news_items to this day. Categories belong to the AI
- *     enrichment stage; ingestion should not guess them.
- *
- * Feeds are read from the `sources` table so they can be added, disabled or
- * re-tiered without a deploy, and every fetch records its outcome against the
- * source that produced it.
- *
- * Items are posted to the existing ingest endpoint rather than written directly,
- * so validation, URL policy, de-duplication and failed-ingest capture all stay
- * in one place. The request goes to nginx on loopback, so it never depends on a
- * development server being alive.
+ *   - simplexml_load_file() follows no redirects and sends no user agent. Free
+ *     Malaysia Today answered 301 and Bernama 404, so for months every article
+ *     on the site came from the one remaining source.
+ *   - Harian Metro and Berita Harian stamp Malaysian local time but label it
+ *     +0000, putting every story eight hours in the future.
+ *   - Categories must not be guessed at ingestion. The old script stamped
+ *     'nation' on everything, which is why that value covers thousands of rows.
  */
 class FetchNewsFeeds extends Command
 {
@@ -40,7 +37,7 @@ class FetchNewsFeeds extends Command
         {--limit=60 : Max items to take from any one feed}
         {--dry-run : Fetch and report, but do not send anything}';
 
-    protected $description = 'Fetch RSS feeds listed in the sources table and submit them for ingestion';
+    protected $description = 'Fetch registered feeds, de-duplicate across sources, and submit for ingestion';
 
     private const INGEST_URL  = 'http://127.0.0.1:8080/api/internal/ingest/batch';
     private const INGEST_HOST = 'ingest.nearbypost.com';
@@ -54,6 +51,9 @@ class FetchNewsFeeds extends Command
         '/topic/', '/topics/', '/live/', '/author/',
     ];
 
+    /** Quirks observed this run, per source id. */
+    private array $observedQuirks = [];
+
     public function handle(): int
     {
         $sources = $this->selectSources();
@@ -66,31 +66,37 @@ class FetchNewsFeeds extends Command
         $this->info("Fetching {$sources->count()} source(s).");
 
         $collected = [];
-        $seenUrls  = [];
 
         foreach ($sources as $source) {
-            $items = $this->fetchSource($source, $seenUrls);
-
-            foreach ($items as $item) {
+            foreach ($this->fetchSource($source) as $item) {
                 $collected[] = $item;
             }
         }
 
-        $this->info('Collected ' . count($collected) . ' unique items.');
+        $this->info('Collected ' . count($collected) . ' items.');
 
-        if ($collected === []) {
+        // Reconcile everything before anything is written. A story carried by
+        // three feeds should reach the database once, credited to the publisher
+        // rather than to whichever aggregator happened to be read first.
+        [$unique, $dropped] = $this->deduplicate($collected);
+
+        $this->info(sprintf('After de-duplication: %d unique, %d duplicate.', count($unique), $dropped));
+
+        $this->recordRecipes($sources);
+
+        if ($unique === []) {
             return 0;
         }
 
         if ($this->option('dry-run')) {
-            foreach (array_slice($collected, 0, 10) as $item) {
+            foreach (array_slice($unique, 0, 10) as $item) {
                 $this->line("  [{$item['source']}] {$item['title']}");
             }
             $this->info('Dry run: nothing submitted.');
             return 0;
         }
 
-        return $this->submit($collected);
+        return $this->submit($unique);
     }
 
     private function selectSources()
@@ -104,6 +110,7 @@ class FetchNewsFeeds extends Command
         }
 
         $tier = $this->option('tier');
+
         if ($tier !== 'all') {
             $query->where('priority_tier', $tier);
         } else {
@@ -113,29 +120,36 @@ class FetchNewsFeeds extends Command
         return $query->orderBy('name')->get();
     }
 
+    // ── fetching ────────────────────────────────────────────────────────
+
     /** @return list<array<string,mixed>> */
-    private function fetchSource(object $source, array &$seenUrls): array
+    private function fetchSource(object $source): array
     {
-        $limit = max(1, (int) $this->option('limit'));
+        $limit  = max(1, (int) $this->option('limit'));
+        $recipe = $this->recipeOf($source);
 
         try {
             $response = Http::withHeaders(['User-Agent' => self::USER_AGENT])
                 ->timeout(25)
-                ->withOptions(['allow_redirects' => ['max' => 5]])
+                ->withOptions(['allow_redirects' => ['max' => 5, 'track_redirects' => true]])
                 ->get($source->rss_url);
 
             if (!$response->successful()) {
                 return $this->recordFailure($source, 'http_' . $response->status());
             }
 
-            $items = $this->parseFeed($response->body(), $source, $seenUrls, $limit);
+            // A feed that moved is worth remembering: the next run can go
+            // straight to where it actually lives.
+            $final = (string) $response->effectiveUri();
+
+            if ($final !== '' && $final !== $source->rss_url) {
+                $this->noteQuirk($source->id, 'redirects_to:' . $final);
+            }
+
+            $items = $this->parseFeed($response->body(), $source, $limit);
 
         } catch (\Throwable $e) {
-            Log::warning('Feed fetch failed', [
-                'source' => $source->name,
-                'error'  => $e->getMessage(),
-            ]);
-
+            Log::warning('Feed fetch failed', ['source' => $source->name, 'error' => $e->getMessage()]);
             return $this->recordFailure($source, 'exception');
         }
 
@@ -147,7 +161,7 @@ class FetchNewsFeeds extends Command
             'updated_at'           => now(),
         ]);
 
-        $this->line(sprintf('  %-22s %3d items', $source->name, count($items)));
+        $this->line(sprintf('  %-32s %3d items', $source->name, count($items)));
 
         return $items;
     }
@@ -162,13 +176,14 @@ class FetchNewsFeeds extends Command
             'updated_at'           => now(),
         ]);
 
-        $this->warn(sprintf('  %-22s FAILED (%s)', $source->name, $status));
+        $this->noteQuirk($source->id, 'failure:' . $status);
+        $this->warn(sprintf('  %-32s FAILED (%s)', $source->name, $status));
 
         return [];
     }
 
     /** @return list<array<string,mixed>> */
-    private function parseFeed(string $body, object $source, array &$seenUrls, int $limit): array
+    private function parseFeed(string $body, object $source, int $limit): array
     {
         $previous = libxml_use_internal_errors(true);
         $xml      = simplexml_load_string($body, 'SimpleXMLElement', LIBXML_NOCDATA);
@@ -176,13 +191,13 @@ class FetchNewsFeeds extends Command
         libxml_use_internal_errors($previous);
 
         if ($xml === false) {
+            $this->noteQuirk($source->id, 'unparseable_xml');
             return [];
         }
 
         // RSS puts items under channel; Atom uses top-level entries.
         $entries = $xml->channel->item ?? $xml->entry ?? [];
-
-        $items = [];
+        $items   = [];
 
         foreach ($entries as $entry) {
             if (count($items) >= $limit) {
@@ -190,33 +205,26 @@ class FetchNewsFeeds extends Command
             }
 
             $url = trim((string) ($entry->link['href'] ?? $entry->link ?? $entry->guid ?? ''));
+
             if ($url === '' || $this->isBlockedPath($url)) {
                 continue;
             }
 
-            $key = preg_replace('/[#?].*$/', '', $url);
-            if (isset($seenUrls[$key])) {
-                continue;
-            }
-            $seenUrls[$key] = true;
-
             $title = $this->cleanText((string) ($entry->title ?? ''));
+
             if ($title === '') {
                 continue;
             }
 
-            $published = (string) ($entry->pubDate ?? $entry->published ?? $entry->updated ?? '');
-
-            // Aggregators name the publisher behind each headline. Credit the
-            // publisher, not the aggregator, and remember the homepage so the
-            // discovery command can go and find their own feed.
             $publisher = $this->publisherOf($entry);
 
             if ($publisher !== null) {
                 $this->notePublisher($publisher, $source->name);
             }
 
-            $credit = $publisher['name'] ?? $source->name;
+            $credit    = $publisher['name'] ?? $source->name;
+            $rawDate   = (string) ($entry->pubDate ?? $entry->published ?? $entry->updated ?? '');
+            $published = $this->normalisePublishedAt($rawDate, $source);
 
             $items[] = [
                 'title'         => mb_substr($title, 0, 500),
@@ -225,7 +233,7 @@ class FetchNewsFeeds extends Command
                 'source_label'  => $credit,
                 'source_name'   => $credit,
                 'source_domain' => parse_url($source->base_url ?? $url, PHP_URL_HOST),
-                'published_at'  => $this->normalisePublishedAt($published),
+                'published_at'  => $published,
                 'summary'       => mb_substr(
                     $this->cleanText((string) ($entry->description ?? $entry->summary ?? '')),
                     0,
@@ -233,52 +241,14 @@ class FetchNewsFeeds extends Command
                 ),
                 // No category is guessed here. Classification belongs to the AI
                 // enrichment stage, which validates against a controlled list.
+
+                // Kept for reconciliation, stripped before submission.
+                '_source_id'    => $source->id,
+                '_aggregator'   => ($source->source_type ?? '') === 'aggregator',
             ];
         }
 
         return $items;
-    }
-
-    /**
-     * Is this a section or listing page rather than an article?
-     *
-     * Matching the blocked fragments against the whole URL is too blunt: Free
-     * Malaysia Today publishes articles at
-     * /category/nation/2026/08/31/some-slug, so a bare '/category/' test threw
-     * away every FMT article. An article is recognised first - by a dated path
-     * segment or a hyphenated slug - and only then are the listing fragments
-     * considered.
-     */
-    /**
-     * Correct publication times that cannot be true.
-     *
-     * Harian Metro and Berita Harian stamp Malaysian local time but label the
-     * offset +0000, which places every one of their stories eight hours in the
-     * future - enough to sort them above genuine breaking news for ever, and to
-     * render as "5 hours from now". Malay Mail, by contrast, labels +0800
-     * correctly, so this cannot be applied per publisher by name; it has to be
-     * judged per timestamp.
-     *
-     * A story cannot be published later than now. Where removing Malaysia's
-     * eight-hour offset lands the timestamp in a plausible recent window, that
-     * is what the publisher meant. Otherwise the arrival time is used.
-     */
-    private function normalisePublishedAt(string $raw): string
-    {
-        $now = time();
-        $ts  = $raw !== '' ? strtotime($raw) : false;
-
-        if ($ts === false) {
-            return gmdate('c', $now);
-        }
-
-        if ($ts > $now + 900) {
-            $corrected = $ts - (8 * 3600);
-            $plausible = $corrected <= $now + 900 && $corrected > $now - (14 * 86400);
-            $ts = $plausible ? $corrected : $now;
-        }
-
-        return gmdate('c', $ts);
     }
 
     /**
@@ -320,6 +290,219 @@ class FetchNewsFeeds extends Command
         cache()->put('ingest:publisher_sightings', $seen, now()->addDay());
     }
 
+    /**
+     * Correct publication times that cannot be true.
+     *
+     * Harian Metro and Berita Harian stamp Malaysian local time but label the
+     * offset +0000, which places every one of their stories eight hours in the
+     * future - enough to sort them above genuine breaking news for ever, and to
+     * render as "5 hours from now". Malay Mail, by contrast, labels +0800
+     * correctly, so this cannot be applied per publisher by name; it has to be
+     * judged per timestamp. Where it is judged, it is recorded on the source.
+     */
+    private function normalisePublishedAt(string $raw, object $source): string
+    {
+        $now = time();
+        $ts  = $raw !== '' ? strtotime($raw) : false;
+
+        if ($ts === false) {
+            return gmdate('c', $now);
+        }
+
+        if ($ts > $now + 900) {
+            $corrected = $ts - (8 * 3600);
+            $plausible = $corrected <= $now + 900 && $corrected > $now - (14 * 86400);
+
+            if ($plausible) {
+                $this->noteQuirk($source->id, 'published_at_local_labelled_utc');
+                $ts = $corrected;
+            } else {
+                $this->noteQuirk($source->id, 'published_at_implausible');
+                $ts = $now;
+            }
+        }
+
+        return gmdate('c', $ts);
+    }
+
+    // ── reconciliation ──────────────────────────────────────────────────
+
+    /**
+     * Collapse the same story arriving from several feeds.
+     *
+     * Two stories are the same when they share a URL, or when their headlines
+     * reduce to the same text once the publisher suffix, section tag and
+     * punctuation are removed. Aggregators rewrite neither, so this catches the
+     * common case of one article arriving both directly and via an aggregator.
+     *
+     * The survivor is chosen, not taken at random: a direct publisher beats an
+     * aggregator, because its URL points at the article rather than at a
+     * redirect, and a longer summary beats a shorter one.
+     *
+     * @return array{0: list<array<string,mixed>>, 1: int}
+     */
+    private function deduplicate(array $items): array
+    {
+        /** @var list<array<string,mixed>> $unique */
+        $unique = [];
+
+        /** @var array<string,int> $slotOf key => index into $unique */
+        $slotOf  = [];
+        $dropped = 0;
+
+        foreach ($items as $item) {
+            $keys = [
+                $this->urlKey($item['url']),
+                'T:' . $this->titleKey($item['title']),
+            ];
+
+            $slot = null;
+
+            foreach ($keys as $key) {
+                if (isset($slotOf[$key])) {
+                    $slot = $slotOf[$key];
+                    break;
+                }
+            }
+
+            if ($slot !== null) {
+                if ($this->prefer($item, $unique[$slot])) {
+                    $unique[$slot] = $item;
+                }
+
+                // Both spellings of this story now lead to the same slot, so a
+                // third copy matching either one is recognised too.
+                foreach ($keys as $key) {
+                    $slotOf[$key] = $slot;
+                }
+
+                $this->countDuplicate($item['_source_id']);
+                $dropped++;
+
+                continue;
+            }
+
+            $unique[] = $item;
+            $slot = array_key_last($unique);
+
+            foreach ($keys as $key) {
+                $slotOf[$key] = $slot;
+            }
+        }
+
+        return [array_values($unique), $dropped];
+    }
+
+    private function prefer(array $candidate, array $incumbent): bool
+    {
+        // A direct publisher URL beats an aggregator redirect.
+        if ($candidate['_aggregator'] !== $incumbent['_aggregator']) {
+            return !$candidate['_aggregator'];
+        }
+
+        return mb_strlen($candidate['summary'] ?? '') > mb_strlen($incumbent['summary'] ?? '');
+    }
+
+    private function urlKey(string $url): string
+    {
+        return 'U:' . preg_replace('/[#?].*$/', '', mb_strtolower(trim($url)));
+    }
+
+    /** A headline reduced to its words, for comparison across publishers. */
+    private function titleKey(string $title): string
+    {
+        $text = mb_strtolower($title);
+
+        // "Story headline - The Star" and "#SHOWBIZ: Story headline"
+        $text = preg_replace('/\s+[-|]\s+[^-|]{2,40}$/u', '', $text);
+        $text = preg_replace('/^#?[a-z]+\s*:\s*/u', '', $text);
+
+        $text = preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', $text);
+        $text = preg_replace('/\s+/u', ' ', $text);
+
+        return trim((string) $text);
+    }
+
+    // ── learned behaviour ───────────────────────────────────────────────
+
+    private function recipeOf(object $source): array
+    {
+        $recipe = json_decode((string) ($source->fetch_recipe ?? ''), true);
+
+        return is_array($recipe) ? $recipe : [];
+    }
+
+    private function noteQuirk(int $sourceId, string $quirk): void
+    {
+        $this->observedQuirks[$sourceId][] = $quirk;
+    }
+
+    /**
+     * Write what this run learned back to each source.
+     *
+     * Recorded rather than merely logged, because a quirk in a log is knowledge
+     * only the person reading the log has; a quirk on the source row is
+     * knowledge the next run inherits.
+     */
+    private function recordRecipes($sources): void
+    {
+        if ($this->option('dry-run')) {
+            return;
+        }
+
+        foreach ($sources as $source) {
+            $observed = array_values(array_unique($this->observedQuirks[$source->id] ?? []));
+
+            if ($observed === []) {
+                continue;
+            }
+
+            $recipe = $this->recipeOf($source);
+
+            $recipe['transport'] = [
+                'follow_redirects' => true,
+                'user_agent'       => 'nearbypost',
+            ];
+
+            $recipe['quirks'] = array_values(array_unique(
+                array_merge($recipe['quirks'] ?? [], $observed)
+            ));
+
+            $recipe['observed'] = [
+                'last_seen_at'  => now()->toAtomString(),
+                'typical_items' => $source->last_item_count,
+            ];
+
+            DB::table('sources')->where('id', $source->id)->update([
+                'fetch_recipe' => json_encode($recipe, JSON_UNESCAPED_SLASHES),
+                'updated_at'   => now(),
+            ]);
+        }
+    }
+
+    private function countDuplicate(?int $sourceId): void
+    {
+        if ($sourceId === null || $this->option('dry-run')) {
+            return;
+        }
+
+        DB::table('sources')->where('id', $sourceId)->update([
+            'items_duplicate' => DB::raw('items_duplicate + 1'),
+        ]);
+    }
+
+    // ── helpers ─────────────────────────────────────────────────────────
+
+    /**
+     * Is this a section or listing page rather than an article?
+     *
+     * Matching the blocked fragments against the whole URL is too blunt: Free
+     * Malaysia Today publishes articles at
+     * /category/nation/2026/08/31/some-slug, so a bare '/category/' test threw
+     * away every FMT article. An article is recognised first - by a dated path
+     * segment or a hyphenated slug - and only then are the listing fragments
+     * considered.
+     */
     private function isBlockedPath(string $url): bool
     {
         $path = mb_strtolower((string) parse_url($url, PHP_URL_PATH));
@@ -355,15 +538,24 @@ class FetchNewsFeeds extends Command
     private function submit(array $items): int
     {
         $created = $duplicate = $rejected = 0;
+        $contributed = [];
 
         foreach (array_chunk($items, self::BATCH_SIZE) as $chunk) {
+            $sourceIds = array_column($chunk, '_source_id');
+
+            // Strip the reconciliation fields; the endpoint validates strictly.
+            $payload = array_map(function (array $item) {
+                unset($item['_source_id'], $item['_aggregator']);
+                return $item;
+            }, $chunk);
+
             try {
                 $response = Http::withHeaders([
                     'Host'         => self::INGEST_HOST,
                     'Content-Type' => 'application/json',
                 ])
                     ->timeout(90)
-                    ->post(self::INGEST_URL, ['items' => array_values($chunk)]);
+                    ->post(self::INGEST_URL, ['items' => array_values($payload)]);
 
                 if (!$response->successful()) {
                     $this->error('  batch rejected: HTTP ' . $response->status());
@@ -374,13 +566,17 @@ class FetchNewsFeeds extends Command
                     continue;
                 }
 
-                foreach ((array) $response->json('results', []) as $result) {
+                foreach ((array) $response->json('results', []) as $i => $result) {
                     if (!($result['success'] ?? false)) {
                         $rejected++;
                     } elseif ($result['duplicate'] ?? false) {
                         $duplicate++;
                     } else {
                         $created++;
+                        $id = $sourceIds[$i] ?? null;
+                        if ($id !== null) {
+                            $contributed[$id] = ($contributed[$id] ?? 0) + 1;
+                        }
                     }
                 }
 
@@ -390,7 +586,13 @@ class FetchNewsFeeds extends Command
             }
         }
 
-        $this->info("Done. new={$created} duplicate={$duplicate} rejected={$rejected}");
+        foreach ($contributed as $sourceId => $count) {
+            DB::table('sources')->where('id', $sourceId)->update([
+                'items_contributed' => DB::raw('items_contributed + ' . (int) $count),
+            ]);
+        }
+
+        $this->info("Done. new={$created} already-held={$duplicate} rejected={$rejected}");
 
         return 0;
     }

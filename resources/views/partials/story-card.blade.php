@@ -10,7 +10,7 @@
   <div class="story-meta">
     @if(!empty($story['primary_category']))
       <a class="story-category"
-         href="{{ route('category', ['slug' => \App\Support\Slug::make($story['primary_category'])]) }}">{{ ucwords($story['primary_category']) }}</a>
+         href="{{ \App\Support\Loc::route('category', ['slug' => \App\Support\Slug::make($story['primary_category'])]) }}">{{ ucwords($story['primary_category']) }}</a>
     @endif
 
     @if(!empty($story['sub_category']) && $story['sub_category'] !== 'Others')
@@ -42,14 +42,14 @@
              back to it belong on every card, not just on the headline. --}}
         <a class="story-source-link" href="{{ $story['url'] }}" target="_blank" rel="noopener nofollow">
           {{ $source }}<span class="external-mark" aria-hidden="true">&#8599;</span>
-          <span class="visually-hidden">(opens the original article on {{ $source }} in a new tab)</span>
+          <span class="visually-hidden">{{ __('site.opens_original', ['source' => $source]) }}</span>
         </a>
       @endif
     </div>
 
     @if(!empty($story['location_label']))
       <a class="story-place"
-         href="{{ route('place', ['slug' => \App\Support\Slug::make($story['location_label'])]) }}">{{ $story['location_label'] }}</a>
+         href="{{ \App\Support\Loc::route('place', ['slug' => \App\Support\Slug::make($story['location_label'])]) }}">{{ $story['location_label'] }}</a>
     @endif
   </div>
 </article>

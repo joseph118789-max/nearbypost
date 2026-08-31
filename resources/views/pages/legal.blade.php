@@ -26,9 +26,9 @@
   <div class="info-card">
     <h3>Pages</h3>
     <ul class="nav-links">
-      <li><a href="{{ route('legal', ['page' => 'terms']) }}">Terms of Use</a></li>
-      <li><a href="{{ route('legal', ['page' => 'privacy']) }}">Privacy Policy</a></li>
-      <li><a href="{{ route('legal', ['page' => 'disclaimer']) }}">Disclaimer</a></li>
+      <li><a href="{{ \App\Support\Loc::route('legal', ['page' => 'terms']) }}">Terms of Use</a></li>
+      <li><a href="{{ \App\Support\Loc::route('legal', ['page' => 'privacy']) }}">Privacy Policy</a></li>
+      <li><a href="{{ \App\Support\Loc::route('legal', ['page' => 'disclaimer']) }}">Disclaimer</a></li>
     </ul>
   </div>
 @endsection

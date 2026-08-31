@@ -249,3 +249,30 @@ a { color: inherit; }
 .story-source-link:hover { color: var(--color-accent); text-decoration: underline; }
 
 .external-mark { font-size: 0.85em; opacity: 0.7; }
+
+/* Reading-language switcher in the header. */
+.lang-switch { display: inline-flex; gap: 4px; align-items: center; }
+
+.lang-option {
+  font-size: 0.78rem;
+  padding: 7px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: #fff;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.lang-option:hover { border-color: #cfcac4; color: var(--color-text-primary); }
+
+.lang-option.active {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
+}
+
+@media (max-width: 620px) {
+  .header { flex-wrap: wrap; gap: 10px; }
+  .header-actions { flex-wrap: wrap; }
+}

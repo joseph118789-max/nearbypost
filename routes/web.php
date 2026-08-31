@@ -2,38 +2,45 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\FeedController;
-use App\Http\Controllers\HomeController;
 use App\Http\Controllers\SitemapController;
+use App\Http\Middleware\SetLocale;
+use App\Support\Loc;
 
 /*
 |--------------------------------------------------------------------------
-| Public pages
+| Public pages, one set per reading language
 |--------------------------------------------------------------------------
 |
 | Rendered on the server. Places and topics are real URLs rather than
 | JavaScript state, so each one can be linked, shared and indexed.
 |
+| English keeps the unprefixed URLs - those are the ones already indexed and
+| there is no reason to churn them. Malay and Chinese are the same routes again
+| under /ms and /zh, with the locale as a route-name prefix so
+| App\Support\Loc::route() can resolve either. Each language is its own URL
+| because a search engine has to index the Malay page separately from the
+| English one, and a reader has to be able to share the version they read.
+|
 */
 
-Route::get('/', [HomeController::class, 'index'])->name('home');
-Route::get('/interest', [HomeController::class, 'interest'])->name('interest');
-Route::get('/marketplace', [HomeController::class, 'marketplace'])->name('marketplace');
+$publicRoutes = require __DIR__ . '/public_pages.php';
 
-Route::get('/category/{slug}', [HomeController::class, 'category'])
-    ->where('slug', '[a-z0-9-]+')
-    ->name('category');
+Route::middleware(SetLocale::class . ':' . Loc::DEFAULT)->group(function () use ($publicRoutes) {
+    $publicRoutes(Loc::DEFAULT);
+});
 
-Route::get('/news/{slug}', [HomeController::class, 'place'])
-    ->where('slug', '[a-z0-9-]+')
-    ->name('place');
+foreach (Loc::all() as $locale) {
+    if ($locale === Loc::DEFAULT) {
+        continue;
+    }
 
-Route::get('/news/{slug}/{categorySlug}', [HomeController::class, 'placeCategory'])
-    ->where(['slug' => '[a-z0-9-]+', 'categorySlug' => '[a-z0-9-]+'])
-    ->name('place.category');
-
-Route::get('/legal/{page}', [HomeController::class, 'legal'])
-    ->where('page', 'terms|privacy|disclaimer')
-    ->name('legal');
+    Route::prefix($locale)
+        ->name($locale . '.')
+        ->middleware(SetLocale::class . ':' . $locale)
+        ->group(function () use ($publicRoutes, $locale) {
+            $publicRoutes($locale);
+        });
+}
 
 /*
 |--------------------------------------------------------------------------

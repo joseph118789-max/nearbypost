@@ -1,6 +1,6 @@
 {{-- Public layout. Rendered on the server: the content is in the HTML. --}}
 <!DOCTYPE html>
-<html lang="en-MY">
+<html lang="{{ \App\Support\Loc::htmlLang() }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -9,6 +9,16 @@
   <meta name="description" content="{{ $description ?? 'Local news and hyperlocal updates from across Malaysia.' }}">
   <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large">
   <link rel="canonical" href="{{ $canonical ?? url()->current() }}">
+
+  {{-- The same page in the other reading languages. Without these a search
+       engine treats the three as competing duplicates rather than one page. --}}
+  @foreach(\App\Support\Loc::alternatesForCurrent() as $alt)
+    <link rel="alternate" hreflang="{{ $alt['hreflang'] }}" href="{{ $alt['url'] }}">
+  @endforeach
+  @if(\App\Support\Loc::alternatesForCurrent())
+    <link rel="alternate" hreflang="x-default"
+          href="{{ \App\Support\Loc::alternatesForCurrent()['en']['url'] ?? url()->current() }}">
+  @endif
 
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="{{ config('app.name') }}">
@@ -45,29 +55,41 @@
 <body>
 
 <header class="header">
-  <a class="logo" href="{{ route('home') }}">{{ config('app.name') }}</a>
+  <a class="logo" href="{{ \App\Support\Loc::route('home') }}">{{ config('app.name') }}</a>
   <nav class="header-actions" aria-label="Quick links">
-    <a class="icon-btn" href="{{ route('interest') }}">All news</a>
+    <a class="icon-btn" href="{{ \App\Support\Loc::route('interest') }}">{{ __('site.all_news') }}</a>
+
+    {{-- Language switcher. Real links, so each language is crawlable and a
+         reader can share the version they read. Query parameters are kept so
+         the radius and period survive the switch. --}}
+    <div class="lang-switch" role="group" aria-label="{{ __('site.reading_language') }}">
+      @foreach(\App\Support\Loc::alternatesForCurrent() as $code => $alt)
+        <a class="lang-option {{ $code === \App\Support\Loc::current() ? 'active' : '' }}"
+           href="{{ $alt['url'] }}"
+           hreflang="{{ $alt['hreflang'] }}"
+           lang="{{ $alt['hreflang'] }}">{{ $alt['label'] }}</a>
+      @endforeach
+    </div>
   </nav>
 </header>
 
 <div class="desktop-layout">
 
   <div class="desktop-sidebar">
-    <p class="site-tagline">A calmer, cleaner local news feed.</p>
+    <p class="site-tagline">{{ __('site.tagline') }}</p>
 
-    <nav class="desktop-nav" aria-label="Sections">
-      <a class="desktop-nav-item {{ ($tab ?? '') === 'nearme' ? 'active' : '' }}" href="{{ route('home') }}">Near Me</a>
-      <a class="desktop-nav-item {{ ($tab ?? '') === 'interest' ? 'active' : '' }}" href="{{ route('interest') }}">By Interest</a>
-      <a class="desktop-nav-item {{ ($tab ?? '') === 'marketplace' ? 'active' : '' }}" href="{{ route('marketplace') }}">Marketplace</a>
+    <nav class="desktop-nav" aria-label="{{ __('site.sections') }}">
+      <a class="desktop-nav-item {{ ($tab ?? '') === 'nearme' ? 'active' : '' }}" href="{{ \App\Support\Loc::route('home') }}">{{ __('site.near_me') }}</a>
+      <a class="desktop-nav-item {{ ($tab ?? '') === 'interest' ? 'active' : '' }}" href="{{ \App\Support\Loc::route('interest') }}">{{ __('site.by_interest') }}</a>
+      <a class="desktop-nav-item {{ ($tab ?? '') === 'marketplace' ? 'active' : '' }}" href="{{ \App\Support\Loc::route('marketplace') }}">{{ __('site.marketplace') }}</a>
     </nav>
 
     @if(!empty($categories))
       <section class="nav-section" aria-labelledby="nav-topics">
-        <h2 id="nav-topics">Topics</h2>
+        <h2 id="nav-topics">{{ __('site.topics') }}</h2>
         <ul class="nav-links">
           @foreach(array_slice($categories, 0, 14) as $cat)
-            <li><a href="{{ route('category', ['slug' => \App\Support\Slug::make($cat)]) }}">{{ ucwords($cat) }}</a></li>
+            <li><a href="{{ \App\Support\Loc::route('category', ['slug' => \App\Support\Slug::make($cat)]) }}">{{ ucwords($cat) }}</a></li>
           @endforeach
         </ul>
       </section>
@@ -75,10 +97,10 @@
 
     @if(!empty($places))
       <section class="nav-section" aria-labelledby="nav-places">
-        <h2 id="nav-places">Places</h2>
+        <h2 id="nav-places">{{ __('site.places') }}</h2>
         <ul class="nav-links">
           @foreach(array_slice($places, 0, 18) as $p)
-            <li><a href="{{ route('place', ['slug' => \App\Support\Slug::make($p)]) }}">{{ $p }}</a></li>
+            <li><a href="{{ \App\Support\Loc::route('place', ['slug' => \App\Support\Slug::make($p)]) }}">{{ $p }}</a></li>
           @endforeach
         </ul>
       </section>
@@ -86,9 +108,9 @@
 
     <div class="desktop-legal-footer">
       <div class="legal-links">
-        <a class="legal-link" href="{{ route('legal', ['page' => 'terms']) }}">Terms</a>
-        <a class="legal-link" href="{{ route('legal', ['page' => 'privacy']) }}">Privacy</a>
-        <a class="legal-link" href="{{ route('legal', ['page' => 'disclaimer']) }}">Disclaimer</a>
+        <a class="legal-link" href="{{ \App\Support\Loc::route('legal', ['page' => 'terms']) }}">{{ __('site.terms') }}</a>
+        <a class="legal-link" href="{{ \App\Support\Loc::route('legal', ['page' => 'privacy']) }}">{{ __('site.privacy') }}</a>
+        <a class="legal-link" href="{{ \App\Support\Loc::route('legal', ['page' => 'disclaimer']) }}">{{ __('site.disclaimer') }}</a>
       </div>
       <p class="copyright">&copy; {{ date('Y') }} {{ config('app.name') }}</p>
     </div>
@@ -98,16 +120,16 @@
     {{-- Section tabs repeated at the top of the content on small screens.
          Stacked, the sidebar would otherwise put thirty navigation links above
          the first headline. --}}
-    <nav class="mobile-tabs" aria-label="Sections">
-      <a class="filter-chip {{ ($tab ?? '') === 'nearme' ? 'active' : '' }}" href="{{ route('home') }}">Near Me</a>
-      <a class="filter-chip {{ ($tab ?? '') === 'interest' ? 'active' : '' }}" href="{{ route('interest') }}">By Interest</a>
-      <a class="filter-chip {{ ($tab ?? '') === 'marketplace' ? 'active' : '' }}" href="{{ route('marketplace') }}">Marketplace</a>
+    <nav class="mobile-tabs" aria-label="{{ __('site.sections') }}">
+      <a class="filter-chip {{ ($tab ?? '') === 'nearme' ? 'active' : '' }}" href="{{ \App\Support\Loc::route('home') }}">{{ __('site.near_me') }}</a>
+      <a class="filter-chip {{ ($tab ?? '') === 'interest' ? 'active' : '' }}" href="{{ \App\Support\Loc::route('interest') }}">{{ __('site.by_interest') }}</a>
+      <a class="filter-chip {{ ($tab ?? '') === 'marketplace' ? 'active' : '' }}" href="{{ \App\Support\Loc::route('marketplace') }}">{{ __('site.marketplace') }}</a>
     </nav>
 
     @yield('main')
   </main>
 
-  <aside class="desktop-right" aria-label="Filters">
+  <aside class="desktop-right" aria-label="{{ __('site.current_settings') }}">
     @yield('aside')
   </aside>
 

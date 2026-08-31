@@ -46,6 +46,10 @@ class FeedDiscovery
         'automotive'    => ['/automotive/feed', '/cars/feed', '/motoring/feed'],
         'health'        => ['/health/feed', '/rss/health', '/category/health/feed'],
         'world'         => ['/world/feed', '/rss/world'],
+        'food'          => ['/food/feed', '/rss/food', '/category/food/feed', '/dining/feed'],
+        'education'     => ['/education/feed', '/rss/education', '/category/education/feed'],
+        'politics'      => ['/politics/feed', '/rss/politics', '/nation/feed'],
+        'opinion'       => ['/opinion/feed', '/rss/opinion', '/columnists/feed'],
     ];
 
     /**

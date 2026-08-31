@@ -21,6 +21,8 @@ class NewsItem extends Model
         "primary_category",
         "secondary_category",
         "sub_category",
+        "source_language",
+        "translated_at",
         "extracted_title",
         "extracted_summary",
         "extracted_text",

@@ -3,12 +3,12 @@
 @section('main')
   <div class="page-head">
     <h1>Marketplace</h1>
-    <p class="page-intro">The Marketplace is not open yet. Local listings will appear here once it launches.</p>
+    <p class="page-intro">{{ __('site.marketplace_closed') }}</p>
   </div>
 
   <div class="empty-state">
-    <p>Nothing to show yet.</p>
-    <p class="empty-hint">In the meantime, read <a href="{{ route('home') }}">news near you</a>.</p>
+    <p>{{ __('site.nothing_yet') }}</p>
+    <p class="empty-hint">In the meantime, read <a href="{{ \App\Support\Loc::route('home') }}">news near you</a>.</p>
   </div>
 @endsection
 

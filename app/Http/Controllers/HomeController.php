@@ -77,8 +77,8 @@ class HomeController extends Controller
         $stories  = $this->feed->latest($category, $days, 24);
 
         $name = $category
-            ? ucwords($category) . ' news in Malaysia'
-            : 'Latest news in Malaysia';
+            ? __('site.category_news', ['category' => ucwords($category)])
+            : __('site.latest_news');
 
         return $this->feedView([
             'tab'         => 'interest',
@@ -106,7 +106,7 @@ class HomeController extends Controller
             throw new NotFoundHttpException('Unknown category');
         }
 
-        $name = ucwords($category) . ' news in Malaysia';
+        $name = __('site.category_news', ['category' => ucwords($category)]);
 
         return $this->feedView([
             'tab'         => 'interest',
@@ -176,8 +176,8 @@ class HomeController extends Controller
         }
 
         $name = $category
-            ? ucwords($category) . ' news in ' . $place
-            : 'News near ' . $place;
+            ? __('site.category_in', ['category' => ucwords($category), 'place' => $place])
+            : __('site.news_near', ['place' => $place]);
 
         return $this->feedView([
             'tab'         => 'nearme',
@@ -224,18 +224,24 @@ class HomeController extends Controller
     private function intro(array $stories, ?string $place, ?string $category, int $days): string
     {
         $count  = count($stories);
-        $window = $days === 1 ? 'the last 24 hours' : "the last {$days} days";
-        $what   = $category ? mb_strtolower($category) . ' stories' : 'stories';
+
+        $window = $days === 1
+            ? __('site.window_24h')
+            : __('site.window_days', ['days' => $days]);
+
+        $what = $category
+            ? __('site.category_stories', ['category' => mb_strtolower($category)])
+            : __('site.stories');
 
         if ($count === 0) {
             return $place
-                ? "No {$what} were published near {$place} in {$window}. Try a wider radius or a longer period."
-                : "No {$what} were published in {$window}.";
+                ? __('site.intro_none_place', ['what' => $what, 'place' => $place, 'window' => $window])
+                : __('site.intro_none', ['what' => $what, 'window' => $window]);
         }
 
-        $where = $place ? " within reach of {$place}" : ' across Malaysia';
-
-        return "{$count} {$what}{$where}, published in {$window} and gathered from Malaysian news sources.";
+        return $place
+            ? __('site.intro_place', ['count' => $count, 'place' => $place, 'window' => $window])
+            : __('site.intro_all', ['count' => $count, 'window' => $window]);
     }
 
     private function description(?string $place, ?string $category, int $days): string

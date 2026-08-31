@@ -43,13 +43,16 @@ class EnrichWithAi extends Command
     protected $description = 'Enrich news items with AI: validates output, enforces controlled enums, preserves good output on retry';
 
     // ── Versioning ───────────────────────────────────────────────────────────
-    private const PROMPT_VERSION    = 'v3';
+    private const PROMPT_VERSION    = 'v4';
     private const PIPELINE_VERSION  = 'v1.0';
     private const MODEL             = 'deepseek-chat';
     private const MAX_RETRIES       = 2;
 
     // ── Controlled enums ────────────────────────────────────────────────────
     private const RELEVANCE_MODES = ['category_only', 'location_only', 'location_and_category'];
+
+    /** The languages a reader can choose. Summaries are produced in all three. */
+    private const READING_LOCALES = ['en', 'ms', 'zh'];
     private const VALID_CATEGORIES = [
         'Property & Real Estate',
         'Food & Lifestyle',
@@ -209,6 +212,7 @@ class EnrichWithAi extends Command
                     'main_place_text'            => $validation['place'],
                     'ai_category'                => $validation['category'],
                     'sub_category'               => $validation['sub_category'],
+                    'source_language'            => $validation['source_language'],
                     'ai_summary'                 => $validation['summary'],
                     'ai_status'                  => 'success',
                     'ai_processed_at'            => now(),
@@ -235,6 +239,8 @@ class EnrichWithAi extends Command
                 }
 
                 $item->update($updateData);
+
+                $this->storeTranslations($item, $validation['translations'] ?? []);
 
                 $this->info("  OK {$item->id} | mode={$validation['relevance_mode']} | cat={$validation['category']}");
                 Log::info('AI enrichment success', [
@@ -355,11 +361,40 @@ class EnrichWithAi extends Command
             $parsed['sub_category'] ?? null
         );
 
+        // Keep only well-formed translations. A locale missing or empty falls
+        // back to the original text at read time rather than showing nothing.
+        $translations = [];
+
+        foreach (self::READING_LOCALES as $locale) {
+            $candidate = $parsed['t'][$locale] ?? null;
+
+            if (!is_array($candidate)) {
+                continue;
+            }
+
+            $translatedTitle = trim((string) ($candidate['title'] ?? ''));
+
+            if ($translatedTitle === '') {
+                continue;
+            }
+
+            $translations[$locale] = [
+                'title'   => mb_substr($translatedTitle, 0, 550),
+                'summary' => mb_substr(trim((string) ($candidate['summary'] ?? '')), 0, 1200) ?: null,
+            ];
+        }
+
+        $sourceLanguage = preg_match('/^[a-z]{2}$/', (string) ($parsed['lang'] ?? ''))
+            ? $parsed['lang']
+            : null;
+
         return [
             'valid'         => empty($errors),
             'summary'       => $summary ?: ($parsed['summary'] ?? ''), // keep raw if passes
             'category'      => $category,
             'sub_category'  => $subCategory,
+            'translations'  => $translations,
+            'source_language' => $sourceLanguage,
             'place'         => $place,
             'relevance_mode'=> $relevanceMode,
             'is_article'    => $isArticle,
@@ -402,6 +437,34 @@ class EnrichWithAi extends Command
         return true;
     }
 
+    /**
+     * Upsert this story's translations.
+     *
+     * Written after the item itself so a translation failure can never lose the
+     * classification work that came with it.
+     */
+    private function storeTranslations(NewsItem $item, array $translations): void
+    {
+        if ($translations === []) {
+            return;
+        }
+
+        foreach ($translations as $locale => $text) {
+            \Illuminate\Support\Facades\DB::table('news_translations')->updateOrInsert(
+                ['news_item_id' => $item->id, 'locale' => $locale],
+                [
+                    'title'      => $text['title'],
+                    'summary'    => $text['summary'],
+                    'model'      => self::MODEL,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]
+            );
+        }
+
+        $item->update(['translated_at' => now()]);
+    }
+
     private function buildPrompt(string $title, string $text, string $source): string
     {
         $truncated = mb_substr($text, 0, 3000);
@@ -423,8 +486,18 @@ Return this exact shape:
   "lat": "latitude of the place (number, e.g. 3.139, omit/null if not location-specific or cannot determine)",
   "lng": "longitude of the place (number, e.g. 101.687, omit/null if not location-specific or cannot determine)",
   "relevance": "location_and_category if place is a specific city/area, category_only if national/world-wide (omit if not an article)",
-  "sub_category": "exact sub-category name copied from the line below that matches your chosen category (omit if not an article)"
+  "sub_category": "exact sub-category name copied from the line below that matches your chosen category (omit if not an article)",
+  "lang": "ISO 639-1 code of the language the article is written in, e.g. en, ms, zh, ta, hi, ja, ko",
+  "t": {
+    "en": {"title": "the headline in natural English", "summary": "the summary in natural English"},
+    "ms": {"title": "the headline in natural Malay", "summary": "the summary in natural Malay"},
+    "zh": {"title": "the headline in Simplified Chinese", "summary": "the summary in Simplified Chinese"}
+  }
 }
+
+Translate faithfully. Keep place names, people and organisations in the form a
+Malaysian reader would recognise; do not translate proper nouns that are
+normally left as they are. Do not add anything the article does not say.
 
 Sub-categories by category. Pick one from the line matching the category you chose:
 {$taxonomy}
@@ -480,6 +553,8 @@ PROMPT;
             'category'  => $parsed['category']  ?? null,
             // Whitelist parser: a key omitted here never reaches validation.
             'sub_category' => $parsed['sub_category'] ?? null,
+            'lang'         => $parsed['lang'] ?? null,
+            't'            => is_array($parsed['t'] ?? null) ? $parsed['t'] : null,
             'place'     => $parsed['place']     ?? null,
             'relevance' => $parsed['relevance']  ?? 'category_only',
             'is_article'=> isset($parsed['is_article']) ? (bool) $parsed['is_article'] : true,

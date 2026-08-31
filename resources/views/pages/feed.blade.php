@@ -11,7 +11,7 @@
   @if(!empty($unresolved))
     <div class="notice">
       We could not find <strong>{{ $place }}</strong> on the map.
-      Try a nearby town or city, or <a href="{{ route('interest') }}">browse all news</a>.
+      Try a nearby town or city, or <a href="{{ \App\Support\Loc::route('interest') }}">browse all news</a>.
     </div>
   @endif
 
@@ -20,15 +20,15 @@
       @include('partials.story-card', ['story' => $story])
     @empty
       <div class="empty-state">
-        <p>No stories match these filters yet.</p>
+        <p>{{ __('site.empty_title') }}</p>
         <p class="empty-hint">
-          Try
-          <a href="{{ request()->fullUrlWithQuery(['days' => 30]) }}">a longer period</a>
+          {{ __('site.try') }}
+          <a href="{{ request()->fullUrlWithQuery(['days' => 30]) }}">{{ __('site.longer_period') }}</a>
           @if(!empty($showRadius))
-            or <a href="{{ request()->fullUrlWithQuery(['radius' => 50]) }}">a wider radius</a>
+            {{ __('site.or') }} <a href="{{ request()->fullUrlWithQuery(['radius' => 50]) }}">{{ __('site.wider_radius') }}</a>
           @endif
           @if(!empty($category))
-            or <a href="{{ request()->fullUrlWithQuery(['category' => null]) }}">all topics</a>
+            {{ __('site.or') }} <a href="{{ request()->fullUrlWithQuery(['category' => null]) }}">{{ __('site.all_topics') }}</a>
           @endif.
         </p>
       </div>
@@ -39,10 +39,10 @@
     {{-- Internal links to sibling places. These give crawlers a path to every
          location page and give readers the obvious next step. --}}
     <section class="link-cloud" aria-labelledby="nearby-places">
-      <h2 id="nearby-places">News in other places</h2>
+      <h2 id="nearby-places">{{ __('site.other_places') }}</h2>
       <div class="filter-chips">
         @foreach(array_slice($places, 0, 24) as $p)
-          <a class="filter-chip" href="{{ route('place', ['slug' => \App\Support\Slug::make($p)]) }}">{{ $p }}</a>
+          <a class="filter-chip" href="{{ \App\Support\Loc::route('place', ['slug' => \App\Support\Slug::make($p)]) }}">{{ $p }}</a>
         @endforeach
       </div>
     </section>
@@ -51,30 +51,30 @@
 
 @section('aside')
   <div class="info-card">
-    <h3>Current settings</h3>
-    <div class="info-row"><span>Location</span><span>{{ $place }}</span></div>
+    <h3>{{ __('site.current_settings') }}</h3>
+    <div class="info-row"><span>{{ __('site.location') }}</span><span>{{ $place }}</span></div>
     @if(!empty($showRadius))
-      <div class="info-row"><span>Radius</span><span>{{ $radius }} km</span></div>
+      <div class="info-row"><span>{{ __('site.radius') }}</span><span>{{ $radius }} km</span></div>
     @endif
-    <div class="info-row"><span>Period</span><span>{{ $windows[$days] ?? $days . 'd' }}</span></div>
+    <div class="info-row"><span>{{ __('site.period') }}</span><span>{{ $windows[$days] ?? $days . 'd' }}</span></div>
     @if(!empty($category))
-      <div class="info-row"><span>Topic</span><span>{{ ucwords($category) }}</span></div>
+      <div class="info-row"><span>{{ __('site.topic') }}</span><span>{{ ucwords($category) }}</span></div>
     @endif
   </div>
 
-  <form class="info-card" method="get" action="{{ route('home') }}">
-    <h3>Change location</h3>
-    <label class="visually-hidden" for="place-input">Town or city</label>
+  <form class="info-card" method="get" action="{{ \App\Support\Loc::route('home') }}">
+    <h3>{{ __('site.change_location') }}</h3>
+    <label class="visually-hidden" for="place-input">{{ __('site.town_or_city') }}</label>
     <input class="modal-input" id="place-input" type="text" name="place"
            value="{{ $place }}" placeholder="e.g. Shah Alam" maxlength="120">
     <input type="hidden" name="days" value="{{ $days }}">
     <input type="hidden" name="radius" value="{{ $radius }}">
-    <button class="desktop-action-btn primary" type="submit">Show news here</button>
+    <button class="desktop-action-btn primary" type="submit">{{ __('site.show_news_here') }}</button>
   </form>
 
   @if(!empty($showRadius))
     <div class="info-card">
-      <h3>Story radius</h3>
+      <h3>{{ __('site.story_radius') }}</h3>
       <div class="filter-chips">
         @foreach($radii as $r)
           <a class="filter-chip {{ $r === $radius ? 'active' : '' }}"
@@ -85,7 +85,7 @@
   @endif
 
   <div class="info-card">
-    <h3>Time range</h3>
+    <h3>{{ __('site.time_range') }}</h3>
     <div class="filter-chips">
       @foreach($windows as $value => $label)
         <a class="filter-chip {{ $value === $days ? 'active' : '' }}"
@@ -96,10 +96,10 @@
 
   @if(!empty($categories))
     <div class="info-card">
-      <h3>Topics</h3>
+      <h3>{{ __('site.topics') }}</h3>
       <div class="filter-chips">
         <a class="filter-chip {{ empty($category) ? 'active' : '' }}"
-           href="{{ request()->fullUrlWithQuery(['category' => null]) }}">All</a>
+           href="{{ request()->fullUrlWithQuery(['category' => null]) }}">{{ __('site.all') }}</a>
         @foreach($categories as $cat)
           <a class="filter-chip {{ !empty($category) && mb_strtolower($category) === mb_strtolower($cat) ? 'active' : '' }}"
              href="{{ request()->fullUrlWithQuery(['category' => $cat]) }}">{{ ucwords($cat) }}</a>
