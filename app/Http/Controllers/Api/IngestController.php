@@ -7,6 +7,7 @@ use App\Models\NewsItem;
 use App\Models\RawIngest;
 use App\Models\FailedIngest;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -111,6 +112,49 @@ class IngestController extends Controller
     }
 
 
+    /**
+     * Is this domain allowed to be ingested directly?
+     *
+     * The sources registry is where feeds are added, disabled and re-tiered, so
+     * it decides what may be ingested. A constant compiled into this controller
+     * cannot: registering a source would not have been enough for its articles
+     * to be accepted. APPROVED_DIRECT_DOMAINS is kept as a fallback for
+     * anything not yet in the registry.
+     */
+    private function isApprovedDomain(string $domain): bool
+    {
+        if ($domain === '') {
+            return false;
+        }
+
+        static $registered = null;
+
+        if ($registered === null) {
+            $registered = [];
+
+            try {
+                foreach (DB::table('sources')->where('is_active', true)->pluck('base_url') as $baseUrl) {
+                    $host = $this->normalizeDomain($baseUrl);
+
+                    if ($host !== null && $host !== '') {
+                        $registered[] = $host;
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Registry unavailable: fall back to the constant below.
+                $registered = [];
+            }
+        }
+
+        foreach (array_merge($registered, self::APPROVED_DIRECT_DOMAINS) as $approved) {
+            if ($domain === $approved || str_ends_with($domain, '.' . $approved)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function policyDecision(array $data): array
     {
         $url = (string) ($data['url'] ?? '');
@@ -122,10 +166,7 @@ class IngestController extends Controller
         }
 
         if ($mode === 'direct_seed') {
-            $allowed = collect(self::APPROVED_DIRECT_DOMAINS)
-                ->contains(fn (string $approved) => $domain === $approved || str_ends_with($domain, '.' . $approved));
-
-            if (!$allowed) {
+            if (!$this->isApprovedDomain($domain)) {
                 return [false, 'direct_domain_not_approved'];
             }
         }
