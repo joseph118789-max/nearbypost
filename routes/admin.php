@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\IntelController;
 use App\Http\Controllers\Admin\NewsController;
 use App\Http\Controllers\Admin\SettingsController;
+use App\Http\Controllers\Admin\SourceController;
 use App\Http\Controllers\Admin\SubscriberController;
 use Illuminate\Support\Facades\Route;
 
@@ -55,5 +56,12 @@ Route::prefix("admin")->name("admin.")->group(function () {
             ->whereNumber("id")->name("contributions.destroy");
         Route::post("/contributors/{id}/untrust", [ContributionController::class, "untrust"])
             ->whereNumber("id")->name("contributions.untrust");
+
+        // Where the news comes from, and what we know about reading it.
+        Route::get("/sources", [SourceController::class, "index"])->name("sources.index");
+        Route::get("/sources/{id}", [SourceController::class, "show"])
+            ->whereNumber("id")->name("sources.show");
+        Route::put("/sources/{id}", [SourceController::class, "update"])
+            ->whereNumber("id")->name("sources.update");
     });
 });

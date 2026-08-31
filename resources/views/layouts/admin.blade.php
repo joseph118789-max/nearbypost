@@ -21,6 +21,8 @@
                          something you have to remember the address of. --}}
                     <a href="{{ route('admin.contributions.index') }}"
                        style="font-size:0.85rem;color:#1f5679;text-decoration:none;">News &mdash; official &amp; unofficial</a>
+                    <a href="{{ route('admin.sources.index') }}"
+                       style="font-size:0.85rem;color:#1f5679;text-decoration:none;">Sources</a>
                 </div>
             </header>
             <main class="admin-content">

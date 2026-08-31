@@ -195,7 +195,9 @@
                 {{ $writer?->name ?? 'Unknown' }}
                 @if($writer?->trusted_at) <span class="badge badge-trusted">trusted</span> @endif
               @else
-                {{ $post->source ?: 'Unknown source' }}
+                {{-- The publisher's own page, in a new window. --}}
+                <a href="{{ $post->url }}" target="_blank" rel="noopener noreferrer"
+                   style="color:#1f5679;font-weight:600;text-decoration:none;">{{ $post->source ?: 'Unknown source' }} &#8599;</a>
               @endif
               &middot; {{ $post->published_at?->diffForHumans() }}
               @if($post->location_label) &middot; {{ $post->location_label }} @endif

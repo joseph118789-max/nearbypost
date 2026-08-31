@@ -148,7 +148,55 @@ class FetchNewsFeeds extends Command
             $query->whereIn('priority_tier', ['primary', 'secondary']);
         }
 
-        return $query->orderBy('name')->get();
+        return $query->orderBy('name')->get()->filter(fn ($s) => $this->isDue($s))->values();
+    }
+
+    /**
+     * Is it time to read this source again?
+     *
+     * Cadence used to belong to the whole tier, so a property section that
+     * publishes twice a week was visited ninety-six times a day. A source with
+     * its own interval is read on that interval instead; a source without one
+     * keeps the tier's behaviour, so nothing changes until somebody sets one.
+     *
+     * The hour, where given, is Kuala Lumpur time and only applies to sources
+     * read once a day or less - it is what "read the property section at 8am"
+     * means.
+     */
+    private function isDue(object $source): bool
+    {
+        // An explicit --source is a deliberate instruction; honour it.
+        if ($this->option('source')) {
+            return true;
+        }
+
+        $interval = (int) ($source->fetch_interval_minutes ?? 0);
+
+        if ($interval <= 0) {
+            return true;
+        }
+
+        $hour = $source->fetch_at_hour;
+
+        if ($hour !== null && $interval >= 1440) {
+            // Only in the named hour, and only once inside it.
+            if ((int) now()->setTimezone('Asia/Kuala_Lumpur')->format('G') !== (int) $hour) {
+                return false;
+            }
+
+            return $source->last_fetched_at === null
+                || \Carbon\Carbon::parse($source->last_fetched_at)->lt(now()->subMinutes(90));
+        }
+
+        // Ninety seconds of slack, because the run that reads a source and the
+        // run fifteen minutes later do not start at the same second. Without
+        // it, a fifteen-minute source is fourteen minutes fifty-seven seconds
+        // old when its next chance comes, gets skipped, and quietly runs at
+        // half the rate it was given.
+        $due = now()->subMinutes($interval)->addSeconds(90);
+
+        return $source->last_fetched_at === null
+            || \Carbon\Carbon::parse($source->last_fetched_at)->lt($due);
     }
 
     // ── fetching ────────────────────────────────────────────────────────
