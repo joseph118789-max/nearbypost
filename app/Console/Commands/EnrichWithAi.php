@@ -224,6 +224,26 @@ class EnrichWithAi extends Command
                     return;
                 }
 
+                // ── Spec 6: no Malaysian angle, no reason to serve it ─────
+                //
+                // Relevance, not location. A story about Malaysians abroad is
+                // kept and kept in the place it happened.
+                if ($validation['my'] === 0) {
+                    $item->update([
+                        'malaysia_relevant' => false,
+                        'relevance_reason'  => mb_substr((string) $validation['why'], 0, 110),
+                    ]);
+
+                    $this->refuse(
+                        $item,
+                        $job,
+                        'NOT_MALAYSIA_RELEVANT',
+                        'no Malaysian angle: ' . mb_substr((string) $validation['why'], 0, 60)
+                    );
+
+                    return;
+                }
+
                 // ── Spec 6/9/10: the arithmetic happens here, not in the model
                 $scorer  = new CategoryScorer();
                 $outcome = $scorer->score($validation['rel'], $validation['sub'], [
@@ -320,6 +340,8 @@ class EnrichWithAi extends Command
                     'meta_confidence'            => $confidence,
                     'ambiguous'                  => $ambiguous,
                     'source_language'            => $validation['source_language'],
+                    'malaysia_relevant'          => true,
+                    'relevance_reason'           => mb_substr((string) $validation['why'], 0, 110),
                     'discarded'                  => false,
                     'error_code'                 => null,
                     'url_used'                   => $haveArticleBody,
@@ -519,6 +541,8 @@ class EnrichWithAi extends Command
             'd'             => (int) ($parsed['d'] ?? 0),
             'e'             => $parsed['e'] ?? null,
             'g'             => (int) ($parsed['g'] ?? 0),
+            'my'            => array_key_exists('my', $parsed) ? (int) $parsed['my'] : 1,
+            'why'           => $parsed['why'] ?? null,
             'a'             => (int) ($parsed['a'] ?? 0),
             'place'         => $place,
             'relevance_mode'=> $relevanceMode,
@@ -653,6 +677,8 @@ Return this exact shape:
   "e": null or one of SPAM_DETECTED, OFF_TOPIC, INSUFFICIENT_CONTENT, INVALID_CONTENT, PAYWALL_BLOCKED, UNSUPPORTED_LANGUAGE,
   "g": 0 or 1,
   "a": 0 or 1,
+  "my": 0 or 1,
+  "why": "a few words on the Malaysian angle, or why there is none",
   "rel": {"<category id>": <relevance 0-1>, ...},
   "sub": {"S<sub-category id>": <relevance 0-1>, ...},
   "summary": "2-3 sentence summary of the article",
@@ -678,6 +704,24 @@ RELEVANCE
 - Opinion, speculation or an interview caps everything at 0.6.
 - Remaining high-confidence slots in this batch: {$slots}. If a slot is 0 you
   may not use that level; choose the next one down.
+
+MALAYSIA ANGLE (my) - this is about relevance, NOT about location.
+
+my = 1 when a reader in Malaysia has reason to care:
+- anything in or about Malaysia, its people, government, companies or economy
+- Malaysians abroad: students, workers, tourists, teams, victims, officials
+- a foreign event with material Malaysian consequence - trade, the ringgit,
+  fuel, palm oil, tourism, aviation, regional security, an outbreak
+- regional news involving Malaysia's neighbours where Malaysia is implicated
+- a foreign publisher writing about Malaysia
+
+my = 0 when there is no Malaysian connection at all: domestic politics of an
+unrelated country, foreign crime, foreign local weather, celebrity news with no
+Malaysian involvement.
+
+A foreign location does NOT make a story irrelevant. "Malaysians stranded by
+Nepal floods" is my = 1 and its place is Kathmandu. "Flooding at the Grand
+Canyon" is my = 0. Judge the angle, then report the place truthfully either way.
 
 GPS (g = 1) only when a specific named place is given - a town, district,
 region or street. "Kuala Lumpur" and "KL" qualify. "urban areas", "some areas"
@@ -754,6 +798,8 @@ PROMPT;
             'e'            => $parsed['e'] ?? null,
             'g'            => (int) ($parsed['g'] ?? 0),
             'a'            => (int) ($parsed['a'] ?? 0),
+            'my'           => array_key_exists('my', $parsed) ? (int) $parsed['my'] : 1,
+            'why'          => $parsed['why'] ?? null,
             'rel'          => is_array($parsed['rel'] ?? null) ? $parsed['rel'] : [],
             'sub'          => is_array($parsed['sub'] ?? null) ? $parsed['sub'] : [],
             't'            => is_array($parsed['t'] ?? null) ? $parsed['t'] : null,

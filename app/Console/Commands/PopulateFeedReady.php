@@ -127,6 +127,12 @@ class PopulateFeedReady extends Command
             return 'skipped';
         }
 
+        // A story with no Malaysian angle is not for this audience, wherever
+        // it happened.
+        if ($item->malaysia_relevant === false) {
+            return 'skipped';
+        }
+
         // ── Gate 1: AI enrichment must exist and be in allowed state ────
         $aiJob = $item->aiProcessingJob;
         if (!$aiJob || !in_array($aiJob->ai_status, self::ALLOWED_AI_STATUSES, true)) {

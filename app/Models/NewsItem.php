@@ -28,6 +28,8 @@ class NewsItem extends Model
         "error_code",
         "meta_confidence",
         "gps_flag",
+        "malaysia_relevant",
+        "relevance_reason",
         "url_used",
         "ambiguous",
         "classification",
