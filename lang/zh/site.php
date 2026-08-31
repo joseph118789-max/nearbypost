@@ -9,9 +9,7 @@ return [
     'marketplace'    => '市集',
     'sections'       => '栏目',
     'topics'         => '主题',
-    'places'         => '地点',
-    'places_near'    => '附近地区',
-    'places_active'  => '新闻集中的地区',
+    'side_panel'     => '更多选项',
     'subtopics'      => '子主题',
     'all_subtopics'  => '所有子主题',
     'reading_language' => '阅读语言',
@@ -32,7 +30,6 @@ return [
     'latest_news'    => '马来西亚最新新闻',
     'category_news'  => '马来西亚:category新闻',
     'category_in'    => ':place 的:category新闻',
-    'other_places'   => '其他地区的新闻',
 
     'intro_place'    => ':place 范围内共 :count 条新闻，发布于:window，来自马来西亚新闻媒体。',
     'intro_all'      => '马来西亚各地共 :count 条新闻，发布于:window，来自马来西亚新闻媒体。',

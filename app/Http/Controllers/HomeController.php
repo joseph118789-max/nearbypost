@@ -10,7 +10,6 @@ use App\Support\Slug;
 use App\Support\Taxonomy;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cookie;
-use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -133,8 +132,6 @@ class HomeController extends Controller
             'tab'        => 'marketplace',
             'place'      => $this->rememberedPlace($request),
             'categories' => $this->feed->categories(),
-            'places'     => $this->popularPlaces(),
-            'placeList'  => $this->placesWithNews(),
             'pageTitle'  => 'Marketplace',
         ]);
     }
@@ -156,8 +153,6 @@ class HomeController extends Controller
             'page'       => $page,
             'pageTitle'  => $pages[$page],
             'categories' => $this->feed->categories(),
-            'places'     => $this->popularPlaces(),
-            'placeList'  => $this->placesWithNews(),
             'place'      => $this->rememberedPlace($request),
         ]);
     }
@@ -216,17 +211,13 @@ class HomeController extends Controller
     {
         $data['categories'] = $this->feed->categories();
 
-        // Places ordered by what is nearest to this reader when the page knows
-        // where they are, and by how much news each carries when it does not.
-        $data['placeList']  = $this->placesWithNews($data['coords'] ?? null);
-        $data['places']     = array_column($data['placeList'], 'name');
-        $data['placesNear'] = !empty($data['coords']);
-
         // Sub-topics of the chosen topic, so the label on every card becomes
-        // somewhere a reader can go.
-        // Counted over the same window as the feed below: a chip reading "3"
-        // must return three stories.
-        $data['subCategories'] = $category
+        // somewhere a reader can go. By Interest only: Near Me is sorted by
+        // distance and carries no topic controls at all.
+        //
+        // Counted over the same window as the feed below, so a chip reading "3"
+        // returns three stories.
+        $data['subCategories'] = $category && ($data['tab'] ?? '') === 'interest'
             ? $this->feed->subCategories($category, $data['days'] ?? FeedQuery::DEFAULT_WINDOW_DAYS)
             : [];
 
@@ -289,115 +280,6 @@ class HomeController extends Controller
     }
 
     // ── helpers ─────────────────────────────────────────────────────────
-
-    /** Places worth linking from every page, for crawl depth and for readers. */
-    private function popularPlaces(): array
-    {
-        return array_column($this->placesWithNews(), 'name');
-    }
-
-    /**
-     * Places that actually have news, with how much.
-     *
-     * This was an alphabetical slice of the gazetteer: every city and state on
-     * file, sorted by spelling, whether or not a single story mentioned it. So
-     * the panel opened with Alor Gajah and Alor Setar while Kuala Lumpur's 299
-     * stories and Putrajaya's 88 were nowhere in the list. There was no reason
-     * behind the order because there was no reason in it at all, and clicking
-     * through often landed on an empty page.
-     *
-     * The list is derived from the feed now. Given the reader's coordinates it
-     * is ordered by distance, which is the one ordering this site can claim to
-     * be about; without them it falls back to volume. Either way the count is
-     * shown, so the order visibly means something.
-     *
-     * @param  array{lat: float, lng: float}|null  $coords
-     * @return list<array{name: string, count: int, lat: float|null, lng: float|null, km: float|null}>
-     */
-    private function placesWithNews(?array $coords = null): array
-    {
-        $places = cache()->remember('feed:places:v2', 900, function () {
-            $rows = DB::table('feed_ready_items')
-                ->where('is_active', true)
-                ->where('published_at', '>=', now()->subDays(14))
-                ->whereNotNull('location_label')
-                ->where('location_label', '<>', '')
-                ->selectRaw('location_label AS name, count(*) AS n, avg(lat) AS lat, avg(lng) AS lng')
-                ->groupBy('location_label')
-                ->orderByRaw('count(*) DESC')
-                ->get();
-
-            $known = [];
-
-            foreach ($rows as $row) {
-                $known[mb_strtolower($row->name)] = true;
-            }
-
-            // "George Town, Penang" and "George Town" are one place. Left split
-            // they read as two thin entries and neither looks worth a click.
-            $merged = [];
-
-            foreach ($rows as $row) {
-                $name = $row->name;
-                $head = trim(explode(',', $name)[0]);
-
-                if ($head !== '' && $head !== $name && isset($known[mb_strtolower($head)])) {
-                    $name = $head;
-                }
-
-                $key = mb_strtolower($name);
-
-                if (!isset($merged[$key])) {
-                    // Rows arrive busiest first, so the coordinates come from
-                    // the spelling that carries the most stories.
-                    $merged[$key] = [
-                        'name'  => $name,
-                        'count' => 0,
-                        'lat'   => $row->lat === null ? null : (float) $row->lat,
-                        'lng'   => $row->lng === null ? null : (float) $row->lng,
-                        'km'    => null,
-                    ];
-                }
-
-                $merged[$key]['count'] += (int) $row->n;
-            }
-
-            // One story is a thin page to send a reader to.
-            $merged = array_values(array_filter($merged, fn ($p) => $p['count'] >= 2));
-
-            usort($merged, fn ($a, $b) => $b['count'] <=> $a['count']);
-
-            return array_slice($merged, 0, 60);
-        });
-
-        if ($coords === null) {
-            return array_slice($places, 0, 40);
-        }
-
-        $near = [];
-
-        foreach ($places as $place) {
-            if ($place['lat'] === null) {
-                continue;
-            }
-
-            $place['km'] = $this->km($coords['lat'], $coords['lng'], $place['lat'], $place['lng']);
-            $near[] = $place;
-        }
-
-        usort($near, fn ($a, $b) => $a['km'] <=> $b['km']);
-
-        return array_slice($near, 0, 40);
-    }
-
-    /** Great-circle distance in kilometres. */
-    private function km(float $lat1, float $lng1, float $lat2, float $lng2): float
-    {
-        $angle = cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * cos(deg2rad($lng2 - $lng1))
-               + sin(deg2rad($lat1)) * sin(deg2rad($lat2));
-
-        return round(6371.0 * acos(min(1.0, max(-1.0, $angle))), 1);
-    }
 
     /** The heading for a feed narrowed by topic, and by sub-topic under it. */
     private function feedName(?string $category, ?string $sub): ?string

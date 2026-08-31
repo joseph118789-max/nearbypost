@@ -73,7 +73,12 @@
   </nav>
 </header>
 
-<div class="desktop-layout">
+{{-- The third column exists only when something belongs in it. Rendering the
+     section first lets an empty one remove the column instead of leaving a gap
+     beside the feed. --}}
+@php $asideContent = trim($__env->yieldContent('aside')); @endphp
+
+<div class="desktop-layout {{ $asideContent === '' ? 'no-aside' : '' }}">
 
   <div class="desktop-sidebar">
     <p class="site-tagline">{{ __('site.tagline') }}</p>
@@ -84,40 +89,70 @@
       <a class="desktop-nav-item {{ ($tab ?? '') === 'marketplace' ? 'active' : '' }}" href="{{ \App\Support\Loc::route('marketplace') }}">{{ __('site.marketplace') }}</a>
     </nav>
 
-    @if(!empty($categories))
-      <section class="nav-section" aria-labelledby="nav-topics">
-        <h2 id="nav-topics">{{ __('site.topics') }}</h2>
-        {{-- Every topic, not the first fourteen. The cap was there because a
-             sticky column taller than the screen cannot be scrolled past; the
-             column scrolls within itself now, and the cap was quietly hiding
-             Travel and Weather from every page on the site. --}}
-        <ul class="nav-links">
-          @foreach($categories as $cat)
-            <li><a href="{{ \App\Support\Loc::route('category', ['slug' => \App\Support\Slug::make($cat)]) }}">{{ \App\Support\Taxonomy::category($cat) }}</a></li>
+    {{-- Each mode carries its own controls and only its own. Near Me asks where
+         you are and how far out to look; topics belong to By Interest and were
+         only ever noise here. --}}
+    @if(($tab ?? '') === 'nearme' && isset($windows))
+      <form class="nav-section" method="get" action="{{ \App\Support\Loc::route('home') }}">
+        <h2>{{ __('site.change_location') }}</h2>
+        <label class="visually-hidden" for="place-input">{{ __('site.town_or_city') }}</label>
+        <input class="modal-input" id="place-input" type="text" name="place"
+               value="{{ $place ?? '' }}" placeholder="e.g. Shah Alam" maxlength="120">
+        <input type="hidden" name="days" value="{{ $days }}">
+        <input type="hidden" name="radius" value="{{ $radius }}">
+        <button class="desktop-action-btn primary" type="submit">{{ __('site.show_news_here') }}</button>
+      </form>
+
+      @if(!empty($showRadius))
+        <section class="nav-section" aria-labelledby="nav-radius">
+          <h2 id="nav-radius">{{ __('site.story_radius') }}</h2>
+          <div class="filter-chips">
+            @foreach($radii as $r)
+              <a class="filter-chip {{ $r === $radius ? 'active' : '' }}"
+                 href="{{ request()->fullUrlWithQuery(['radius' => $r]) }}">{{ $r }} km</a>
+            @endforeach
+          </div>
+        </section>
+      @endif
+
+      <section class="nav-section" aria-labelledby="nav-time">
+        <h2 id="nav-time">{{ __('site.time_range') }}</h2>
+        <div class="filter-chips">
+          @foreach($windows as $value => $label)
+            <a class="filter-chip {{ $value === $days ? 'active' : '' }}"
+               href="{{ request()->fullUrlWithQuery(['days' => $value]) }}">{{ $label }}</a>
           @endforeach
-        </ul>
+        </div>
       </section>
     @endif
 
-    @if(!empty($placeList))
-      {{-- Places that have news, nearest first where the page knows where the
-           reader is and busiest first where it does not, each showing how many
-           stories sit behind it. This was an alphabetical slice of the
-           gazetteer, which is why it opened with Alor Gajah and Alor Setar
-           while Kuala Lumpur was nowhere in it. --}}
-      <section class="nav-section" aria-labelledby="nav-places">
-        <h2 id="nav-places">{{ !empty($placesNear) ? __('site.places_near') : __('site.places_active') }}</h2>
+    {{-- By Interest asks what you want to read. The master topics live here and
+         only here; they were also drawn as chips on the right, which was one
+         control shown twice. Their sub-topics take the right column instead. --}}
+    @if(($tab ?? '') === 'interest' && !empty($categories))
+      <section class="nav-section" aria-labelledby="nav-topics">
+        <h2 id="nav-topics">{{ __('site.topics') }}</h2>
         <ul class="nav-links">
-          @foreach(array_slice($placeList, 0, 24) as $p)
-            <li>
-              <a class="place-link" href="{{ \App\Support\Loc::route('place', ['slug' => \App\Support\Slug::make($p['name'])]) }}">
-                <span class="place-name">{{ $p['name'] }}</span>
-                <span class="place-count">{{ $p['count'] }}</span>
-              </a>
-            </li>
+          <li><a class="{{ empty($category) ? 'active' : '' }}"
+                 href="{{ \App\Support\Loc::route('interest') }}">{{ __('site.all') }}</a></li>
+          @foreach($categories as $cat)
+            <li><a class="{{ !empty($category) && mb_strtolower($category) === mb_strtolower($cat) ? 'active' : '' }}"
+                   href="{{ \App\Support\Loc::route('category', ['slug' => \App\Support\Slug::make($cat)]) }}">{{ \App\Support\Taxonomy::category($cat) }}</a></li>
           @endforeach
         </ul>
       </section>
+
+      @isset($windows)
+        <section class="nav-section" aria-labelledby="nav-time">
+          <h2 id="nav-time">{{ __('site.time_range') }}</h2>
+          <div class="filter-chips">
+            @foreach($windows as $value => $label)
+              <a class="filter-chip {{ $value === $days ? 'active' : '' }}"
+                 href="{{ request()->fullUrlWithQuery(['days' => $value]) }}">{{ $label }}</a>
+            @endforeach
+          </div>
+        </section>
+      @endisset
     @endif
 
     <div class="desktop-legal-footer">
@@ -143,9 +178,11 @@
     @yield('main')
   </main>
 
-  <aside class="desktop-right" aria-label="{{ __('site.current_settings') }}">
-    @yield('aside')
-  </aside>
+  @if($asideContent !== '')
+    <aside class="desktop-right" aria-label="{{ __('site.side_panel') }}">
+      {!! $asideContent !!}
+    </aside>
+  @endif
 
 </div>
 

@@ -292,12 +292,6 @@ a { color: inherit; }
 }
 
 /* Places carry their story count, so the ordering is visibly about something. */
-.place-link { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.place-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.place-count {
-  flex: none; font-size: 0.72rem; color: var(--color-text-tertiary);
-  font-variant-numeric: tabular-nums;
-}
 
 /* Sub-topics of the chosen topic. */
 .subcat-row { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--color-border-light); }
@@ -307,3 +301,14 @@ a { color: inherit; }
 }
 .chip-count { margin-left: 5px; opacity: 0.55; font-variant-numeric: tabular-nums; }
 .story-subcategory { text-decoration: none; }
+
+/* Where nothing belongs beside the feed, the feed takes the room. */
+@media (min-width: 1101px) {
+  .desktop-layout.no-aside { grid-template-columns: 280px minmax(0, 1fr); }
+}
+
+/* The open topic, marked in the list that opened it. */
+.nav-links a.active { color: var(--color-accent); font-weight: 600; }
+
+/* The change-location form sits in the left column with the other controls. */
+.desktop-sidebar form.nav-section .modal-input { margin-bottom: 10px; }

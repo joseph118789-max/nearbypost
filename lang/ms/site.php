@@ -9,9 +9,7 @@ return [
     'marketplace'    => 'Pasaran',
     'sections'       => 'Bahagian',
     'topics'         => 'Topik',
-    'places'         => 'Tempat',
-    'places_near'    => 'Tempat berhampiran anda',
-    'places_active'  => 'Di mana ada berita',
+    'side_panel'     => 'Pilihan lain',
     'subtopics'      => 'Sub-topik',
     'all_subtopics'  => 'semua sub-topik',
     'reading_language' => 'Bahasa bacaan',
@@ -32,7 +30,6 @@ return [
     'latest_news'    => 'Berita terkini di Malaysia',
     'category_news'  => 'Berita :category di Malaysia',
     'category_in'    => 'Berita :category di :place',
-    'other_places'   => 'Berita di tempat lain',
 
     'intro_place'    => ':count berita dalam lingkungan :place, diterbitkan dalam :window dan dikumpulkan daripada sumber berita Malaysia.',
     'intro_all'      => ':count berita di seluruh Malaysia, diterbitkan dalam :window dan dikumpulkan daripada sumber berita Malaysia.',

@@ -15,9 +15,7 @@ return [
     'marketplace'    => 'Marketplace',
     'sections'       => 'Sections',
     'topics'         => 'Topics',
-    'places'         => 'Places',
-    'places_near'    => 'Places near you',
-    'places_active'  => 'Where the news is',
+    'side_panel'     => 'More options',
     'subtopics'      => 'Sub-topics',
     'all_subtopics'  => 'all sub-topics',
     'reading_language' => 'Reading language',
@@ -38,7 +36,6 @@ return [
     'latest_news'    => 'Latest news in Malaysia',
     'category_news'  => ':category news in Malaysia',
     'category_in'    => ':category news in :place',
-    'other_places'   => 'News in other places',
 
     'intro_place'    => ':count stories within reach of :place, published in :window and gathered from Malaysian news sources.',
     'intro_all'      => ':count stories across Malaysia, published in :window and gathered from Malaysian news sources.',
