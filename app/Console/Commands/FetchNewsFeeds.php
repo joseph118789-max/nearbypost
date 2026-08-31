@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use App\Services\Classification\ContentPolicy;
+use App\Services\IndexCrawler;
 
 /**
  * Fetch every registered feed, reconcile what comes back, then submit it.
@@ -110,7 +111,12 @@ class FetchNewsFeeds extends Command
 
     private function selectSources()
     {
-        $query = DB::table('sources')->where('is_active', true)->whereNotNull('rss_url');
+        // A source is a feed or a section page; either needs somewhere to read.
+        $query = DB::table('sources')
+            ->where('is_active', true)
+            ->where(function ($q) {
+                $q->whereNotNull('rss_url')->orWhereNotNull('index_url');
+            });
 
         if ($ref = $this->option('source')) {
             return $query->where(function ($q) use ($ref) {
@@ -134,6 +140,10 @@ class FetchNewsFeeds extends Command
     /** @return list<array<string,mixed>> */
     private function fetchSource(object $source): array
     {
+        if (($source->source_kind ?? 'rss') === 'index') {
+            return $this->fetchIndex($source);
+        }
+
         $limit  = max(1, (int) $this->option('limit'));
         $recipe = $this->recipeOf($source);
 
@@ -173,6 +183,77 @@ class FetchNewsFeeds extends Command
         $this->line(sprintf('  %-32s %3d items', $source->name, count($items)));
 
         return $items;
+    }
+
+    /**
+     * Read a publisher's section page.
+     *
+     * Feeds are a publisher's choice, not a guarantee: The Star and Bernama both
+     * advertise feeds that answer 404, so relying on RSS alone meant getting
+     * nothing at all from two of the largest outlets in the country.
+     *
+     * Only the index is read. Links are not followed onwards, and the site is
+     * not crawled recursively - these are the headlines the section page is
+     * already showing.
+     */
+    private function fetchIndex(object $source): array
+    {
+        $limit = max(1, (int) $this->option('limit'));
+
+        $links = (new IndexCrawler($this->policy))->crawl(
+            $source->index_url,
+            $source->link_pattern
+        );
+
+        if ($links === []) {
+            return $this->recordFailure($source, 'index_no_links');
+        }
+
+        $items = [];
+
+        foreach (array_slice($links, 0, $limit) as $link) {
+            if ($this->isBlockedPath($link['url'])) {
+                continue;
+            }
+
+            $items[] = [
+                'title'         => $link['title'],
+                'url'           => $link['url'],
+                'source'        => $this->publisherName($source),
+                'source_label'  => $this->publisherName($source),
+                'source_name'   => $this->publisherName($source),
+                'source_domain' => parse_url($source->base_url ?? $link['url'], PHP_URL_HOST),
+                // A section page carries no publication time and no standfirst.
+                // Extraction fetches the body and enrichment writes the summary,
+                // which is the same path a feed item takes when its description
+                // turns out to be a byline.
+                'published_at'  => gmdate('c'),
+                'summary'       => '',
+                '_source_id'    => $source->id,
+                '_aggregator'   => false,
+            ];
+        }
+
+        DB::table('sources')->where('id', $source->id)->update([
+            'last_fetched_at'      => now(),
+            'last_status'          => 'ok',
+            'last_item_count'      => count($items),
+            'consecutive_failures' => 0,
+            'updated_at'           => now(),
+        ]);
+
+        $this->line(sprintf('  %-32s %3d items (index)', $source->name, count($items)));
+
+        return $items;
+    }
+
+    /**
+     * Credit the publication, not the section.
+     * "The Star - Business" is a crawl target; the reader sees "The Star".
+     */
+    private function publisherName(object $source): string
+    {
+        return trim(explode(' - ', $source->name)[0]);
     }
 
     private function recordFailure(object $source, string $status): array
@@ -245,7 +326,8 @@ class FetchNewsFeeds extends Command
             $published = $this->normalisePublishedAt($rawDate, $source);
 
             $items[] = [
-                'title'         => mb_substr($title, 0, 500),
+                // news_items.title is varchar(255).
+                'title'         => mb_substr($title, 0, 250),
                 'url'           => $url,
                 'source'        => $credit,
                 'source_label'  => $credit,
