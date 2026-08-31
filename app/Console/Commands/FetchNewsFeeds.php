@@ -214,7 +214,7 @@ class FetchNewsFeeds extends Command
                 'source_label'  => $source->name,
                 'source_name'   => $source->name,
                 'source_domain' => parse_url($source->base_url ?? $url, PHP_URL_HOST),
-                'published_at'  => $published !== '' ? $published : gmdate('c'),
+                'published_at'  => $this->normalisePublishedAt($published),
                 'summary'       => mb_substr(
                     $this->cleanText((string) ($entry->description ?? $entry->summary ?? '')),
                     0,
@@ -238,6 +238,38 @@ class FetchNewsFeeds extends Command
      * segment or a hyphenated slug - and only then are the listing fragments
      * considered.
      */
+    /**
+     * Correct publication times that cannot be true.
+     *
+     * Harian Metro and Berita Harian stamp Malaysian local time but label the
+     * offset +0000, which places every one of their stories eight hours in the
+     * future - enough to sort them above genuine breaking news for ever, and to
+     * render as "5 hours from now". Malay Mail, by contrast, labels +0800
+     * correctly, so this cannot be applied per publisher by name; it has to be
+     * judged per timestamp.
+     *
+     * A story cannot be published later than now. Where removing Malaysia's
+     * eight-hour offset lands the timestamp in a plausible recent window, that
+     * is what the publisher meant. Otherwise the arrival time is used.
+     */
+    private function normalisePublishedAt(string $raw): string
+    {
+        $now = time();
+        $ts  = $raw !== '' ? strtotime($raw) : false;
+
+        if ($ts === false) {
+            return gmdate('c', $now);
+        }
+
+        if ($ts > $now + 900) {
+            $corrected = $ts - (8 * 3600);
+            $plausible = $corrected <= $now + 900 && $corrected > $now - (14 * 86400);
+            $ts = $plausible ? $corrected : $now;
+        }
+
+        return gmdate('c', $ts);
+    }
+
     private function isBlockedPath(string $url): bool
     {
         $path = mb_strtolower((string) parse_url($url, PHP_URL_PATH));
