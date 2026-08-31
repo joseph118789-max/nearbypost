@@ -118,6 +118,8 @@ return [
 
     // What happened to it
     'state_published'       => 'Published',
+    'state_pending_review'  => 'With an editor',
+    'post_pending_review'   => 'Sent for review. Your first post is read by an editor before it goes live; after that, your posts appear straight away.',
     'state_rejected'        => 'Not published',
     'state_held'            => 'Waiting',
     'state_awaiting_marketplace' => 'Held',

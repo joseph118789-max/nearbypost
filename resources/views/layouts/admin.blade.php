@@ -14,8 +14,13 @@
     <div class="admin-wrapper">
         <div class="admin-main">
             <header class="admin-header">
-                <div style="display:flex;align-items:center;gap:12px;">
-                    <span style="font-weight:600;color:#1c5a7f;">NearbyPost Admin</span>
+                <div style="display:flex;align-items:center;gap:16px;">
+                    <a href="{{ route('admin.dashboard') }}"
+                       style="font-weight:600;color:#1c5a7f;text-decoration:none;">NearbyPost Admin</a>
+                    {{-- Reachable from every admin page, so the queue is not
+                         something you have to remember the address of. --}}
+                    <a href="{{ route('admin.contributions.index') }}"
+                       style="font-size:0.85rem;color:#1f5679;text-decoration:none;">Reader submissions</a>
                 </div>
             </header>
             <main class="admin-content">

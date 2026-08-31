@@ -3,6 +3,7 @@
 namespace App\Services\Contribution;
 
 use App\Models\NewsItem;
+use App\Models\User;
 use App\Services\LocationResolver;
 use Illuminate\Support\Facades\DB;
 
@@ -107,10 +108,19 @@ class PostPublisher
         // The Marketplace has no reader-facing feed yet, so a listing is
         // accepted and kept rather than served into the news feed, where it
         // does not belong.
-        $item->status = $item->section === 'marketplace' ? 'held' : 'active';
-
         if ($item->section === 'marketplace') {
+            $item->status = 'held';
             $item->review_status = 'awaiting_marketplace';
+        } elseif ($this->contributorIsTrusted($item)) {
+            $item->status = 'active';
+        } else {
+            // The automatic check says this is news. Whether it is TRUE, and
+            // whether we want it on the site with our name on it, is a
+            // different question and no model can answer it. So a contributor
+            // nobody has vouched for waits for an editor - once, after which
+            // they are no longer a stranger.
+            $item->status = 'held';
+            $item->review_status = 'pending_review';
         }
 
         $item->save();
@@ -130,6 +140,26 @@ class PostPublisher
         $this->storeTranslations($item, $verdict['translations']);
 
         return $item->refresh();
+    }
+
+    /**
+     * Has an editor vouched for whoever wrote this?
+     *
+     * The queue exists to look at a new contributor's work, not to read the
+     * same regular's copy for ever. Set CONTRIBUTIONS_ALWAYS_REVIEW=true to
+     * keep every post waiting regardless.
+     */
+    private function contributorIsTrusted(NewsItem $item): bool
+    {
+        if (config('services.contributions.always_review')) {
+            return false;
+        }
+
+        if (!$item->contributor_id) {
+            return false;
+        }
+
+        return User::where('id', $item->contributor_id)->whereNotNull('trusted_at')->exists();
     }
 
     /**

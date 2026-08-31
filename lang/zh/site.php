@@ -112,6 +112,8 @@ return [
 
     // 处理结果
     'state_published'       => '已发布',
+    'state_pending_review'  => '编辑审阅中',
+    'post_pending_review'   => '已送交审阅。您的第一篇投稿会由编辑先行阅读，之后发布的投稿将直接显示。',
     'state_rejected'        => '未发布',
     'state_held'            => '等待中',
     'state_awaiting_marketplace' => '暂存',

@@ -220,6 +220,7 @@ class ContributeController extends Controller
     {
         return match ($post->review_status) {
             'published'            => __('site.post_published'),
+            'pending_review'       => __('site.post_pending_review'),
             'awaiting_marketplace' => __('site.post_awaiting_marketplace'),
             'rejected'             => __('site.post_rejected', ['reason' => $post->review_reason]),
             default                => __('site.post_held'),

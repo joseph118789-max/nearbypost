@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin\Auth;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\RateLimiter;
 
 class LoginController extends Controller
 {
@@ -20,10 +21,31 @@ class LoginController extends Controller
             'password' => ['required'],
         ]);
 
+        // This form had no limit of any kind on it. Unlimited guesses against a
+        // publicly reachable login is what turns any weak password into an open
+        // door, and this account can publish and un-publish the whole site.
+        //
+        // Keyed on the address and the account together, so neither one machine
+        // grinding through passwords nor many machines against one account gets
+        // an unlimited run.
+        $key = 'admin-login:' . sha1(mb_strtolower($credentials['email']) . '|' . $request->ip());
+
+        if (RateLimiter::tooManyAttempts($key, 5)) {
+            $seconds = RateLimiter::availableIn($key);
+
+            return back()->withErrors([
+                'email' => "Too many attempts. Try again in {$seconds} seconds.",
+            ])->onlyInput('email');
+        }
+
         if (Auth::guard('admin')->attempt($credentials, $request->boolean('remember'))) {
+            RateLimiter::clear($key);
             $request->session()->regenerate();
+
             return redirect()->intended(route('admin.dashboard'));
         }
+
+        RateLimiter::hit($key, 900);
 
         return back()->withErrors([
             'email' => 'The provided credentials do not match our records.',

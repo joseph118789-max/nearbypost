@@ -112,6 +112,8 @@ return [
 
     // Apa yang berlaku
     'state_published'       => 'Diterbitkan',
+    'state_pending_review'  => 'Dengan editor',
+    'post_pending_review'   => 'Dihantar untuk semakan. Hantaran pertama anda dibaca oleh editor sebelum disiarkan; selepas itu, hantaran anda muncul terus.',
     'state_rejected'        => 'Tidak diterbitkan',
     'state_held'            => 'Menunggu',
     'state_awaiting_marketplace' => 'Ditahan',

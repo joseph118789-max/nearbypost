@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\ContributionController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\IntelController;
 use App\Http\Controllers\Admin\NewsController;
@@ -39,5 +40,18 @@ Route::prefix("admin")->name("admin.")->group(function () {
         Route::post("/settings/wa-groups", [SettingsController::class, "saveWAGroups"])->name("settings.wa-groups.save");
 
         Route::get("/intel/analytics", [IntelController::class, "analytics"])->name("intel.analytics");
+
+        // Reader submissions waiting for a person to read them.
+        Route::get("/contributions", [ContributionController::class, "index"])->name("contributions.index");
+        Route::post("/contributions/{id}/approve", [ContributionController::class, "approve"])
+            ->whereNumber("id")->name("contributions.approve");
+        Route::post("/contributions/{id}/reject", [ContributionController::class, "reject"])
+            ->whereNumber("id")->name("contributions.reject");
+        Route::post("/contributions/{id}/unpublish", [ContributionController::class, "unpublish"])
+            ->whereNumber("id")->name("contributions.unpublish");
+        Route::delete("/contributions/{id}", [ContributionController::class, "destroy"])
+            ->whereNumber("id")->name("contributions.destroy");
+        Route::post("/contributors/{id}/untrust", [ContributionController::class, "untrust"])
+            ->whereNumber("id")->name("contributions.untrust");
     });
 });

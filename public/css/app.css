@@ -384,7 +384,8 @@ a { color: inherit; }
 }
 .post-state--published { background: #dcfce7; color: #14532d; }
 .post-state--rejected { background: #fee2e2; color: #7f1d1d; }
-.post-state--held, .post-state--awaiting_marketplace { background: #fef3c7; color: #78350f; }
+.post-state--held, .post-state--awaiting_marketplace,
+.post-state--pending_review { background: #fef3c7; color: #78350f; }
 
 .post-action { font-size: 0.78rem; font-weight: 600; color: var(--color-text-tertiary);
   background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit; text-decoration: none; }

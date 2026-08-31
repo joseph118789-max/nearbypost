@@ -40,6 +40,8 @@ class NewsItem extends Model
         "image_path",
         "review_status",
         "review_reason",
+        "approved_by",
+        "approved_at",
         "status",
         "location_label",
         "canonical_place_name",

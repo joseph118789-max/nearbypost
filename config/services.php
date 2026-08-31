@@ -47,6 +47,15 @@ return [
      |
      | ⚠ This sends the reader's IP to whoever is configured here.
      */
+    /*
+     | Reader submissions. A contributor an editor has vouched for publishes on
+     | the automatic news check alone; everyone else waits in the queue at
+     | /admin/contributions. Turn this on to queue every post from everyone.
+     */
+    'contributions' => [
+        'always_review' => (bool) env('CONTRIBUTIONS_ALWAYS_REVIEW', false),
+    ],
+
     'geoip' => [
         'enabled' => (bool) env('GEOIP_ENABLED', true),
         'url' => env('GEOIP_URL', 'https://ipwho.is/{ip}'),
