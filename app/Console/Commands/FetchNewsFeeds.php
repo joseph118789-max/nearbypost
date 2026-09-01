@@ -214,6 +214,10 @@ class FetchNewsFeeds extends Command
             return $this->fetchIndex($source);
         }
 
+        if (($source->source_kind ?? 'rss') === 'next_data') {
+            return $this->fetchNextData($source);
+        }
+
         $limit  = max(1, (int) $this->option('limit'));
         $recipe = $this->recipeOf($source);
 
@@ -250,6 +254,107 @@ class FetchNewsFeeds extends Command
             'consecutive_failures' => 0,
             'updated_at'           => now(),
         ]);
+        }
+
+        $this->line(sprintf('  %-32s %3d items', $source->name, count($items)));
+
+        return $items;
+    }
+
+    /**
+     * Read a publisher who builds their pages in the browser.
+     *
+     * A Next.js application ships the data its page is about to render inside
+     * the HTML, in a script tag called __NEXT_DATA__. For a publisher with no
+     * feed and no sitemap that block is the only structured list of what they
+     * have published - and it is served to every visitor as part of the page,
+     * so reading it is what a browser does.
+     *
+     * link_pattern names which keys inside pageProps hold articles, comma
+     * separated, because a publisher decides what to call its own sections:
+     * The Edge uses malaysiaNews and cityCountryData, and the next one will use
+     * something else.
+     */
+    private function fetchNextData(object $source): array
+    {
+        $limit = max(1, (int) $this->option('limit'));
+
+        try {
+            $response = Http::withHeaders(['User-Agent' => self::USER_AGENT])
+                ->timeout(25)
+                ->get($source->index_url);
+
+            if (!$response->successful()) {
+                return $this->recordFailure($source, 'http_' . $response->status());
+            }
+
+            if (!preg_match('#<script id="__NEXT_DATA__"[^>]*>(.*?)</script>#s', $response->body(), $m)) {
+                // The publisher has changed how their site is built. Better to
+                // say so than to return nothing and look merely quiet.
+                return $this->recordFailure($source, 'no_next_data_block');
+            }
+
+            $data = json_decode($m[1], true);
+            $props = $data['props']['pageProps'] ?? [];
+
+        } catch (\Throwable $e) {
+            Log::warning('Next data fetch failed', ['source' => $source->name, 'error' => $e->getMessage()]);
+
+            return $this->recordFailure($source, 'exception');
+        }
+
+        $keys = array_filter(array_map('trim', explode(',', (string) ($source->link_pattern ?: ''))));
+        $items = [];
+
+        foreach ($keys as $key) {
+            foreach ((array) ($props[$key] ?? []) as $row) {
+                if (!is_array($row) || empty($row['title']) || empty($row['nid'])) {
+                    continue;
+                }
+
+                $url = rtrim((string) $source->base_url, '/') . '/node/' . $row['nid'];
+
+                if ($this->isBlockedPath($url)) {
+                    continue;
+                }
+
+                // Their timestamps are milliseconds. Treating one as seconds
+                // dates the story to 1970 and the pipeline drops it as stale.
+                $created = isset($row['created']) ? (int) $row['created'] : null;
+                $published = $created
+                    ? \Carbon\Carbon::createFromTimestampMs($created)->toDateTimeString()
+                    : now()->toDateTimeString();
+
+                $items[] = [
+                    'title'         => mb_substr((string) $row['title'], 0, 250),
+                    'url'           => $url,
+                    'source'        => $this->publisherName($source),
+                    'source_label'  => $this->publisherName($source),
+                    'source_name'   => $this->publisherName($source),
+                    'source_domain' => parse_url((string) $source->base_url, PHP_URL_HOST),
+                    'summary'       => mb_substr((string) ($row['summary'] ?? ''), 0, 1000),
+                    'published_at'  => $published,
+                    'source_id'     => $source->id,
+                ];
+
+                if (count($items) >= $limit) {
+                    break 2;
+                }
+            }
+        }
+
+        if ($items === []) {
+            return $this->recordFailure($source, 'next_data_no_articles');
+        }
+
+        if (!$this->option('dry-run')) {
+            DB::table('sources')->where('id', $source->id)->update([
+                'last_fetched_at'      => now(),
+                'last_status'          => 'ok',
+                'last_item_count'      => count($items),
+                'consecutive_failures' => 0,
+                'updated_at'           => now(),
+            ]);
         }
 
         $this->line(sprintf('  %-32s %3d items', $source->name, count($items)));

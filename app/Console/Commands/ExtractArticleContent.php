@@ -475,7 +475,12 @@ if html.strip():
     out["text"] = trafilatura.extract(
         html,
         include_comments=False,
-        include_tables=False,
+        # Tables are content, not furniture, on a page that is mostly table: a
+        # Bursa filing mirrored by KLSE Screener extracted to nothing with these
+        # off and 2,505 characters with them on. Measured on ordinary articles
+        # first - The Edge and New Straits Times both returned exactly the same
+        # text either way - so this buys the filings without costing the news.
+        include_tables=True,
         favor_precision=True,
     )
     try:
