@@ -46,7 +46,7 @@ class EnrichWithAi extends Command
     protected $description = 'Enrich news items with AI: validates output, enforces controlled enums, preserves good output on retry';
 
     // ── Versioning ───────────────────────────────────────────────────────────
-    private const PROMPT_VERSION    = 'v5';
+    private const PROMPT_VERSION    = 'v6';
     private const PIPELINE_VERSION  = 'v1.0';
     private const MODEL             = 'deepseek-chat';
     private const MAX_RETRIES       = 2;
@@ -682,7 +682,7 @@ Return this exact shape:
   "rel": {"<category id>": <relevance 0-1>, ...},
   "sub": {"S<sub-category id>": <relevance 0-1>, ...},
   "summary": "2-3 sentence summary of the article",
-  "place": "the main specific location, or null if not tied to one place",
+  "place": "where the story HAPPENED, or null - see WHERE below",
   "lang": "ISO 639-1 code of the language the article is written in",
   "t": {
     "en": {"title": "headline in natural English", "summary": "summary in natural English"},
@@ -723,9 +723,41 @@ A foreign location does NOT make a story irrelevant. "Malaysians stranded by
 Nepal floods" is my = 1 and its place is Kathmandu. "Flooding at the Grand
 Canyon" is my = 0. Judge the angle, then report the place truthfully either way.
 
-GPS (g = 1) only when a specific named place is given - a town, district,
-region or street. "Kuala Lumpur" and "KL" qualify. "urban areas", "some areas"
-and "city center" without a city do not.
+WHERE - the single most important field, and the one most often got wrong.
+
+Give the place the story HAPPENED or is ABOUT. Not the place it was written,
+filed or announced from.
+
+⚠ A DATELINE IS NOT A LOCATION. Malaysian articles open with the city the
+reporter filed from - "KUALA LUMPUR:", "GEORGE TOWN:", "PUTRAJAYA:". That tells
+you where the desk is, not where the news is. A minister standing in Kuala
+Lumpur announcing a national policy, or talking about an incident in Kedah, is
+not a Kuala Lumpur story.
+
+Return null - and this will be the right answer very often - when the story has
+no particular place:
+- national policy, budgets, laws, ministry announcements that apply countrywide
+- a person profile, an interview, a career story
+- markets, currencies, commodities, company results
+- sport, unless a specific venue or town is central to what happened
+- anything where a reader would not be better served by being near it
+
+Return a place when being near it genuinely matters:
+- an incident at a location: a fire, a crash, a raid, a flood, a closure
+- something happening to one town, district or neighbourhood
+- an event, opening or disruption people would attend or be caught in
+
+Be as specific as the text allows: "Desa ParkCity, Kuala Lumpur" beats "Kuala
+Lumpur", and a district beats a state. If the story is about somewhere outside
+Malaysia, give that place - Kathmandu, Bangkok - rather than where it was filed.
+
+Ask yourself: would a reader standing in this place be more interested than a
+reader anywhere else in the country? If not, the answer is null.
+
+GPS (g = 1) only when you returned a specific named place above - a town,
+district, region or street. "Kuala Lumpur" and "KL" qualify. "urban areas",
+"some areas" and "city center" without a city do not. g = 0 whenever place is
+null.
 
 AMBIGUOUS (a = 1) when two categories are genuinely equally applicable.
 

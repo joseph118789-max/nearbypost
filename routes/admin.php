@@ -99,6 +99,7 @@ Route::prefix("admin")->name("admin.")->group(function () {
         Route::get("/sources/list", [SourceController::class, "index"])->name("sources.index");
         Route::post("/sources/publishers", [SourceController::class, "addPublisher"])->name("sources.publishers.add");
 
+        Route::get("/sources/failing", [SourceController::class, "failing"])->name("sources.failing");
         Route::get("/sources/blocked", [SourceController::class, "blocked"])->name("sources.blocked");
         Route::post("/sources/blocked", [SourceController::class, "block"])->name("sources.block");
         Route::delete("/sources/blocked/{id}", [SourceController::class, "unblock"])

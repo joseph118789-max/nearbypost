@@ -384,6 +384,12 @@ class FetchNewsFeeds extends Command
 
             $rawSummary = $this->cleanText((string) ($entry->description ?? $entry->summary ?? ''));
 
+            // Most publishers put the whole article in <content:encoded>, and
+            // it is the only copy we can get from the ones that render in the
+            // browser or refuse our crawler. Kept now; extraction takes it
+            // rather than going back out to the web.
+            $this->keepFeedText($url, (string) $title, $entry, $source);
+
             // An index of stories is not a story. Rejecting it here means it is
             // never stored, never classified and never served.
             if ($this->policy->isListingPage($title, $rawSummary)) {
@@ -430,6 +436,48 @@ class FetchNewsFeeds extends Command
      * The publisher an aggregator credits for this item, if it names one.
      * Returns ['name' => string, 'homepage' => string] or null.
      */
+    /**
+     * Store the full article text a feed item carried, if it carried one.
+     *
+     * <content:encoded> is an RSS extension in the "content" namespace, so it
+     * is not reachable as $entry->content - it has to be asked for by
+     * namespace, which is why it went unnoticed for so long.
+     */
+    private function keepFeedText(string $url, string $title, \SimpleXMLElement $entry, object $source): void
+    {
+        $encoded = '';
+
+        foreach ($entry->children('http://purl.org/rss/1.0/modules/content/') as $name => $node) {
+            if ($name === 'encoded') {
+                $encoded = (string) $node;
+                break;
+            }
+        }
+
+        // Atom puts it in <content>, in the default namespace.
+        if ($encoded === '') {
+            $encoded = (string) ($entry->content ?? '');
+        }
+
+        $text = $this->cleanText($encoded);
+
+        // Shorter than the summary we already have is not worth a row.
+        if (mb_strlen($text) < 400) {
+            return;
+        }
+
+        DB::table('feed_contents')->updateOrInsert(
+            ['url_hash' => sha1($url)],
+            [
+                'url'        => mb_substr($url, 0, 990),
+                'text'       => mb_substr($text, 0, 60000),
+                'source'     => mb_substr($source->name ?? '', 0, 250),
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
+    }
+
     private function publisherOf(\SimpleXMLElement $entry): ?array
     {
         if (!isset($entry->source)) {

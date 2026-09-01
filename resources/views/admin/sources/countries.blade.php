@@ -60,6 +60,13 @@
     </div>
   </form>
 
+  <h2>Not working</h2>
+  <p class="lede">
+    Sources whose feed has stopped answering, or whose article text never arrives &mdash; the
+    quiet failure, where stories keep appearing but are classified and located from a one-line
+    teaser. <a href="{{ route('admin.sources.failing') }}">See what is failing</a>.
+  </p>
+
   <h2>Do not visit</h2>
   <p class="lede">
     {{ $blocked }} address(es) the crawler has been told to leave alone. Deleting a junk source is

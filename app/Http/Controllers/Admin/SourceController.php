@@ -332,6 +332,50 @@ class SourceController extends Controller
             : redirect()->route('admin.sources.index', ['country' => $source->country])->with('status', $message);
     }
 
+    /**
+     * Where effort is worth spending, split by how the source is failing.
+     *
+     * A feed that stops answering is loud. A feed that answers while the
+     * article text never arrives is silent - the stories keep coming and every
+     * one is judged on a teaser - and it is the one that cost this project
+     * months, so both are shown.
+     */
+    public function failing(): View
+    {
+        $feedFailures = DB::table('sources')
+            ->where('is_active', true)
+            ->where(function ($q) {
+                $q->where('consecutive_failures', '>', 0)
+                  ->orWhere(function ($q2) {
+                      $q2->whereNotNull('last_status')->whereNotIn('last_status', ['ok']);
+                  });
+            })
+            ->orderByDesc('consecutive_failures')
+            ->get();
+
+        // Anything under 400 characters is a teaser, not an article.
+        $textFailures = DB::table('extraction_jobs as e')
+            ->join('news_items as n', 'n.id', '=', 'e.news_item_id')
+            ->where('n.published_at', '>=', now()->subDays(7))
+            ->groupBy('n.source')
+            ->havingRaw("count(*) FILTER (WHERE e.extraction_status = 'success') = 0
+                         OR avg(length(coalesce(e.extracted_text, ''))) < 400")
+            ->orderByRaw('count(*) DESC')
+            ->get([
+                DB::raw('n.source AS source'),
+                DB::raw('count(*) AS total'),
+                DB::raw("count(*) FILTER (WHERE e.extraction_status = 'success') AS ok"),
+                DB::raw("count(*) FILTER (WHERE e.extraction_status = 'fallback_used') AS fallback"),
+                DB::raw("count(*) FILTER (WHERE e.extraction_status = 'failed') AS failed"),
+                DB::raw("round(avg(length(coalesce(e.extracted_text, ''))))::int AS avg_chars"),
+            ]);
+
+        return view('admin.sources.failing', [
+            'feedFailures' => $feedFailures,
+            'textFailures' => $textFailures,
+        ]);
+    }
+
     /** The do-not-visit list. */
     public function blocked(): View
     {

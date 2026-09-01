@@ -40,28 +40,28 @@ class DocumentSources extends Command
 
         'Malay Mail' => [
             'expect' => 'General Malaysian news in English, strong on Klang Valley crime, courts and city government - the kind of story Near Me depends on.',
-            'extract' => 'The RSS feed itself is fine. Article pages are NOT: they answer an identified crawler with 403, so full text cannot be read and the story falls back to headline-only classification per spec 3.6.',
-            'tech' => 'The 403 is the open question on this source. Working around it means presenting as a browser, which is the owner\'s decision to make and has not been made. Timestamps are labelled +0800 correctly.',
+            'extract' => 'Read from <content:encoded> in the RSS feed, NOT from the article page. The extractor takes the feed copy first and only falls back to fetching the page. SOLVED 2026-09-01: the article pages answer our crawler with 403, but the FEED hands over the whole article anyway - 9,500 characters of the very article whose page refuses us. No user-agent games were needed, and none should be added.',
+            'tech' => 'The 403 is no longer a problem and must not be worked around: the feed gives the full text without asking the publisher for anything they have not already published. Timestamps are labelled +0800 correctly, unlike Berita Harian and Harian Metro.',
             'interval' => 15,
         ],
 
         'New Straits Times' => [
             'expect' => 'General and national news in English, high volume, good coverage of government announcements and the courts.',
-            'extract' => 'RSS for discovery, trafilatura on the article page for the body. Both work.',
-            'tech' => 'The site is Next.js and carries the full article in embedded JSON, which is a better source than the rendered HTML if extraction ever degrades. Not currently used.',
+            'extract' => 'Read from <content:encoded> in the RSS feed, NOT from the article page. The extractor takes the feed copy first and only falls back to fetching the page. The article page is useless here: nst.com.my renders its articles in the browser, so the HTML we download contains no prose at all and trafilatura returns about 800 characters of navigation menu - long enough to be stored as a success. The feed carries the whole article, up to 15,000 characters.',
+            'tech' => 'Server HTML has ZERO prose paragraphs - checked. Its JSON-LD block carries only the headline and a 216-character description, no articleBody. Anything that reads the page will get menus. Read the feed.',
             'interval' => 15,
         ],
 
         'Berita Harian' => [
             'expect' => 'General news in Malay. Feeds the Malay reading language directly and, through translation, the other two.',
-            'extract' => 'Standard RSS and article pages; extraction is reliable.',
+            'extract' => 'Read from <content:encoded> in the RSS feed, NOT from the article page. The extractor takes the feed copy first and only falls back to fetching the page. Berita Harian renders in the browser and its pages answer 403 in any case, so the feed is the only copy obtainable. It carries around 2,500 characters per article.',
             'tech' => 'DANGEROUS TIMESTAMPS. It stamps Malaysian local time but labels the offset +0000, putting every story 8 hours in the future - enough to outrank real breaking news for ever. Judged per timestamp in FetchNewsFeeds::normalisePublishedAt(), never per publisher by name, because Malay Mail labels the same field correctly.',
             'interval' => 15,
         ],
 
         'Harian Metro' => [
             'expect' => 'Popular Malay-language news: crime, human interest, local incidents. Reliable volume.',
-            'extract' => 'Standard RSS and article pages.',
+            'extract' => 'Read from <content:encoded> in the RSS feed, NOT from the article page. The extractor takes the feed copy first and only falls back to fetching the page. Harian Metro renders in the browser - the downloaded page has no prose in it - so the feed is the only copy. Around 2,600 characters per article.',
             'tech' => 'Same future-dated timestamp fault as Berita Harian: local time labelled +0000. Handled per timestamp, not per publisher.',
             'interval' => 15,
         ],

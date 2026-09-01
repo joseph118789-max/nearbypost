@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\NewsItem;
 use App\Models\ExtractionJob;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
@@ -59,8 +60,16 @@ class ExtractArticleContent extends Command
         ]);
 
         try {
-            // Try trafilatura first
-            $extracted = $this->extractWithTrafilatura($item->url);
+            // The feed's own copy first. Trafilatura does not fail loudly on a
+            // page whose article is rendered in the browser - it returns the
+            // navigation menu, which is long enough to pass for an article and
+            // be stored as a success. Preferring the network would mean
+            // preferring that menu over the real text we already hold.
+            $extracted = $this->fromFeed($item);
+
+            if ($extracted === null) {
+                $extracted = $this->extractWithTrafilatura($item->url);
+            }
 
             if ($extracted && !empty($extracted['text'])) {
                 // Prefer the article's own publication time over whatever the
@@ -74,11 +83,11 @@ class ExtractArticleContent extends Command
                     'extracted_summary' => $extracted['summary'] ?? $item->summary,
                     'extracted_text' => $extracted['text'],
                     'extraction_status' => 'success',
-                    'extraction_method' => 'trafilatura',
+                    'extraction_method' => $extracted['method'] ?? 'trafilatura',
                     'extracted_at' => now(),
                 ]);
                 $item->update(['status' => 'active']);
-                $this->info("✓ Extracted (trafilatura): {$item->id}");
+                $this->info("✓ Extracted ({$extracted['method']}): {$item->id}");
             } else {
                 $this->useFallback($item, $job);
             }
@@ -111,6 +120,34 @@ class ExtractArticleContent extends Command
      * The HTML goes to trafilatura over stdin, so the URL never reaches a shell
      * command at all.
      */
+    /**
+     * The article as the feed published it, if it did.
+     *
+     * Most publishers put the whole thing in <content:encoded>, and for the
+     * ones that render in the browser or refuse our crawler it is the only copy
+     * obtainable at all. The row is consumed here: it exists to carry the text
+     * from the fetch to this step, and keeping it afterwards would only grow a
+     * second copy of the archive.
+     */
+    private function fromFeed(NewsItem $item): ?array
+    {
+        $row = DB::table('feed_contents')->where('url_hash', sha1((string) $item->url))->first();
+
+        if (!$row || mb_strlen((string) $row->text) < self::MIN_EXTRACT_CHARS) {
+            return null;
+        }
+
+        DB::table('feed_contents')->where('id', $row->id)->delete();
+
+        return [
+            'title'   => $item->title,
+            'text'    => $row->text,
+            'summary' => mb_substr($row->text, 0, 500),
+            'date'    => null,
+            'method'  => 'feed_content',
+        ];
+    }
+
     private function extractWithTrafilatura(string $url): ?array
     {
         try {
