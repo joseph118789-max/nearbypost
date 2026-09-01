@@ -224,6 +224,14 @@ main { max-width: 720px; margin: 0 auto; padding: 14px; }
 
 .peek {
   width: min(560px, calc(100vw - 28px));
+  /* The reset at the top of this file sets margin: 0 on everything, which
+     includes the margin: auto a browser gives a modal dialog to centre it. On a
+     phone the box is nearly the full width so nobody noticed; on a desktop it
+     sat in the top-left corner. */
+  margin: auto;
+  /* A long summary scrolls inside the box rather than running off the screen
+     and taking the buttons with it. */
+  max-height: calc(100vh - 40px); overflow-y: auto;
   border: 0; border-radius: 18px; padding: 20px;
   background: var(--paper); color: var(--ink);
   box-shadow: 0 24px 60px rgba(16, 32, 26, 0.28);
