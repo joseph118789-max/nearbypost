@@ -43,6 +43,7 @@ class EnrichWithAi extends Command
     protected $signature = 'ingest:enrich
         {--news_item_id= : Process a specific news item}
         {--force : Re-process even if already processed}
+        {--stale : Re-judge stories last judged under an older prompt}
         {--limit=50 : Number of items to process per run}';
 
     protected $description = 'Enrich news items with AI: validates output, enforces controlled enums, preserves good output on retry';
@@ -95,7 +96,9 @@ class EnrichWithAi extends Command
             return 1;
         }
 
-        $force       = $this->option('force');
+        // --stale means re-judge, so it carries its own permission: without
+        // this the guard would refuse every item the option just selected.
+        $force       = $this->option('force') || $this->option('stale');
         $newsItemId  = $this->option('news_item_id');
 
         // Prioritize items that are known to need processing (ai_status = pending)
@@ -114,6 +117,28 @@ class EnrichWithAi extends Command
                   ->whereDoesntHave('aiProcessingJob', function ($q2) {
                       $q2->where('ai_status', 'success');
                   });
+        }
+
+        // ── --stale: everything the current prompt has never seen ──────────
+        //
+        // A normal run deliberately refuses to re-send a story that already
+        // succeeded, which is right: it stops a scheduled job quietly spending
+        // money re-deciding settled questions. But it also means a prompt fix
+        // only ever reaches new stories, and the archive keeps whatever the old
+        // prompt decided - which is how a dateline fix landed while 96% of the
+        // live feed went on showing national stories as news near Kuala Lumpur.
+        //
+        // So there is a deliberate way to say "apply the new rules to the old
+        // stories", separate from the scheduled run and never used by it.
+        // Newest first, so a limited batch spends itself on what readers can
+        // actually see.
+        if ($this->option('stale')) {
+            $query = NewsItem::whereHas('extractionJob', function ($q) {
+                $q->whereIn('extraction_status', ['success', 'fallback_used']);
+            })->whereHas('aiProcessingJob', function ($q) {
+                $q->where('ai_status', 'success')
+                   ->where('prompt_version', '!=', self::PROMPT_VERSION);
+            });
         }
 
         $limit = (int) ($this->option('limit') ?: 50);
