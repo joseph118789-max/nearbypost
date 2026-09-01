@@ -94,6 +94,7 @@ Route::prefix("admin")->name("admin.")->group(function () {
         Route::get("/brain", [BrainController::class, "index"])->name("brain.index");
         Route::get("/brain/prompt", [BrainController::class, "prompt"])->name("brain.prompt");
 
+        Route::get("/brain/daily", [BrainController::class, "daily"])->name("brain.daily");
         Route::get("/brain/spend", [BrainController::class, "spend"])->name("brain.spend");
         Route::post("/brain/spend/refresh", [BrainController::class, "refreshBalance"])->name("brain.spend.refresh");
 

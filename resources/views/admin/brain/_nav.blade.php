@@ -18,6 +18,7 @@
   <span class="navgroup"><b>1</b> Acquisition</span>
   <span class="navlinks">
     <a href="{{ route('admin.sources.countries') }}" class="{{ request()->routeIs('admin.sources.*') ? 'on' : '' }}">Sources</a>
+    <a href="{{ route('admin.brain.daily') }}" class="{{ request()->routeIs('admin.brain.daily') ? 'on' : '' }}">Daily report</a>
   </span>
 
   <span class="navgroup"><b>2</b> Processing</span>

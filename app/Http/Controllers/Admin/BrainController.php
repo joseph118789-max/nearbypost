@@ -166,6 +166,94 @@ class BrainController extends Controller
     }
 
     /**
+     * What each source delivered, day by day.
+     *
+     * A source that stops is silent: the feed keeps filling from everything
+     * else and the site looks fine. So the report leads with what has gone
+     * quiet rather than with the total, which is the number that hides it.
+     */
+    public function daily(): View
+    {
+        $days = [];
+
+        for ($i = 13; $i >= 0; $i--) {
+            $days[] = now()->subDays($i)->toDateString();
+        }
+
+        // A publisher's sections count as that publisher delivering.
+        $stats = DB::table('source_daily_stats as s')
+            ->join('sources as src', 'src.id', '=', 's.source_id')
+            ->where('s.day', '>=', $days[0])
+            ->selectRaw("coalesce(src.parent_source_id, src.id) as root_id,
+                         to_char(s.day, 'YYYY-MM-DD') as day,
+                         sum(s.items_new) as n")
+            ->groupBy('root_id', 'day')
+            ->get();
+
+        $roots = DB::table('sources')
+            ->whereNull('parent_source_id')
+            ->get(['id', 'name', 'is_active', 'last_fetched_at'])
+            ->keyBy('id');
+
+        $rows = [];
+        $totals = [];
+
+        foreach ($stats as $stat) {
+            $id = (int) $stat->root_id;
+
+            if (!isset($roots[$id])) {
+                continue;
+            }
+
+            $rows[$id] ??= [
+                'id'        => $id,
+                'name'      => $roots[$id]->name,
+                'is_active' => $roots[$id]->is_active,
+                'by_day'    => [],
+                'total'     => 0,
+                'quiet'     => false,
+            ];
+
+            $rows[$id]['by_day'][$stat->day] = (int) $stat->n;
+            $rows[$id]['total'] += (int) $stat->n;
+            $totals[$stat->day] = ($totals[$stat->day] ?? 0) + (int) $stat->n;
+        }
+
+        // Delivered nothing today, having averaged something over the week.
+        $today = now()->toDateString();
+        $quiet = [];
+
+        foreach ($rows as $id => $row) {
+            $week = 0;
+
+            foreach (array_slice($days, -8, 7) as $d) {
+                $week += $row['by_day'][$d] ?? 0;
+            }
+
+            $perDay = (int) round($week / 7);
+
+            if (($row['by_day'][$today] ?? 0) === 0 && $perDay > 0 && $roots[$id]->is_active) {
+                $rows[$id]['quiet'] = true;
+                $quiet[] = (object) [
+                    'id'              => $id,
+                    'name'            => $row['name'],
+                    'per_day'         => $perDay,
+                    'last_fetched_at' => $roots[$id]->last_fetched_at,
+                ];
+            }
+        }
+
+        usort($rows, fn ($a, $b) => $b['total'] <=> $a['total']);
+
+        return view('admin.brain.daily', [
+            'days'   => $days,
+            'rows'   => $rows,
+            'totals' => $totals,
+            'quiet'  => collect($quiet)->sortByDesc('per_day')->values(),
+        ]);
+    }
+
+    /**
      * What is left to spend, and what it went on.
      */
     public function spend(AiSpend $spend): View
