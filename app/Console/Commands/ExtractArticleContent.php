@@ -144,8 +144,12 @@ class ExtractArticleContent extends Command
             // theirs, and refusing it loses the outlet altogether - the point
             // of teaser_ok is that it is published as written and never
             // expanded, so its shortness costs nothing but length.
+            // ⛔ No exception for a teaser any more. teaser_ok let a few hundred
+            // characters through as though they were a story, and a few hundred
+            // characters cannot be summarised or located - there is nothing in
+            // them to process. Every one had to be deleted afterwards, and the
+            // model calls spent on them were spent on nothing.
             if ($extracted !== null
-                && $strategy !== 'teaser_ok'
                 && mb_strlen((string) ($extracted['text'] ?? '')) < self::MIN_USABLE_CHARS) {
                 // 'failed' rather than a new status: the table has a check
                 // constraint listing the four it accepts, and inventing a fifth
