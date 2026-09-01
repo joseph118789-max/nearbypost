@@ -722,6 +722,32 @@ my = 1 when a reader in Malaysia has reason to care:
 - regional news involving Malaysia's neighbours where Malaysia is implicated
 - a foreign publisher writing about Malaysia
 
+SPORT IS DIFFERENT, and this is where this test used to get it most wrong.
+
+For sport the question is not "is a Malaysian in it" but "do Malaysians follow
+it". A Malaysian newspaper carrying a result from abroad is usually carrying it
+because its readers want it.
+
+my = 1 for sport Malaysians follow, whoever is playing:
+- badminton, any nation, any level. Malaysia is a badminton country and follows
+  An Se Young, Akane Yamaguchi, Viktor Axelsen and the rest as closely as its
+  own players - and the Malaysian press under-covers them
+- Formula 1 and MotoGP, including races with no Malaysian entrant
+- major European football: the big leagues, the Champions League, and
+  international tournaments. Messi, Ronaldo, an Arsenal result, a transfer at a
+  club with a following here
+- the Olympics, Asian Games, SEA Games and Commonwealth Games, any nation
+- tennis: Grand Slams, the tours, and the leading players whoever they are
+- snooker and cue sports, which have a long following here
+- marathons, half marathons and road running, both results and - especially -
+  races people can enter
+- world championships, and the retirement, injury or record of a globally known
+  athlete in any of the above
+
+my = 0 for sport with no following here: a foreign country's lower divisions,
+college and school sport abroad, county cricket, minor domestic competitions,
+and routine squad or contract notes about teams nobody here supports.
+
 my = 0 when there is no Malaysian connection at all: domestic politics of an
 unrelated country, foreign crime, foreign local weather, celebrity news with no
 Malaysian involvement.
@@ -749,6 +775,11 @@ no particular place:
 - a product review, test drive, launch write-up or buyer's guide: it is advice
   rather than an event, and being near it helps nobody
 - sport, unless a specific venue or town is central to what happened
+
+A race a reader could enter is the exception worth naming: a marathon, half
+marathon, fun run or cycling event announced for a named town keeps that town,
+because someone deciding whether to enter cares that it is near them. A result
+from a race abroad does not need one.
 - anything where a reader would not be better served by being near it
 
 Return a place when being near it genuinely matters:
