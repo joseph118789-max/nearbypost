@@ -1,20 +1,53 @@
 <style>
-  .brainnav { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 20px; }
+  /* A row per stage: the stage name in its own column, its pages beside it.
+     Flowed into one wrapping line, "3 · published" ended up at the start of a
+     second row detached from the pills it labels. */
+  .brainnav {
+    display:grid; grid-template-columns:max-content 1fr;
+    align-items:center; gap:8px 14px; margin:0 0 22px;
+    padding:14px 16px; background:#fff; border:1px solid #e2edf6; border-radius:16px;
+  }
+  .brainnav .home {
+    grid-column:1 / -1; justify-self:start;
+    padding:7px 15px; border-radius:20px; font-size:0.84rem; text-decoration:none;
+    background:#f2f7fb; border:1px solid #e2edf6; color:#1f5679; font-weight:600;
+  }
+  .brainnav .home.on { background:#1c5a7f; border-color:#1c5a7f; color:#fff; }
+
+  .brainnav .navgroup {
+    display:flex; align-items:center; gap:7px; white-space:nowrap;
+    font-size:0.7rem; text-transform:uppercase; letter-spacing:0.08em;
+    color:#8aa4b8; font-weight:600;
+  }
+  .brainnav .navgroup b {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:19px; height:19px; border-radius:50%;
+    background:#e6eff6; color:#1c5a7f; font-size:0.68rem; font-weight:700;
+  }
+
+  .brainnav .navlinks { display:flex; flex-wrap:wrap; gap:6px; }
   .brainnav a {
+    padding:7px 13px; border-radius:20px; font-size:0.84rem; text-decoration:none;
+    background:#fff; border:1px solid #e2edf6; color:#1f5679; white-space:nowrap;
+  }
+  .brainnav a:hover { border-color:#9fc4dc; }
+  .brainnav a.on { background:#1c5a7f; border-color:#1c5a7f; color:#fff; font-weight:600; }
+
+  /* On a phone the label sits above its row rather than squeezing the pills
+     into a column two words wide. */
+  @media (max-width:700px) {
+    .brainnav { grid-template-columns:1fr; gap:4px; padding:12px; }
+    .brainnav .navgroup { margin-top:8px; }
+  }
+
+  /* A plain row of pills, for toggles that are not the section nav - the nav
+     is a grid and would lay two choices out as two columns. */
+  .pillrow { display:flex; flex-wrap:wrap; gap:6px; }
+  .pillrow a {
     padding:7px 13px; border-radius:20px; font-size:0.84rem; text-decoration:none;
     background:#fff; border:1px solid #e2edf6; color:#1f5679;
   }
-  .brainnav a.on { background:#1c5a7f; border-color:#1c5a7f; color:#fff; font-weight:600; }
-  .brainnav a:hover { border-color:#9fc4dc; }
-  /* A quiet label rather than a divider: ten pills in a row is a wall, and the
-     grouping is the argument this section makes. */
-  .brainnav .navgroup {
-    font-size:0.66rem; text-transform:uppercase; letter-spacing:0.09em; color:#9db4c5;
-    align-self:center; padding-left:10px; margin-left:2px; border-left:1px solid #e2edf6;
-  }
-  @media (max-width:700px) {
-    .brainnav .navgroup { flex-basis:100%; border-left:0; padding-left:0; margin:6px 0 0; }
-  }
+  .pillrow a.on { background:#1c5a7f; border-color:#1c5a7f; color:#fff; font-weight:600; }
 
   .card { background:#fff; border:1px solid #e2edf6; border-radius:18px; padding:18px 20px; margin-bottom:14px; }
 

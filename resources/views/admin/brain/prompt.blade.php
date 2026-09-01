@@ -30,7 +30,7 @@
       A gathered story and a reader's post arrive differently and are checked differently at the
       door. Past that door they meet the same house rules.
     </p>
-    <div class="brainnav" style="margin:0;">
+    <div class="pillrow">
       <a href="{{ route('admin.brain.prompt', ['for' => 'scraper'] + ($story ? ['news_item_id' => $story->id] : [])) }}"
          class="{{ $for === 'scraper' ? 'on' : '' }}">Official &mdash; a gathered story</a>
       <a href="{{ route('admin.brain.prompt', ['for' => 'contributor']) }}"
