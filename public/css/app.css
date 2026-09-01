@@ -273,6 +273,28 @@ main { max-width: 720px; margin: 0 auto; padding: 14px; }
 
 h1 { font-size: 1.35rem; line-height: 1.25; margin-bottom: 6px; text-wrap: balance; }
 
+/* Who wrote it, on the bar rather than behind the toggle. Quieter than the
+   topic pickers because most readers want everything and should not have to
+   decide before they can read anything. */
+/* The bar is a grid, not a flex row, so this needs a grid instruction to
+   claim a line of its own. Sharing one with the place field squeezed
+   "Kuala Lumpur" down to "Kuala", which tells a reader neither where they
+   are nor what they can change. */
+.sourcepick { grid-column: 1 / -1; display: flex; gap: 6px; margin-top: 2px; }
+.sourcepick label {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  min-height: 34px; padding: 4px 10px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--paper);
+  font-size: 0.82rem; color: var(--ink-soft); cursor: pointer;
+}
+.sourcepick label.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.sourcepick input { position: absolute; opacity: 0; pointer-events: none; }
+.sourcepick label:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Its own line at every width. Sharing the bar with the place field and the
+   topic picker squeezed "Kuala Lumpur" down to "Kuala Lum", which tells a
+   reader neither where they are nor what they can change. */
+@media (min-width: 700px) { .sourcepick label { flex: 0 0 auto; min-width: 88px; } }
+
 /* The page a forwarded link lands on. Someone arriving here has no idea what
    this site is, so the two ways onward - the publisher, or the rest of the feed
    - are the loudest things under the story. */

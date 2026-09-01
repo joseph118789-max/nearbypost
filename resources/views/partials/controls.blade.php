@@ -9,7 +9,9 @@
      forgotten, while the place and the topic are what people reach for. One
      GET form, one submit button, no JavaScript required. --}}
 @php
-  $hasAdvanced = ($radius ?? null) !== 20 || ($days ?? null) !== 7 || !empty($source);
+  // Source is no longer in there, so a source choice must not spring the panel
+  // open on every page load.
+  $hasAdvanced = ($radius ?? null) !== 20 || ($days ?? null) !== 7;
 @endphp
 
 <form class="controls" method="get" id="feed-controls"
@@ -55,19 +57,22 @@
           @endforeach
         </div>
 
-        <p class="adv-label">{{ __('site.source') }}</p>
-        <div class="segmented">
-          @foreach(['' => __('site.all'), 'official' => __('site.official'), 'unofficial' => __('site.unofficial')] as $value => $label)
-            <label class="{{ (string) ($source ?? '') === (string) $value ? 'on' : '' }}">
-              <input type="radio" name="source" value="{{ $value }}" {{ (string) ($source ?? '') === (string) $value ? 'checked' : '' }}>
-              <span>{{ $label }}</span>
-            </label>
-          @endforeach
-        </div>
-
         <button class="go wide" type="submit">{{ __('site.show_news_here') }}</button>
       </div>
     </details>
+
+    {{-- Out in the open, not behind the toggle. Radius and time range are set
+         once and forgotten; who wrote the story is a question a reader asks
+         while reading, and it is how they learn that some of this was sent in
+         by their neighbours. --}}
+    <div class="sourcepick" role="group" aria-label="{{ __('site.source') }}">
+      @foreach(['' => __('site.all'), 'official' => __('site.official'), 'unofficial' => __('site.unofficial')] as $value => $label)
+        <label class="{{ (string) ($source ?? '') === (string) $value ? 'on' : '' }}">
+          <input type="radio" name="source" value="{{ $value }}" {{ (string) ($source ?? '') === (string) $value ? 'checked' : '' }}>
+          <span>{{ $label }}</span>
+        </label>
+      @endforeach
+    </div>
 
     {{-- Their own line, so each is wide enough to read. --}}
     <div class="picks">
@@ -121,5 +126,12 @@
     if (sub) {
       sub.addEventListener('change', function () { form.submit(); });
     }
+
+    // Same as the topic pickers: choosing applies it. Leaving a chosen filter
+    // sitting unapplied next to a list it does not describe is worse than
+    // having no filter at all.
+    form.querySelectorAll('.sourcepick input[type=radio]').forEach(function (radio) {
+      radio.addEventListener('change', function () { form.submit(); });
+    });
   })();
 </script>
