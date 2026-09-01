@@ -2,6 +2,7 @@
 @section('title', 'Removed')
 @push('styles')
 @include('admin.sources._styles')
+@include('admin.brain._styles')
 <style>
   .rem { background:#fff;border:1px solid #e2edf6;border-radius:16px;padding:14px 18px;margin-bottom:9px; }
   .rem .t { font-size:0.9rem;font-weight:600;line-height:1.4; }
@@ -15,6 +16,8 @@
 
 @section('content')
 <div class="srcpage">
+  @include('admin.brain._nav')
+
   <h1>Removed</h1>
   <p class="lede">
     Every story taken off the site, and the reason given. One removal is an incident; enough of

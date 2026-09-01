@@ -2,6 +2,7 @@
 @section('title', $case->title)
 @push('styles')
 @include('admin.sources._styles')
+@include('admin.brain._styles')
 <style>
   .places { width:100%;border-collapse:collapse;background:#fff;border:1px solid #e2edf6;
             border-radius:18px;overflow:hidden;font-size:0.85rem;margin-bottom:14px; }
@@ -17,6 +18,8 @@
 
 @section('content')
 <div class="srcpage">
+  @include('admin.brain._nav')
+
   <a class="back" href="{{ route('admin.cases.index') }}">&larr; Case studies</a>
 
   <h1>{{ $case->title }}</h1>

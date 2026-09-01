@@ -4,10 +4,13 @@
 
 @push('styles')
 @include('admin.sources._styles')
+@include('admin.brain._styles')
 @endpush
 
 @section('content')
 <div class="srcpage">
+  @include('admin.brain._nav')
+
   <a class="back" href="{{ route('admin.sources.index') }}">&larr; All publishers</a>
 
   <h1>{{ $root->name }}</h1>

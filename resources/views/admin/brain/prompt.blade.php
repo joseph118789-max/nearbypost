@@ -9,6 +9,8 @@
 
 @section('content')
 <div class="srcpage">
+  @include('admin.brain._nav')
+
   <h1>The prompt</h1>
   <p class="lede">
     Word for word, what the AI is sent for one story. Built by the same code the pipeline uses, so
@@ -18,8 +20,6 @@
     Each part says who can change it. When an answer looks wrong, that is usually the question worth
     asking first.
   </p>
-
-  @include('admin.brain._nav')
 
   <div class="card">
     <h2>Which story?</h2>

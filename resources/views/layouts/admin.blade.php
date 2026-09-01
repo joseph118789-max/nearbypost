@@ -21,16 +21,12 @@
                          something you have to remember the address of. --}}
                     <a href="{{ route('admin.contributions.index') }}"
                        style="font-size:0.85rem;color:#1f5679;text-decoration:none;">News &mdash; official &amp; unofficial</a>
-                    <a href="{{ route('admin.sources.index') }}"
-                       style="font-size:0.85rem;color:#1f5679;text-decoration:none;">Sources</a>
-                    <a href="{{ route('admin.rules.index') }}"
-                       style="font-size:0.85rem;color:#1f5679;text-decoration:none;">Rules</a>
-                    <a href="{{ route('admin.cases.index') }}"
-                       style="font-size:0.85rem;color:#1f5679;text-decoration:none;">Case studies</a>
+                    {{-- Sources, Rules, Case studies and Removed are inside the
+                         resource centre now. They are all the same job - teaching
+                         the AI to do its work - and two routes to each of them
+                         would hide that. --}}
                     <a href="{{ route('admin.brain.index') }}"
-                       style="font-size:0.85rem;color:#1f5679;text-decoration:none;">Resource centre</a>
-                    <a href="{{ route('admin.removals.index') }}"
-                       style="font-size:0.85rem;color:#1f5679;text-decoration:none;">Removed</a>
+                       style="font-size:0.85rem;color:#1f5679;text-decoration:none;font-weight:600;">Resource centre</a>
                 </div>
             </header>
             <main class="admin-content">

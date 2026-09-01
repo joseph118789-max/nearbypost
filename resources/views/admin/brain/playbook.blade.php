@@ -18,6 +18,8 @@
 
 @section('content')
 <div class="srcpage">
+  @include('admin.brain._nav')
+
   <h1>Playbook</h1>
   <p class="lede">
     How this newsroom decides. Not a list of bans &mdash; those are the
@@ -28,8 +30,6 @@
     the very next story, so change one thing at a time and run the
     <a href="{{ route('admin.brain.bench') }}">bench</a> afterwards.
   </p>
-
-  @include('admin.brain._nav')
 
   @if(session('status'))<div class="flash">{{ session('status') }}</div>@endif
   @if($errors->any())<div class="warn">{{ $errors->first() }}</div>@endif

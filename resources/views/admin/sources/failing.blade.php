@@ -2,10 +2,13 @@
 @section('title', 'Failing sources')
 @push('styles')
 @include('admin.sources._styles')
+@include('admin.brain._styles')
 @endpush
 
 @section('content')
 <div class="srcpage">
+  @include('admin.brain._nav')
+
   <a class="back" href="{{ route('admin.sources.countries') }}">&larr; Sources</a>
   <h1>Failing sources</h1>
   <p class="lede">

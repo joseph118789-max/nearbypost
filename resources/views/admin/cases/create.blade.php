@@ -2,10 +2,13 @@
 @section('title', 'Write a case study')
 @push('styles')
 @include('admin.sources._styles')
+@include('admin.brain._styles')
 @endpush
 
 @section('content')
 <div class="srcpage">
+  @include('admin.brain._nav')
+
   <a class="back" href="{{ route('admin.cases.index') }}">&larr; Case studies</a>
   <h1>Write a case study</h1>
   <p class="lede">

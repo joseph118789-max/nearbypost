@@ -2,10 +2,13 @@
 @section('title', 'Case studies')
 @push('styles')
 @include('admin.sources._styles')
+@include('admin.brain._styles')
 @endpush
 
 @section('content')
 <div class="srcpage">
+  @include('admin.brain._nav')
+
   <h1>Case studies</h1>
   <p class="lede">
     A story that is happening in many places at once &mdash; a nationwide promotion, a chain

@@ -5,6 +5,16 @@
     background:#fff; border:1px solid #e2edf6; color:#1f5679;
   }
   .brainnav a.on { background:#1c5a7f; border-color:#1c5a7f; color:#fff; font-weight:600; }
+  .brainnav a:hover { border-color:#9fc4dc; }
+  /* A quiet label rather than a divider: ten pills in a row is a wall, and the
+     grouping is the argument this section makes. */
+  .brainnav .navgroup {
+    font-size:0.66rem; text-transform:uppercase; letter-spacing:0.09em; color:#9db4c5;
+    align-self:center; padding-left:10px; margin-left:2px; border-left:1px solid #e2edf6;
+  }
+  @media (max-width:700px) {
+    .brainnav .navgroup { flex-basis:100%; border-left:0; padding-left:0; margin:6px 0 0; }
+  }
 
   .card { background:#fff; border:1px solid #e2edf6; border-radius:18px; padding:18px 20px; margin-bottom:14px; }
   .card h2 { font-size:1.02rem; color:#123c55; margin-bottom:6px; }

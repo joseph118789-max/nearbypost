@@ -61,6 +61,19 @@ class BrainController extends Controller
             'terms'        => DB::table('briefing_terms')->where('is_active', true)->count(),
             'sections'     => count($this->playbook->sections()),
             'adapters'     => Adapters::all(),
+
+            // The parts that were teaching the AI all along, from elsewhere in
+            // the panel. Counted here so the overview shows what the model
+            // knows rather than only what was built most recently.
+            'rules'        => DB::table('review_rules')->where('is_active', true)->count(),
+            'casesLive'    => DB::table('news_items')->where('origin', 'editorial')
+                                ->where('review_status', 'published')->count(),
+            'casesDraft'   => DB::table('news_items')->where('origin', 'editorial')
+                                ->where('review_status', '!=', 'published')->count(),
+            'sourcesOn'    => DB::table('sources')->where('is_active', true)->count(),
+            'sourcesNoted' => DB::table('sources')->where('is_active', true)
+                                ->whereNotNull('expect_note')->count(),
+            'removals'     => DB::table('removals')->count(),
         ]);
     }
 

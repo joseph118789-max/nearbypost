@@ -2,10 +2,13 @@
 @section('title', 'Sources by country')
 @push('styles')
 @include('admin.sources._styles')
+@include('admin.brain._styles')
 @endpush
 
 @section('content')
 <div class="srcpage">
+  @include('admin.brain._nav')
+
   <h1>Sources by country</h1>
   <p class="lede">
     Pick a country to work on its publishers. Writing this handbook is local knowledge &mdash; the

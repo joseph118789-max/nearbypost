@@ -9,14 +9,14 @@
 
 @section('content')
 <div class="srcpage">
+  @include('admin.brain._nav')
+
   <h1>Resource centre</h1>
   <p class="lede">
     Everything the AI is told, and everything that says whether it is getting it right. This is what
     a different AI would have to be handed to do the same job &mdash; so anything that lives only in
     the code, or only in somebody's head, is a thing the next model will get wrong.
   </p>
-
-  @include('admin.brain._nav')
 
   <div class="card">
     <h2>What the model is told</h2>
@@ -129,6 +129,37 @@
       <p style="margin-top:12px;">
         <a class="btn-sm" href="{{ route('admin.brain.playbook') }}">Playbook</a>
         <a class="btn-sm" href="{{ route('admin.brain.briefing') }}">Briefing</a>
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>Rules and case studies</h2>
+      <p class="sub">Sent to the AI with every article, alongside the playbook.</p>
+      <table class="tidy">
+        <tr><td>House rules in force</td><td style="text-align:right;">{{ $rules }}</td></tr>
+        <tr><td>Case studies published</td><td style="text-align:right;">{{ $casesLive }}</td></tr>
+        <tr><td>Case studies still draft</td><td style="text-align:right;" class="mini">{{ $casesDraft }} &mdash; not taught until published</td></tr>
+      </table>
+      <p style="margin-top:12px;">
+        <a class="btn-sm" href="{{ route('admin.rules.index') }}">Rules</a>
+        <a class="btn-sm" href="{{ route('admin.cases.index') }}">Case studies</a>
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>Where the news comes from</h2>
+      <p class="sub">The handbook, and the strategy the extractor obeys.</p>
+      <div class="stat"><span class="n">{{ $sourcesOn }}</span><span class="of">sources switched on</span></div>
+      <p class="mini" style="margin-top:8px;">
+        {{ $sourcesNoted }} of them have handbook notes written.
+        @if($sourcesNoted < $sourcesOn)
+          The {{ $sourcesOn - $sourcesNoted }} without notes are the ones the next person will have to
+          work out from scratch.
+        @endif
+      </p>
+      <p style="margin-top:12px;">
+        <a class="btn-sm" href="{{ route('admin.sources.countries') }}">Sources</a>
+        <a class="btn-sm" href="{{ route('admin.removals.index') }}">Removed ({{ $removals }})</a>
       </p>
     </div>
 

@@ -19,6 +19,8 @@
 
 @section('content')
 <div class="srcpage">
+  @include('admin.brain._nav')
+
   <h1>Malaysia briefing</h1>
   <p class="lede">
     What an AI trained somewhere else does not know about this country. The model running today
@@ -30,8 +32,6 @@
     “A story about the MB of Kedah is a Kedah story whatever its dateline says” is the answer. A term
     with no implication is not sent at all.
   </p>
-
-  @include('admin.brain._nav')
 
   @if(session('status'))<div class="flash">{{ session('status') }}</div>@endif
   @if($errors->any())<div class="warn">{{ $errors->first() }}</div>@endif

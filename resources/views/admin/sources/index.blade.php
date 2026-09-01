@@ -4,10 +4,13 @@
 
 @push('styles')
 @include('admin.sources._styles')
+@include('admin.brain._styles')
 @endpush
 
 @section('content')
 <div class="srcpage">
+  @include('admin.brain._nav')
+
   @if($canLeave)
     <a class="back" href="{{ route('admin.sources.countries') }}">&larr; All countries</a>
   @endif

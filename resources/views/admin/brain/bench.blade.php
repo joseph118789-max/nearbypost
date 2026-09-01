@@ -9,6 +9,8 @@
 
 @section('content')
 <div class="srcpage">
+  @include('admin.brain._nav')
+
   <h1>Bench</h1>
   <p class="lede">
     Stories with an answer a person has confirmed, so a model's accuracy is a number rather than an
@@ -18,8 +20,6 @@
     <strong>Most answers are right.</strong> The bench fills fastest by agreeing quickly and stopping
     only at what is wrong.
   </p>
-
-  @include('admin.brain._nav')
 
   @if(session('status'))<div class="flash">{{ session('status') }}</div>@endif
   @if($errors->any())<div class="warn">{{ $errors->first() }}</div>@endif

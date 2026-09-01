@@ -4,6 +4,7 @@
 
 @push('styles')
 @include('admin.sources._styles')
+@include('admin.brain._styles')
 <style>
   .rule { background:#fff;border:1px solid #e2edf6;border-radius:18px;padding:16px 18px;margin-bottom:10px; }
   .rule.off { opacity:0.55; }
@@ -19,6 +20,8 @@
 
 @section('content')
 <div class="srcpage">
+  @include('admin.brain._nav')
+
   <h1>Rules</h1>
   <p class="lede">
     What the reviewer must refuse, in your words. These are given to it with every submission and

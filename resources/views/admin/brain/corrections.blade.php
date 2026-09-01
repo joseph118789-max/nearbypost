@@ -9,6 +9,8 @@
 
 @section('content')
 <div class="srcpage">
+  @include('admin.brain._nav')
+
   <h1>Corrections</h1>
   <p class="lede">
     Every fix a person has made, kept. Not only deletions &mdash; a story in the wrong town, under
@@ -18,8 +20,6 @@
     This is the material the <a href="{{ route('admin.brain.bench') }}">bench</a> is built from and
     the evidence the next <a href="{{ route('admin.rules.index') }}">rule</a> should be written on.
   </p>
-
-  @include('admin.brain._nav')
 
   @if(session('status'))<div class="flash">{{ session('status') }}</div>@endif
 
