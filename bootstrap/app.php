@@ -20,6 +20,14 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         $middleware->trustProxies('*');
 
+        // Must run before anything asks who the visitor is. traefik overwrites
+        // X-Forwarded-For with the Cloudflare edge it is talking to, so without
+        // this every reader looks like a Cloudflare data centre - and the rate
+        // limiter buckets thousands of unrelated people together.
+        $middleware->web(prepend: [
+            \App\Http\Middleware\TrustCloudflare::class,
+        ]);
+
         // Where an unauthenticated request is sent. There are two logins on
         // this site and one global default cannot serve both: sending a guest
         // who asked for /admin to the public chooser, whose admin door leads

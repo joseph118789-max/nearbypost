@@ -1,6 +1,9 @@
 @extends('layouts.public')
 
 @section('main')
+  {{-- What this page is, for a reader arriving from a search result and for the
+       search engine that sent them. --}}
+  <h1 class="feed-title">{{ $heading }}</h1>
   <p class="lede">{{ $intro }}</p>
 
   @if(!empty($unresolved))

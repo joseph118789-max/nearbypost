@@ -355,7 +355,13 @@ class HomeController extends Controller
         // distance, so the reader is placed by their IP and the answer is
         // remembered like any other choice - one keystroke from being
         // corrected, and never consulted again once it has been.
-        $located = app(GeoIp::class)->place($request->ip(), $request->userAgent());
+        $located = app(GeoIp::class)->place(
+            $request->ip(),
+            $request->userAgent(),
+            // Cloudflare has already worked out the country; there is no reason
+            // to pay an external lookup to disagree with it.
+            $request->headers->get('CF-IPCountry')
+        );
 
         if ($located !== null) {
             Cookie::queue(self::PLACE_COOKIE, $located, 60 * 24 * 90);

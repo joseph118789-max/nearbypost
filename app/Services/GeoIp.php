@@ -56,10 +56,20 @@ class GeoIp
 
     /**
      * The reader's town or city, or null when it cannot be established.
+     *
+     * $country, where given, is Cloudflare's own two-letter answer, which
+     * arrives on every request for free. A reader it has already placed outside
+     * Malaysia needs no lookup at all: this site only ever wanted a Malaysian
+     * town, and skipping the call spares an external request and one fewer IP
+     * address handed to a third party.
      */
-    public function place(?string $ip, ?string $userAgent = null): ?string
+    public function place(?string $ip, ?string $userAgent = null, ?string $country = null): ?string
     {
         if (!config('services.geoip.enabled')) {
+            return null;
+        }
+
+        if ($country !== null && mb_strtoupper(trim($country)) !== 'MY') {
             return null;
         }
 
