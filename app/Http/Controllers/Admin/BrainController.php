@@ -166,6 +166,45 @@ class BrainController extends Controller
     }
 
     /**
+     * What each publisher permits, exposes, and costs us.
+     *
+     * Blocked and broken first: those are the rows that need a decision, and
+     * putting them under forty working sources is how they stay unmade.
+     */
+    public function constraints(): View
+    {
+        $sources = DB::table('sources')
+            ->whereNull('parent_source_id')
+            ->orderByRaw("case robots_policy when 'prohibited' then 0 when 'ai_restricted' then 1 else 2 end")
+            ->orderByRaw('case when best_route is null then 0 else 1 end')
+            ->orderByRaw('coalesce(coverage_pct, 100)')
+            ->orderBy('name')
+            ->get();
+
+        return view('admin.brain.constraints', [
+            'sources'    => $sources,
+            'unaudited'  => $sources->whereNull('audited_at')->count(),
+            'summary'    => $sources->whereNotNull('audited_at')
+                                ->groupBy('robots_policy')
+                                ->map->count()
+                                ->sortKeys()
+                                ->all(),
+            'labels'     => [
+                'permitted'     => 'permitted',
+                'ai_restricted' => 'AI restricted',
+                'prohibited'    => 'prohibited',
+                'unknown'       => 'unknown',
+            ],
+            'blurbs'     => [
+                'permitted'     => 'Nothing in their robots.txt stands against reading them.',
+                'ai_restricted' => 'They block AI crawlers by name. General reading is permitted, but the intent is plain and worth a licensing conversation.',
+                'prohibited'    => 'They forbid automated extraction in writing. Written permission is the only route.',
+                'unknown'       => 'No robots.txt was served, so nothing can be assumed either way.',
+            ],
+        ]);
+    }
+
+    /**
      * What each source delivered, day by day.
      *
      * A source that stops is silent: the feed keeps filling from everything
