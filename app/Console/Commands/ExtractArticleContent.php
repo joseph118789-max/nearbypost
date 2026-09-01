@@ -94,11 +94,16 @@ class ExtractArticleContent extends Command
 
             $extracted = null;
 
-            if ($strategy !== 'page_only') {
+            // Where the pages refuse us but the publisher's own API does not.
+            if ($strategy === 'wp_json') {
+                $extracted = $this->fromWordPressApi($item);
+            }
+
+            if ($extracted === null && $strategy !== 'page_only') {
                 $extracted = $this->fromFeed($item);
             }
 
-            if ($extracted === null && $strategy !== 'feed_only') {
+            if ($extracted === null && !in_array($strategy, ['feed_only', 'wp_json'], true)) {
                 $extracted = $this->extractWithTrafilatura($item->url);
             }
 
@@ -229,7 +234,7 @@ class ExtractArticleContent extends Command
             return null;
         }
 
-        return in_array($source->extraction_strategy, ['feed_only', 'page_only'], true)
+        return in_array($source->extraction_strategy, ['feed_only', 'page_only', 'wp_json', 'teaser_ok'], true)
             ? $source->extraction_strategy
             : null;
     }
@@ -247,6 +252,70 @@ class ExtractArticleContent extends Command
         $strip = fn (string $h) => preg_replace('/^www\./', '', mb_strtolower($h));
 
         return $strip($host) === $strip($base);
+    }
+
+    /**
+     * Ask a WordPress site for the post behind this URL.
+     *
+     * The slug is the last part of the address, which is how WordPress itself
+     * addresses a post, so no guessing is involved. One post is requested by
+     * slug rather than a page of recent ones: the story wanted may be days old
+     * by the time extraction reaches it.
+     */
+    private function fromWordPressApi(NewsItem $item): ?array
+    {
+        $path = (string) parse_url((string) $item->url, PHP_URL_PATH);
+        $slug = trim($path, '/');
+        $slug = $slug === '' ? '' : basename($slug);
+
+        if ($slug === '') {
+            return null;
+        }
+
+        $base = DB::table('sources')->where('name', $item->source)->value('base_url');
+
+        if (!$base) {
+            return null;
+        }
+
+        try {
+            $response = Http::withHeaders(['User-Agent' => self::USER_AGENT])
+                ->timeout(self::EXTRACT_TIMEOUT_SECONDS)
+                ->get(rtrim($base, '/') . '/wp-json/wp/v2/posts', ['slug' => $slug]);
+
+            if (!$response->successful()) {
+                return null;
+            }
+
+            $post = $response->json(0);
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        if (!is_array($post)) {
+            return null;
+        }
+
+        $html = (string) ($post['content']['rendered'] ?? '');
+        $text = trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5)));
+
+        if (mb_strlen($text) < self::MIN_EXTRACT_CHARS) {
+            return null;
+        }
+
+        $words = preg_split('/\s+/u', $text, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        if (count($words) > self::MAX_WORDS) {
+            $text = implode(' ', array_slice($words, 0, self::MAX_WORDS));
+        }
+
+        return [
+            'title'   => trim(html_entity_decode(strip_tags((string) ($post['title']['rendered'] ?? '')), ENT_QUOTES | ENT_HTML5)) ?: null,
+            'summary' => null,
+            'text'    => $text,
+            'date'    => $this->plausibleDate($post['date_gmt'] ?? $post['date'] ?? null),
+            'method'  => 'wp_json',
+        ];
     }
 
     private function fromFeed(NewsItem $item): ?array
@@ -439,7 +508,16 @@ PY;
         // again, and passing it on as fallback_used told the classifier it was
         // reading a story - which is how a summary came to be written from a
         // title and a location guessed from nothing.
-        $usable = $summary !== null && mb_strlen($summary) >= self::MIN_USABLE_CHARS;
+        // Some publishers will never give more than a teaser: they block
+        // automated reads of their articles and offer a short feed, which is a
+        // choice of theirs to respect rather than work around. Where an editor
+        // has said so, the teaser is accepted and published as the publisher's
+        // own words - never expanded into a summary, which is what turned a
+        // headline into invented fuel prices.
+        $teaserOk = $this->strategyFor($item) === 'teaser_ok';
+
+        $usable = $summary !== null
+            && ($teaserOk ? mb_strlen($summary) > 0 : mb_strlen($summary) >= self::MIN_USABLE_CHARS);
 
         $job->update([
             'extracted_title' => $item->title,

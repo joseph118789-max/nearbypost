@@ -55,6 +55,8 @@
     <option value="" @selected(!$strategy)>General &mdash; use the feed's text, fetch the page if it is thin</option>
     <option value="feed_only" @selected($strategy === 'feed_only')>Feed only &mdash; the whole article is already in the feed</option>
     <option value="page_only" @selected($strategy === 'page_only')>Page only &mdash; the feed carries a teaser worth ignoring</option>
+    <option value="wp_json" @selected($strategy === 'wp_json')>WordPress API &mdash; their article pages refuse us but their API does not</option>
+    <option value="teaser_ok" @selected($strategy === 'teaser_ok')>Teaser is all there is &mdash; publish their short summary as written, never expand it</option>
   </select>
 
   <label class="lbl" for="tech-{{ $s->id }}">What to look for technically</label>

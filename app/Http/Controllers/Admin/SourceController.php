@@ -264,7 +264,7 @@ class SourceController extends Controller
             'expect_note'            => ['nullable', 'string', 'max:4000'],
             'extract_note'           => ['nullable', 'string', 'max:4000'],
             'tech_note'              => ['nullable', 'string', 'max:4000'],
-            'extraction_strategy'    => ['nullable', 'string', 'in:feed_only,page_only'],
+            'extraction_strategy'    => ['nullable', 'string', 'in:feed_only,page_only,wp_json,teaser_ok'],
             'fetch_interval_minutes' => ['nullable', 'integer', 'min:5', 'max:10080'],
             'fetch_at_hour'          => ['nullable', 'integer', 'min:0', 'max:23'],
             'is_active'              => ['nullable', 'boolean'],
