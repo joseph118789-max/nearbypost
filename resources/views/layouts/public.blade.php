@@ -54,137 +54,64 @@
 </head>
 <body>
 
-<header class="header">
-  <a class="logo" href="{{ \App\Support\Loc::route('home') }}">{{ config('app.name') }}</a>
-  <nav class="header-actions" aria-label="Quick links">
-    <a class="icon-btn" href="{{ \App\Support\Loc::route('interest') }}">{{ __('site.all_news') }}</a>
+{{-- The bar is deliberately almost empty. On a phone every pixel above the
+     first headline is a pixel of news the reader cannot see, so the language
+     picker and the account are single characters wide and everything else has
+     gone. --}}
+<header class="topbar">
+  <a class="brand" href="{{ \App\Support\Loc::route('home') }}">{{ config('app.name') }}</a>
 
-    {{-- One door for both kinds of account. A reader clicking this should not
-         need to already know whether they are an administrator. --}}
+  <div class="topbar-right">
+    {{-- A <details> menu rather than a script: it opens on a phone with no
+         JavaScript, and closes when something else is tapped. --}}
+    <details class="menu lang">
+      <summary aria-label="{{ __('site.reading_language') }}">
+        @include('partials.flag')
+      </summary>
+      <div class="menu-body">
+        @foreach(\App\Support\Loc::alternatesForCurrent() as $code => $alt)
+          <a class="{{ $code === \App\Support\Loc::current() ? 'on' : '' }}"
+             href="{{ $alt['url'] }}" hreflang="{{ $alt['hreflang'] }}" lang="{{ $alt['hreflang'] }}">
+            @include('partials.flag', ['code' => $code]) {{ $alt['label'] }}
+          </a>
+        @endforeach
+      </div>
+    </details>
+
     @auth('web')
-      <a class="icon-btn" href="{{ route('contribute.index') }}">{{ __('site.my_posts') }}</a>
+      <a class="icon-link" href="{{ route('contribute.index') }}" aria-label="{{ __('site.my_posts') }}" title="{{ __('site.my_posts') }}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-5 0-9 2.5-9 5.5V21h18v-1.5c0-3-4-5.5-9-5.5Z"/></svg>
+      </a>
     @else
-      <a class="icon-btn" href="{{ route('login') }}">{{ __('site.login') }}</a>
+      <a class="icon-link" href="{{ route('login') }}" aria-label="{{ __('site.login') }}" title="{{ __('site.login') }}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-5 0-9 2.5-9 5.5V21h18v-1.5c0-3-4-5.5-9-5.5Z"/></svg>
+      </a>
     @endauth
-
-    {{-- Language switcher. Real links, so each language is crawlable and a
-         reader can share the version they read. Query parameters are kept so
-         the radius and period survive the switch. --}}
-    <div class="lang-switch" role="group" aria-label="{{ __('site.reading_language') }}">
-      @foreach(\App\Support\Loc::alternatesForCurrent() as $code => $alt)
-        <a class="lang-option {{ $code === \App\Support\Loc::current() ? 'active' : '' }}"
-           href="{{ $alt['url'] }}"
-           hreflang="{{ $alt['hreflang'] }}"
-           lang="{{ $alt['hreflang'] }}">{{ $alt['label'] }}</a>
-      @endforeach
-    </div>
-  </nav>
+  </div>
 </header>
 
-{{-- The third column exists only when something belongs in it. Rendering the
-     section first lets an empty one remove the column instead of leaving a gap
-     beside the feed. --}}
-@php $asideContent = trim($__env->yieldContent('aside')); @endphp
+<nav class="modes" aria-label="{{ __('site.sections') }}">
+  <a class="{{ ($tab ?? '') === 'nearme' ? 'on' : '' }}" href="{{ \App\Support\Loc::route('home') }}">{{ __('site.near_me') }}</a>
+  <a class="{{ ($tab ?? '') === 'interest' ? 'on' : '' }}" href="{{ \App\Support\Loc::route('interest') }}">{{ __('site.by_interest') }}</a>
+  <a class="{{ ($tab ?? '') === 'marketplace' ? 'on' : '' }}" href="{{ \App\Support\Loc::route('marketplace') }}">{{ __('site.marketplace') }}</a>
+</nav>
 
-<div class="desktop-layout {{ $asideContent === '' ? 'no-aside' : '' }}">
+@isset($windows)
+  @include('partials.controls')
+@endisset
 
-  <div class="desktop-sidebar">
-    <p class="site-tagline">{{ __('site.tagline') }}</p>
+<main id="main">
+  @yield('main')
+</main>
 
-    <nav class="desktop-nav" aria-label="{{ __('site.sections') }}">
-      <a class="desktop-nav-item {{ ($tab ?? '') === 'nearme' ? 'active' : '' }}" href="{{ \App\Support\Loc::route('home') }}">{{ __('site.near_me') }}</a>
-      <a class="desktop-nav-item {{ ($tab ?? '') === 'interest' ? 'active' : '' }}" href="{{ \App\Support\Loc::route('interest') }}">{{ __('site.by_interest') }}</a>
-      <a class="desktop-nav-item {{ ($tab ?? '') === 'marketplace' ? 'active' : '' }}" href="{{ \App\Support\Loc::route('marketplace') }}">{{ __('site.marketplace') }}</a>
-    </nav>
+<footer class="foot">
+  <a href="{{ \App\Support\Loc::route('legal', ['page' => 'terms']) }}">{{ __('site.terms') }}</a>
+  <a href="{{ \App\Support\Loc::route('legal', ['page' => 'privacy']) }}">{{ __('site.privacy') }}</a>
+  <a href="{{ \App\Support\Loc::route('legal', ['page' => 'disclaimer']) }}">{{ __('site.disclaimer') }}</a>
+  <span>&copy; {{ date('Y') }} {{ config('app.name') }}</span>
+</footer>
 
-    {{-- Controls only. The topics moved to the right column, where choosing
-         one opens its sub-topics; keeping a copy here would be the same
-         control twice again. Story radius appears only where distance is what
-         the feed is sorted by. --}}
-    @isset($windows)
-      <form class="nav-section" method="get" action="{{ \App\Support\Loc::route('home') }}">
-        <h2>{{ __('site.change_location') }}</h2>
-        <label class="visually-hidden" for="place-input">{{ __('site.town_or_city') }}</label>
-        <input class="modal-input" id="place-input" type="text" name="place"
-               value="{{ $place ?? '' }}" placeholder="e.g. Shah Alam" maxlength="120">
-        <input type="hidden" name="days" value="{{ $days }}">
-        <input type="hidden" name="radius" value="{{ $radius }}">
-        @if(!empty($source))
-          <input type="hidden" name="source" value="{{ $source }}">
-        @endif
-        {{-- A single-field form submits on Enter, and a phone keyboard offers
-             Go, so the button was the only thing removed here. --}}
-        <p class="field-hint">{{ __('site.press_enter') }}</p>
-      </form>
-
-      {{-- Who wrote it. Official is gathered by Nearbypost from news
-           publishers; Unofficial is sent in by readers. --}}
-      <section class="nav-section" aria-labelledby="nav-source">
-        <h2 id="nav-source">{{ __('site.source') }}</h2>
-        <div class="filter-chips">
-          <a class="filter-chip {{ empty($source) ? 'active' : '' }}"
-             href="{{ request()->fullUrlWithQuery(['source' => null]) }}">{{ __('site.all') }}</a>
-          <a class="filter-chip {{ ($source ?? '') === 'official' ? 'active' : '' }}"
-             href="{{ request()->fullUrlWithQuery(['source' => 'official']) }}">{{ __('site.official') }}</a>
-          <a class="filter-chip {{ ($source ?? '') === 'unofficial' ? 'active' : '' }}"
-             href="{{ request()->fullUrlWithQuery(['source' => 'unofficial']) }}">{{ __('site.unofficial') }}</a>
-        </div>
-      </section>
-
-      @if(!empty($showRadius))
-        <section class="nav-section" aria-labelledby="nav-radius">
-          <h2 id="nav-radius">{{ __('site.story_radius') }}</h2>
-          <div class="filter-chips">
-            @foreach($radii as $r)
-              <a class="filter-chip {{ $r === $radius ? 'active' : '' }}"
-                 href="{{ request()->fullUrlWithQuery(['radius' => $r]) }}">{{ $r }} km</a>
-            @endforeach
-          </div>
-        </section>
-      @endif
-
-      <section class="nav-section" aria-labelledby="nav-time">
-        <h2 id="nav-time">{{ __('site.time_range') }}</h2>
-        <div class="filter-chips">
-          @foreach($windows as $value => $label)
-            <a class="filter-chip {{ $value === $days ? 'active' : '' }}"
-               href="{{ request()->fullUrlWithQuery(['days' => $value]) }}">{{ $label }}</a>
-          @endforeach
-        </div>
-      </section>
-    @endisset
-
-
-    <div class="desktop-legal-footer">
-      <div class="legal-links">
-        <a class="legal-link" href="{{ \App\Support\Loc::route('legal', ['page' => 'terms']) }}">{{ __('site.terms') }}</a>
-        <a class="legal-link" href="{{ \App\Support\Loc::route('legal', ['page' => 'privacy']) }}">{{ __('site.privacy') }}</a>
-        <a class="legal-link" href="{{ \App\Support\Loc::route('legal', ['page' => 'disclaimer']) }}">{{ __('site.disclaimer') }}</a>
-      </div>
-      <p class="copyright">&copy; {{ date('Y') }} {{ config('app.name') }}</p>
-    </div>
-  </div>
-
-  <main class="desktop-main" id="main">
-    {{-- Section tabs repeated at the top of the content on small screens.
-         Stacked, the sidebar would otherwise put thirty navigation links above
-         the first headline. --}}
-    <nav class="mobile-tabs" aria-label="{{ __('site.sections') }}">
-      <a class="filter-chip {{ ($tab ?? '') === 'nearme' ? 'active' : '' }}" href="{{ \App\Support\Loc::route('home') }}">{{ __('site.near_me') }}</a>
-      <a class="filter-chip {{ ($tab ?? '') === 'interest' ? 'active' : '' }}" href="{{ \App\Support\Loc::route('interest') }}">{{ __('site.by_interest') }}</a>
-      <a class="filter-chip {{ ($tab ?? '') === 'marketplace' ? 'active' : '' }}" href="{{ \App\Support\Loc::route('marketplace') }}">{{ __('site.marketplace') }}</a>
-    </nav>
-
-    @yield('main')
-  </main>
-
-  @if($asideContent !== '')
-    <aside class="desktop-right" aria-label="{{ __('site.side_panel') }}">
-      {!! $asideContent !!}
-    </aside>
-  @endif
-
-</div>
+@yield('after')
 
 </body>
 </html>

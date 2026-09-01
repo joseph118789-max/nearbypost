@@ -26,6 +26,11 @@ return [
     'story_radius'   => '新闻范围',
     'time_range'     => '时间范围',
     'all'            => '全部',
+    'more_options'   => '范围、时段与来源',
+    'read_at_source' => '阅读全文',
+    'close'          => '关闭',
+    'ago'            => '前',
+    'nearby'         => '附近',
 
     'news_near'      => ':place 附近的新闻',
     'latest_news'    => '马来西亚最新新闻',

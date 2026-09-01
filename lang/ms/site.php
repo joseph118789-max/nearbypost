@@ -26,6 +26,11 @@ return [
     'story_radius'   => 'Jejari berita',
     'time_range'     => 'Julat masa',
     'all'            => 'Semua',
+    'more_options'   => 'Jejari, tempoh dan sumber',
+    'read_at_source' => 'Baca berita penuh',
+    'close'          => 'Tutup',
+    'ago'            => 'lalu',
+    'nearby'         => 'Berhampiran',
 
     'news_near'      => 'Berita berhampiran :place',
     'latest_news'    => 'Berita terkini di Malaysia',

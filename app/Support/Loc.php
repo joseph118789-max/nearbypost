@@ -52,6 +52,25 @@ class Loc
         return self::LOCALES[$locale]['label'] ?? $locale;
     }
 
+    /**
+     * A flag to stand for a reading language when there is only room for one
+     * character.
+     *
+     * Flags label countries, not languages, and this is the usual imperfect
+     * compromise: Chinese is not China, and the readers of the Chinese edition
+     * are Malaysian. It is used only as the closed state of the menu - opening
+     * it names every language in its own script, which is what a reader
+     * actually recognises.
+     */
+    public static function flag(?string $locale = null): string
+    {
+        return match ($locale ?? self::current()) {
+            'ms' => '🇲🇾',
+            'zh' => '🇨🇳',
+            default => '🇬🇧',
+        };
+    }
+
     /** The route name for a locale: unprefixed for English, prefixed otherwise. */
     public static function routeName(string $name, ?string $locale = null): string
     {

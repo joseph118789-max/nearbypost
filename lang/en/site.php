@@ -32,6 +32,11 @@ return [
     'story_radius'   => 'Story radius',
     'time_range'     => 'Time range',
     'all'            => 'All',
+    'more_options'   => 'Radius, period and source',
+    'read_at_source' => 'Read the full story',
+    'close'          => 'Close',
+    'ago'            => 'ago',
+    'nearby'         => 'Nearby',
 
     'news_near'      => 'News near :place',
     'latest_news'    => 'Latest news in Malaysia',
