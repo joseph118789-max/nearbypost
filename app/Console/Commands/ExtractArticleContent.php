@@ -15,7 +15,20 @@ class ExtractArticleContent extends Command
     protected $description = 'Extract content from news items';
 
     /** Manual V6 section 9: keep roughly the first 500 words. */
-    private const MAX_WORDS = 500;
+    /**
+     * The article is kept whole.
+     *
+     * This was 500 words, defended on the inverted pyramid: the facts are at
+     * the top. True of who and what; false of where. A village, a district or a
+     * road name usually appears in the third or fourth paragraph, so the cap
+     * removed exactly the part that answers the question this site exists to
+     * ask, and locations came back as states.
+     *
+     * The ceiling that remains is a guard against a page that is not an article
+     * at all - a forum thread, a transcript - not an editorial judgement about
+     * what matters.
+     */
+    private const MAX_WORDS = 4000;
 
     /** A page that has not answered in this long is not worth waiting for. */
     private const EXTRACT_TIMEOUT_SECONDS = 25;

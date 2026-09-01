@@ -68,13 +68,21 @@ class PromptAssembler
             $this->part('discard', 'What is not news', 'playbook', $this->playbook->block('discard')),
             $this->part('rules', 'House rules', 'rules', (new ReviewRules())->promptBlock('scraper')),
             $this->part('cases', 'Worked examples', 'cases', (new CaseStudyExamples())->promptBlock()),
-            $this->part('relevance', 'Scoring relevance', 'playbook',
-                $this->playbook->block('relevance', ['slots' => json_encode($slots)])),
+            $this->part('relevance', 'Scoring relevance', 'playbook', $this->playbook->block('relevance')),
             $this->part('malaysia_angle', 'The Malaysian angle', 'playbook', $this->playbook->block('malaysia_angle')),
             $this->part('where', 'Where a story happened', 'playbook', $this->playbook->block('where')),
             $this->part('briefing', 'Malaysia briefing', 'briefing', $this->briefing->promptBlock()),
             $this->part('reporting', 'GPS, ambiguity and sub-categories', 'playbook', $this->playbook->block('reporting')),
             $this->part('taxonomy', 'Categories and sub-categories', 'taxonomy', $this->taxonomy()),
+
+            // ── Everything above this line is identical on every call ──────
+            //
+            // Which is the whole point: an identical run of tokens at the start
+            // of a prompt is billed at roughly a tenth of the price after the
+            // first call. Anything that varies goes below, however small - one
+            // line of batch counter in the middle used to make the thirteen
+            // thousand characters after it look new every time.
+            $this->part('batch', 'This batch', 'code', $this->batch($slots)),
             $this->part('article', 'The story', 'article',
                 "Article title: {$safeTitle}\nSource: {$safeSrc}\nContent:\n{$safeText}\n"),
         ];
@@ -110,6 +118,11 @@ class PromptAssembler
     private function contract(): string
     {
         return <<<TEXT
+        Fill the fields in the order they appear. "places_named" comes before
+        "place" on purpose: list what the text actually says first, then choose
+        from your own list. Answering "place" from memory of the first line is
+        how a story about Semporna and Lahad Datu ends up filed as "Sabah".
+
         Return this exact shape:
         {
           "is_article": true or false,
@@ -121,8 +134,9 @@ class PromptAssembler
           "why": "a few words on the Malaysian angle, or why there is none",
           "rel": {"<category id>": <relevance 0-1>, ...},
           "sub": {"S<sub-category id>": <relevance 0-1>, ...},
-          "summary": "2-3 sentence summary of the article",
-          "place": "where the story HAPPENED, or null - see WHERE below",
+          "summary": "2-3 sentence summary. Where the story has a location, say it in the first sentence.",
+          "places_named": ["every place the text names, in the order it names them, however small - a village, a road, a building, a district, a town, a state. [] if none."],
+          "place": "the ONE place from places_named where the story HAPPENED, or null - see WHERE below",
           "lang": "ISO 639-1 code of the language the article is written in",
           "t": {
             "en": {"title": "headline in natural English", "summary": "summary in natural English"},
@@ -132,6 +146,20 @@ class PromptAssembler
         }
 
         TEXT;
+    }
+
+    /**
+     * The only instruction that changes between calls, kept to one line and
+     * kept at the end so it cannot break the cache above it.
+     */
+    private function batch(array $slots): string
+    {
+        if ($slots === []) {
+            return '';
+        }
+
+        return 'Remaining high-confidence slots in this batch: ' . json_encode($slots)
+             . ". If a slot is 0 you may not use that level; choose the next one down.\n";
     }
 
     private function taxonomy(): string

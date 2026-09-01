@@ -629,6 +629,12 @@ class EnrichWithAi extends Command
             'a'             => (int) ($parsed['a'] ?? 0),
             'place'         => $place,
             'relevance_mode'=> $relevanceMode,
+            // Kept so a coarse answer can be checked against what the model
+            // said the text contained, rather than argued about.
+            'places_named'  => array_slice(array_values(array_filter(
+                array_map(fn ($p) => mb_substr(trim((string) $p), 0, 120), (array) ($parsed['places_named'] ?? [])),
+                fn ($p) => $p !== ''
+            )), 0, 25),
             'is_article'    => $isArticle,
             'lat'           => $lat,
             'lng'           => $lng,
