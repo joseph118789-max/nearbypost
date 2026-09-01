@@ -11,6 +11,7 @@ use App\Services\SubCategoryTaxonomy;
 use App\Services\Classification\ContentPolicy;
 use App\Services\Contribution\CaseStudyExamples;
 use App\Services\Contribution\ReviewRules;
+use App\Services\Knowledge\PromptAssembler;
 use App\Services\Classification\CategoryScorer;
 use App\Services\Classification\BatchSlots;
 
@@ -733,191 +734,15 @@ class EnrichWithAi extends Command
 
     private function buildPrompt(string $title, string $text, string $source, array $slots = []): string
     {
-        $truncated = mb_substr($text, 0, 3000);
-        // Escape for safe embedding in prompt
-        $safeTitle = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
-        $safeSrc   = htmlspecialchars($source, ENT_QUOTES, 'UTF-8');
-        $safeText  = htmlspecialchars($truncated, ENT_NOQUOTES, 'UTF-8');
-        $taxonomy  = (new SubCategoryTaxonomy())->promptBlock();
-
-        $categoryList = (new CategoryScorer())->promptCategories();
-
-        // The newsroom's own rules, set in the panel. Empty when none apply to
-        // gathered articles, so the prompt is unchanged rather than gaining an
-        // empty heading - which a model reads as "there are no rules".
-        $houseRules = (new ReviewRules())->promptBlock('scraper');
-
-        // Cases an editor published, as precedent. A rule states the policy; a
-        // case shows a judgement this newsroom made and stood behind, which is
-        // how the awkward calls get taught - where the line falls between one
-        // chain's branches and a whole class of business, or between a policy
-        // announced in Putrajaya and a policy that happens in Putrajaya.
-        $worked = (new CaseStudyExamples())->promptBlock();
-        $subList      = (new SubCategoryTaxonomy())->promptBlockWithIds();
-        $slots        = json_encode($slots);
-
-        return <<<PROMPT
-You are an expert hyperlocal news classifier for nearbypost.com. Respond with
-ONLY valid JSON - no markdown fences, no commentary.
-
-You judge RELEVANCE. You do not choose the category: relevance is multiplied by
-each category's weight elsewhere, and the highest score wins. Do not try to
-predict that outcome.
-
-Return this exact shape:
-{
-  "is_article": true or false,
-  "d": 0 or 1,
-  "e": null or one of SPAM_DETECTED, OFF_TOPIC, INSUFFICIENT_CONTENT, INVALID_CONTENT, PAYWALL_BLOCKED, UNSUPPORTED_LANGUAGE,
-  "g": 0 or 1,
-  "a": 0 or 1,
-  "my": 0 or 1,
-  "why": "a few words on the Malaysian angle, or why there is none",
-  "rel": {"<category id>": <relevance 0-1>, ...},
-  "sub": {"S<sub-category id>": <relevance 0-1>, ...},
-  "summary": "2-3 sentence summary of the article",
-  "place": "where the story HAPPENED, or null - see WHERE below",
-  "lang": "ISO 639-1 code of the language the article is written in",
-  "t": {
-    "en": {"title": "headline in natural English", "summary": "summary in natural English"},
-    "ms": {"title": "headline in natural Malay", "summary": "summary in natural Malay"},
-    "zh": {"title": "headline in Simplified Chinese", "summary": "summary in Simplified Chinese"}
-  }
-}
-
-DISCARD (d = 1) if the item is not news: pure opinion or editorial, unconfirmed
-rumour, speculation ("might", "could", "possibly"), he-said-she-said with no
-resolution, clickbait without substance, or no actual event. Set e when a listed
-code applies. When d = 1, rel and sub may be empty.
-
-{$houseRules}
-{$worked}
-RELEVANCE
-- Include only categories with non-zero relevance. Omit the rest.
-- 1.0 is RARE: it needs a specific place, a specific action, and a verifiable
-  fact. At most one category may be 1.0.
-- At most one further category may be 0.8-0.9. All others 0.6 or below.
-- Opinion, speculation or an interview caps everything at 0.6.
-- Remaining high-confidence slots in this batch: {$slots}. If a slot is 0 you
-  may not use that level; choose the next one down.
-
-MALAYSIA ANGLE (my) - this is about relevance, NOT about location.
-
-my = 1 when a reader in Malaysia has reason to care:
-- anything in or about Malaysia, its people, government, companies or economy
-- Malaysians abroad: students, workers, tourists, teams, victims, officials
-- a foreign event with material Malaysian consequence - trade, the ringgit,
-  fuel, palm oil, tourism, aviation, regional security, an outbreak
-- regional news involving Malaysia's neighbours where Malaysia is implicated
-- a foreign publisher writing about Malaysia
-
-SPORT IS DIFFERENT, and this is where this test used to get it most wrong.
-
-For sport the question is not "is a Malaysian in it" but "do Malaysians follow
-it". A Malaysian newspaper carrying a result from abroad is usually carrying it
-because its readers want it.
-
-my = 1 for sport Malaysians follow, whoever is playing:
-- badminton, any nation, any level. Malaysia is a badminton country and follows
-  An Se Young, Akane Yamaguchi, Viktor Axelsen and the rest as closely as its
-  own players - and the Malaysian press under-covers them
-- Formula 1 and MotoGP, including races with no Malaysian entrant
-- major European football: the big leagues, the Champions League, and
-  international tournaments. Messi, Ronaldo, an Arsenal result, a transfer at a
-  club with a following here
-- the Olympics, Asian Games, SEA Games and Commonwealth Games, any nation
-- tennis: Grand Slams, the tours, and the leading players whoever they are
-- snooker and cue sports, which have a long following here
-- marathons, half marathons and road running, both results and - especially -
-  races people can enter
-- world championships, and the retirement, injury or record of a globally known
-  athlete in any of the above
-
-my = 0 for sport with no following here: a foreign country's lower divisions,
-college and school sport abroad, county cricket, minor domestic competitions,
-and routine squad or contract notes about teams nobody here supports.
-
-my = 0 when there is no Malaysian connection at all: domestic politics of an
-unrelated country, foreign crime, foreign local weather, celebrity news with no
-Malaysian involvement.
-
-A foreign location does NOT make a story irrelevant. "Malaysians stranded by
-Nepal floods" is my = 1 and its place is Kathmandu. "Flooding at the Grand
-Canyon" is my = 0. Judge the angle, then report the place truthfully either way.
-
-WHERE - the single most important field, and the one most often got wrong.
-
-Give the place the story HAPPENED or is ABOUT. Not the place it was written,
-filed or announced from.
-
-⚠ A DATELINE IS NOT A LOCATION. Malaysian articles open with the city the
-reporter filed from - "KUALA LUMPUR:", "GEORGE TOWN:", "PUTRAJAYA:". That tells
-you where the desk is, not where the news is. A minister standing in Kuala
-Lumpur announcing a national policy, or talking about an incident in Kedah, is
-not a Kuala Lumpur story.
-
-Return null - and this will be the right answer very often - when the story has
-no particular place:
-- national policy, budgets, laws, ministry announcements that apply countrywide
-- a person profile, an interview, a career story
-- markets, currencies, commodities, company results
-- a product review, test drive, launch write-up or buyer's guide: it is advice
-  rather than an event, and being near it helps nobody
-- sport, unless a specific venue or town is central to what happened
-
-A race a reader could enter is the exception worth naming: a marathon, half
-marathon, fun run or cycling event announced for a named town keeps that town,
-because someone deciding whether to enter cares that it is near them. A result
-from a race abroad does not need one.
-- anything where a reader would not be better served by being near it
-
-Return a place when being near it genuinely matters:
-- an incident at a location: a fire, a crash, a raid, a flood, a closure
-- something happening to one town, district or neighbourhood
-- an event, opening or disruption people would attend or be caught in
-
-Be as specific as the text allows: "Desa ParkCity, Kuala Lumpur" beats "Kuala
-Lumpur", and a district beats a state. If the story is about somewhere outside
-Malaysia, give that place - Kathmandu, Bangkok - rather than where it was filed.
-
-A SPEAKER'S ADDRESS IS NOT A LOCATION EITHER. When someone comments on a
-national matter, the story is not located where they work. An academic in Penang
-saying affordable housing is a national problem is a national housing story, not
-a Penang story; an industry body in Petaling Jaya calling for a policy rethink is
-not a Petaling Jaya story. Locate the event being discussed, and where there is
-no event in one place, return null.
-
-The same goes for the office that published the piece. A car review, a buyer's
-guide or a product write-up belongs to nowhere, whatever city the reviewer sat
-in.
-
-Ask yourself: would a reader standing in this place be more interested than a
-reader anywhere else in the country? If not, the answer is null.
-
-GPS (g = 1) only when you returned a specific named place above - a town,
-district, region or street. "Kuala Lumpur" and "KL" qualify. "urban areas",
-"some areas" and "city center" without a city do not. g = 0 whenever place is
-null.
-
-AMBIGUOUS (a = 1) when two categories are genuinely equally applicable.
-
-SUB-CATEGORIES: keys are the S-prefixed ids below, e.g. "S124". Never put a
-category id in "sub" - they are separate numbering systems. Give relevance for
-the sub-categories of every category you scored 0.4 or above, not only your
-favourite: the winning category is decided by weight afterwards, and if you
-supply sub-categories for one category only, the winner may have none.
-
-Categories (id: name):
-{$categoryList}
-
-Sub-categories (id: name, grouped by category):
-{$subList}
-
-Article title: {$safeTitle}
-Source: {$safeSrc}
-Content:
-{$safeText}
-PROMPT;
+        // Assembled from its parts rather than written here, so the newsroom
+        // can read and change the reasoning without a deployment - and so the
+        // prompt viewer in the panel shows the same text the model is sent
+        // rather than a reconstruction that drifts away from it.
+        //
+        // The output contract stays in the assembler's own code: the parser
+        // that reads the reply is written against those exact field names, and
+        // an editor tidying them would break classification silently.
+        return (new PromptAssembler())->build($title, $text, $source, $slots);
     }
 
     private function callDeepSeek(string $apiKey, string $prompt): array
