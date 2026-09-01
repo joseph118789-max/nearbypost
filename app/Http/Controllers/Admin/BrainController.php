@@ -74,7 +74,45 @@ class BrainController extends Controller
             'sourcesNoted' => DB::table('sources')->where('is_active', true)
                                 ->whereNotNull('expect_note')->count(),
             'removals'     => DB::table('removals')->count(),
+            'proposals'    => DB::table('bench_items')->where('proposed', true)->count(),
+
+            // Stage one, in one line: is the pipeline reading articles, or
+            // headlines? Everything downstream depends on the answer, so it
+            // belongs on the overview rather than three pages in.
+            'readFull'     => $this->reading('full'),
+            'readTeaser'   => $this->reading('teaser'),
+            'readHeld'     => $this->reading('held'),
         ]);
+    }
+
+    /**
+     * How much of an article the pipeline is actually holding.
+     *
+     * 'full'   - enough to summarise and locate from.
+     * 'teaser' - a paywalled or blocked publisher's own opening, published as
+     *            written and never expanded.
+     * 'held'   - nothing usable; served to nobody.
+     */
+    private function reading(string $bucket): int
+    {
+        $sql = "
+            select count(*) as n
+            from news_items n
+            join lateral (
+                select * from extraction_jobs x
+                where x.news_item_id = n.id order by x.id desc limit 1
+            ) e on true
+            where n.published_at > now() - interval '7 days'
+              and n.url not like '%news.google%'
+              and ";
+
+        $sql .= match ($bucket) {
+            'full'   => "e.extraction_status in ('success','fallback_used') and length(e.extracted_text) >= 600",
+            'teaser' => "e.extraction_status in ('success','fallback_used') and length(e.extracted_text) < 600",
+            default  => "e.extraction_status not in ('success','fallback_used')",
+        };
+
+        return (int) (DB::selectOne($sql)->n ?? 0);
     }
 
     /**
@@ -106,7 +144,15 @@ class BrainController extends Controller
             $story->source ?? 'The Star'
         );
 
+        // Which door: a gathered story, or a reader's post. Both end up in the
+        // same classifier; only the check at the door differs.
+        $for = $request->query('for') === 'contributor' ? 'contributor' : 'scraper';
+
         return view('admin.brain.prompt', [
+            'for'               => $for,
+            'contributorPrompt' => $for === 'contributor'
+                ? (new \App\Services\Contribution\NewsworthinessReview())->previewPrompt()
+                : '',
             'parts'   => $parts,
             'origins' => PromptAssembler::ORIGINS,
             'story'   => $story,

@@ -17,6 +17,34 @@
   }
 
   .card { background:#fff; border:1px solid #e2edf6; border-radius:18px; padding:18px 20px; margin-bottom:14px; }
+
+  /* The pipeline, said once at the top. The rest of the page only makes sense
+     against it. */
+  .pipeline { display:flex; align-items:stretch; gap:10px; flex-wrap:wrap; margin:0 0 26px; }
+  .pipeline .stage {
+    flex:1 1 210px; background:#fff; border:1px solid #e2edf6; border-radius:14px;
+    padding:12px 14px; display:flex; flex-direction:column; gap:2px;
+  }
+  .pipeline .stage .num {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:20px; height:20px; border-radius:50%; background:#1c5a7f; color:#fff;
+    font-size:0.7rem; font-weight:700; margin-bottom:4px;
+  }
+  .pipeline .stage strong { color:#123c55; font-size:0.95rem; }
+  .pipeline .stage .what { font-size:0.8rem; color:#6b8ba3; line-height:1.45; }
+  .pipeline .arrow { align-self:center; color:#9db4c5; font-size:1.2rem; }
+  @media (max-width:700px) { .pipeline .arrow { display:none; } }
+
+  .stagehead {
+    display:flex; align-items:center; gap:9px;
+    font-size:1.15rem; color:#123c55; margin:30px 0 4px;
+  }
+  .stagehead .num {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:24px; height:24px; border-radius:50%; background:#1c5a7f; color:#fff;
+    font-size:0.75rem; font-weight:700;
+  }
+  .stagelede { font-size:0.87rem; color:#5f7f9a; line-height:1.6; max-width:60rem; margin-bottom:14px; }
   .card h2 { font-size:1.02rem; color:#123c55; margin-bottom:6px; }
   .card .sub { font-size:0.83rem; color:#6b8ba3; margin-bottom:12px; }
 

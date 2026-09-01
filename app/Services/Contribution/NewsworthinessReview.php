@@ -91,6 +91,24 @@ class NewsworthinessReview
         ];
     }
 
+    /**
+     * The prompt as an editor can read it, for the panel.
+     *
+     * The same builder the review itself uses, so what is displayed is what is
+     * sent - a viewer with its own copy drifts apart from the real thing within
+     * a month.
+     */
+    public function previewPrompt(string $section = 'near'): string
+    {
+        return $this->prompt(
+            $section,
+            'Example: Burst pipe floods three shops in Taman Melawati',
+            'A water pipe burst outside the row of shops on Jalan Bandar this morning, flooding three '
+                . 'units. Traders said the water was ankle deep by 9am and the council had been called.',
+            'Taman Melawati, Kuala Lumpur'
+        );
+    }
+
     private function prompt(string $section, string $title, string $body, ?string $place): string
     {
         $categories = implode("\n", array_map(fn ($c) => '- ' . $c, $this->categoryNames()));
