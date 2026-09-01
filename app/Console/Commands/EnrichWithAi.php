@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
 use App\Services\SubCategoryTaxonomy;
 use App\Services\Classification\ContentPolicy;
+use App\Services\Contribution\ReviewRules;
 use App\Services\Classification\CategoryScorer;
 use App\Services\Classification\BatchSlots;
 
@@ -659,6 +660,11 @@ class EnrichWithAi extends Command
         $taxonomy  = (new SubCategoryTaxonomy())->promptBlock();
 
         $categoryList = (new CategoryScorer())->promptCategories();
+
+        // The newsroom's own rules, set in the panel. Empty when none apply to
+        // gathered articles, so the prompt is unchanged rather than gaining an
+        // empty heading - which a model reads as "there are no rules".
+        $houseRules = (new ReviewRules())->promptBlock('scraper');
         $subList      = (new SubCategoryTaxonomy())->promptBlockWithIds();
         $slots        = json_encode($slots);
 
@@ -696,6 +702,7 @@ rumour, speculation ("might", "could", "possibly"), he-said-she-said with no
 resolution, clickbait without substance, or no actual event. Set e when a listed
 code applies. When d = 1, rel and sub may be empty.
 
+{$houseRules}
 RELEVANCE
 - Include only categories with non-zero relevance. Omit the rest.
 - 1.0 is RARE: it needs a specific place, a specific action, and a verifiable
@@ -739,6 +746,8 @@ no particular place:
 - national policy, budgets, laws, ministry announcements that apply countrywide
 - a person profile, an interview, a career story
 - markets, currencies, commodities, company results
+- a product review, test drive, launch write-up or buyer's guide: it is advice
+  rather than an event, and being near it helps nobody
 - sport, unless a specific venue or town is central to what happened
 - anything where a reader would not be better served by being near it
 
