@@ -232,14 +232,26 @@ main { max-width: 720px; margin: 0 auto; padding: 14px; }
 .peek-meta { font-size: 0.74rem; color: var(--ink-faint); margin-bottom: 8px; }
 .peek h2 { font-size: 1.1rem; line-height: 1.35; margin-bottom: 10px; text-wrap: pretty; }
 .peek p#peek-summary { font-size: 0.95rem; line-height: 1.65; color: var(--ink-soft); }
-.peek-actions { display: flex; gap: 10px; margin-top: 18px; }
+/* Three actions do not fit across a phone. The article is what the reader
+   asked for, so it takes the full width; the page link and Close share the row
+   under it, where they are still a comfortable tap apart. */
+.peek-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
+.peek-actions #peek-link { grid-column: 1 / -1; }
 .peek-actions a, .peek-actions button {
-  flex: 1; height: var(--tap); display: inline-flex; align-items: center; justify-content: center;
+  min-height: var(--tap); display: inline-flex; align-items: center; justify-content: center;
+  padding: 8px 12px; text-align: center;
   border-radius: 12px; font: inherit; font-size: 0.9rem; font-weight: 600;
   text-decoration: none; cursor: pointer; border: 1px solid var(--line);
 }
 .peek-actions a { background: var(--accent); border-color: var(--accent); color: #fff; }
+/* The page here is a quieter offer than the article itself. */
+.peek-actions #peek-page { background: var(--paper); border-color: var(--line); color: var(--accent); }
 .peek-actions button { background: var(--paper); color: var(--ink-soft); }
+
+@media (min-width: 560px) {
+  .peek-actions { grid-template-columns: 2fr 1fr 1fr; }
+  .peek-actions #peek-link { grid-column: auto; }
+}
 
 /* ── Page furniture ─────────────────────────────────────────────────── */
 
@@ -252,6 +264,25 @@ main { max-width: 720px; margin: 0 auto; padding: 14px; }
 .foot a:hover { color: var(--accent); text-decoration: underline; }
 
 h1 { font-size: 1.35rem; line-height: 1.25; margin-bottom: 6px; text-wrap: balance; }
+
+/* The page a forwarded link lands on. Someone arriving here has no idea what
+   this site is, so the two ways onward - the publisher, or the rest of the feed
+   - are the loudest things under the story. */
+.story-page { max-width: 42rem; }
+.story-onward { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 8px; }
+.story-onward a { display: inline-block; padding: 9px 14px; border-radius: 6px;
+                  font-size: .9rem; text-decoration: none; }
+.btn-primary { background: #1e4636; color: #fff; }
+.btn-primary:hover { background: #163326; }
+.btn-quiet { background: #eef1ee; color: #1e4636; }
+.btn-quiet:hover { background: #e2e7e2; }
+.story-related { margin-top: 26px; border-top: 1px solid #e6e6e2; padding-top: 14px; }
+.story-related h2 { font-size: 1rem; margin-bottom: 8px; }
+.story-related ul { list-style: none; padding: 0; margin: 0; }
+.story-related li { padding: 7px 0; border-bottom: 1px solid #f0f0ec; }
+.story-related li:last-child { border-bottom: 0; }
+.story-related a { text-decoration: none; }
+.story-related .meta { display: block; font-size: .78rem; color: #6b7280; margin-top: 2px; }
 
 /* A label, not a banner: every pixel above the first headline is a pixel of
    news a phone cannot show. */

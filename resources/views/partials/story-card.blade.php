@@ -14,7 +14,15 @@
 @endphp
 
 <li class="story" data-meta="{{ $meta }}">
-  <a class="headline" href="{{ $story['url'] }}" {!! $byReader ? '' : ' target="_blank" rel="noopener nofollow"' !!}>{{ $story['title'] }}</a>
+  {{-- Our own address, so the link a reader copies or forwards brings the next
+       person here rather than straight to the publisher. A reader's post already
+       has a page of its own and keeps it. data-src carries the publisher's link
+       for the popup and for anyone without JavaScript to reach from the page. --}}
+  <a class="headline"
+     href="{{ $byReader || empty($story['news_item_id'])
+              ? $story['url']
+              : \App\Support\Loc::route('story', ['id' => $story['news_item_id']]) }}"
+     data-src="{{ $story['url'] }}">{{ $story['title'] }}</a>
 
   <p class="meta">
     @if($when)<span>{{ $when }}</span>@endif

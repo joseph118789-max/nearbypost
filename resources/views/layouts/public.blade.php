@@ -7,7 +7,10 @@
 
   <title>{{ $pageTitle ?? 'Local news for your area' }} | {{ config('app.name') }}</title>
   <meta name="description" content="{{ $description ?? 'Local news and hyperlocal updates from across Malaysia.' }}">
-  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large">
+  {{-- Overridable: the per-story pages exist to be shared, not to be found,
+       and inviting a crawler onto nine thousand two-sentence pages would work
+       against the place and topic pages that are meant to rank. --}}
+  <meta name="robots" content="{{ $robots ?? 'index, follow, max-snippet:-1, max-image-preview:large' }}">
   <link rel="canonical" href="{{ $canonical ?? url()->current() }}">
 
   {{-- Sized files rather than one bitmap scaled by the browser: at 16 pixels

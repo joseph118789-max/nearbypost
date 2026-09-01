@@ -31,6 +31,11 @@ return [
     'more_options'   => 'Jejari, tempoh dan sumber',
     'read_at_source' => 'Baca berita penuh',
     'close'          => 'Tutup',
+    'open_page'      => 'Buka di Nearbypost',
+    'more_near'      => 'Lagi berita berhampiran :place',
+    'more_like_this' => 'Lagi seperti ini',
+    'also_near'      => 'Juga berhampiran :place',
+    'browse_all'     => 'Lihat semua berita',
     'ago'            => 'lalu',
     'nearby'         => 'Berhampiran',
 

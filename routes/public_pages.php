@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\StoryController;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -23,6 +24,11 @@ return function (string $locale): void {
 
     Route::get('/news/{slug}/{categorySlug}', [HomeController::class, 'placeCategory'])
         ->where(['slug' => '[a-z0-9-]+', 'categorySlug' => '[a-z0-9-]+'])->name('place.category');
+
+    // Where a forwarded headline lands. Registered per reading language like
+    // the rest, so a story shared by a Malay reader opens in Malay.
+    Route::get('/story/{id}', [StoryController::class, 'show'])
+        ->whereNumber('id')->name('story');
 
     Route::get('/legal/{page}', [HomeController::class, 'legal'])
         ->where('page', 'terms|privacy|disclaimer')->name('legal');

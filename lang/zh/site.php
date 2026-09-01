@@ -31,6 +31,11 @@ return [
     'more_options'   => '范围、时段与来源',
     'read_at_source' => '阅读全文',
     'close'          => '关闭',
+    'open_page'      => '在 Nearbypost 打开',
+    'more_near'      => ':place 附近的更多新闻',
+    'more_like_this' => '更多相关新闻',
+    'also_near'      => ':place 附近还有',
+    'browse_all'     => '浏览所有新闻',
     'ago'            => '前',
     'nearby'         => '附近',
 

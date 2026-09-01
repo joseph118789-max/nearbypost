@@ -31,7 +31,9 @@ class FeedQuery
     public function fields(): array
     {
         return [
-            'id', 'title', 'summary', 'source', 'published_at',
+            // news_item_id, not id: id is the feed row, and a multi-point story
+            // has one row per place. The page is about the story.
+            'id', 'news_item_id', 'title', 'summary', 'source', 'published_at',
             'primary_category', 'secondary_category', 'sub_category',
             'url', 'lat', 'lng', 'location_label', 'precision_type',
             'origin', 'image_path',
@@ -102,6 +104,7 @@ class FeedQuery
                 'feed_ready_items.id',
                 DB::raw('COALESCE(t.title, feed_ready_items.title) AS title'),
                 DB::raw('COALESCE(t.summary, feed_ready_items.summary) AS summary'),
+                'feed_ready_items.news_item_id',
                 'feed_ready_items.source',
                 'feed_ready_items.published_at',
                 'feed_ready_items.primary_category',
@@ -175,6 +178,7 @@ class FeedQuery
             SELECT DISTINCT ON (COALESCE(f.news_item_id, -f.id)) f.id,
                    COALESCE(t.title, f.title) AS title,
                    COALESCE(t.summary, f.summary) AS summary,
+                   f.news_item_id,
                    f.source, f.published_at,
                    f.primary_category, f.secondary_category, f.sub_category,
                    f.url, f.location_label, f.lat, f.lng,

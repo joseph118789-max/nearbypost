@@ -37,6 +37,11 @@ return [
     'more_options'   => 'Radius, period and source',
     'read_at_source' => 'Read the full story',
     'close'          => 'Close',
+    'open_page'      => 'Open on Nearbypost',
+    'more_near'      => 'More news near :place',
+    'more_like_this' => 'More like this',
+    'also_near'      => 'Also near :place',
+    'browse_all'     => 'Browse all news',
     'ago'            => 'ago',
     'nearby'         => 'Nearby',
 
