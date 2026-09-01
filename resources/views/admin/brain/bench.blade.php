@@ -150,8 +150,24 @@
                          aria-label="Tick {{ \Illuminate\Support\Str::limit($p->title, 40) }}">
                 </td>
                 <td>
-                  <a href="{{ route('admin.brain.prompt', ['news_item_id' => $p->news_item_id]) }}"
-                     class="storylink">{{ \Illuminate\Support\Str::limit($p->title, 62) }}</a>
+                  {{-- The publisher's article, in a new tab. Agreeing with a
+                       proposal without being able to read the story is the same
+                       guesswork the evidence line was added to end. --}}
+                  <a href="{{ $p->url }}" target="_blank" rel="noopener nofollow"
+                     class="storylink">{{ \Illuminate\Support\Str::limit($p->title, 62) }} &#8599;</a>
+
+                  @if($p->read_text)
+                    <p class="readtext">
+                      <span class="mini">{{ $p->source }} &middot; {{ number_format((int) $p->read_chars) }} chars read</span><br>
+                      {{ $p->read_text }}{{ (int) $p->read_chars > 260 ? '…' : '' }}
+                    </p>
+                  @else
+                    <p class="readtext none">Nothing was read for this story &mdash; only the headline.</p>
+                  @endif
+
+                  <a class="mini" href="{{ route('admin.brain.prompt', ['news_item_id' => $p->news_item_id]) }}">
+                    See the whole prompt it was judged from
+                  </a>
                 </td>
                 <td class="mini">
                   @if(!$p->expect_keep)

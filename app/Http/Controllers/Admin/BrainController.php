@@ -277,7 +277,25 @@ class BrainController extends Controller
         return view('admin.brain.bench', [
             'items' => DB::table('bench_items')->where('proposed', false)->orderByDesc('id')->limit(60)->get(),
             'count' => DB::table('bench_items')->where('proposed', false)->count(),
-            'proposals' => DB::table('bench_items')->where('proposed', true)->orderBy('expect_keep')->orderBy('id')->get(),
+            // The link and the read text, same as the rows above: a proposal
+            // asks you to agree with a judgement, so it has to show what the
+            // judgement was made from.
+            'proposals' => DB::table('bench_items as b')
+                ->leftJoin('news_items as n', 'n.id', '=', 'b.news_item_id')
+                ->leftJoin(DB::raw('lateral (
+                    select extracted_text from extraction_jobs x
+                    where x.news_item_id = b.news_item_id
+                      and x.extraction_status in (\'success\',\'fallback_used\')
+                    order by x.id desc limit 1
+                ) e'), DB::raw('true'), DB::raw('true'))
+                ->where('b.proposed', true)
+                ->orderBy('b.expect_keep')
+                ->orderBy('b.id')
+                ->get([
+                    'b.*', 'n.url', 'n.source',
+                    DB::raw('left(regexp_replace(coalesce(e.extracted_text, \'\'), \'\s+\', \' \', \'g\'), 260) as read_text'),
+                    DB::raw('length(e.extracted_text) as read_chars'),
+                ]),
             'runs'  => $runs->map(function ($run) {
                 $run->parsed = $run->scores ? json_decode($run->scores, true) : null;
 
