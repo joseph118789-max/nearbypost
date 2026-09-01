@@ -59,7 +59,12 @@ class PopulateFeedReady extends Command
             });
         }
 
-        $items = $query->limit($limit)->orderBy('id')->get();
+        // Newest first. Oldest-first spent every run on the same few thousand
+        // stories that can never promote - their enrichment failed long ago and
+        // fails again each time - so nothing published today was ever reached.
+        // If a run cannot clear the backlog, recent news is what it should
+        // clear.
+        $items = $query->limit($limit)->orderByDesc('published_at')->orderByDesc('id')->get();
         $this->info("Populating feed_ready: {$items->count()} items.");
 
         $created = 0;

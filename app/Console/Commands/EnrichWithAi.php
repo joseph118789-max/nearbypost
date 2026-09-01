@@ -359,17 +359,28 @@ class EnrichWithAi extends Command
                 }
                 if ($validation['is_article'] ?? true) {
                     $relevanceMode = $validation['relevance_mode'] ?? 'category_only';
-                    $lat = $validation['lat'] ?? null;
-                    $lng = $validation['lng'] ?? null;
-                    // Malaysia bounding box: lat 0.5-7.5, lng 99.5-120
-                    $isMalaysia = $lat !== null && $lng !== null
-                        && $lat >= 0.5 && $lat <= 7.5
-                        && $lng >= 99.5 && $lng <= 120;
-                    if ($relevanceMode === 'category_only' || !$isMalaysia) {
-                        $updateData['status'] = 'international';
-                    } else {
-                        $updateData['status'] = 'active';
-                    }
+
+                    // Anything still here has already been judged twice: the
+                    // classifier refused what is not news, and the relevance
+                    // test refused what has no Malaysian angle. What is left is
+                    // worth serving.
+                    //
+                    // Having no location is not a reason to hide a story. It
+                    // decides WHICH feed it appears in - Near Me sorts by
+                    // distance and already excludes category_only on its own,
+                    // while By Interest and the topic pages do not care. This
+                    // line used to read "category_only OR outside a Malaysia
+                    // bounding box means international", which hid every
+                    // national policy story, profile, market report and
+                    // overseas sport result the moment the location rules
+                    // started correctly answering "nowhere".
+                    //
+                    // The bounding box was the crude version of the relevance
+                    // question, and the relevance filter now answers it with
+                    // nuance - keeping Malaysians caught in the Nepal floods
+                    // and refusing flooding at the Grand Canyon. Asking it
+                    // again here, worse, only overrode the good answer.
+                    $updateData['status'] = 'active';
                     $updateData['relevance_mode'] = $relevanceMode;
                 }
 
