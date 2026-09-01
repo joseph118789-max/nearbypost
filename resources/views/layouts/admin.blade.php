@@ -27,6 +27,8 @@
                        style="font-size:0.85rem;color:#1f5679;text-decoration:none;">Rules</a>
                     <a href="{{ route('admin.cases.index') }}"
                        style="font-size:0.85rem;color:#1f5679;text-decoration:none;">Case studies</a>
+                    <a href="{{ route('admin.brain.index') }}"
+                       style="font-size:0.85rem;color:#1f5679;text-decoration:none;">Resource centre</a>
                     <a href="{{ route('admin.removals.index') }}"
                        style="font-size:0.85rem;color:#1f5679;text-decoration:none;">Removed</a>
                 </div>

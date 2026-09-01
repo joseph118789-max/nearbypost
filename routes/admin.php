@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\BrainController;
 use App\Http\Controllers\Admin\CaseStudyController;
 use App\Http\Controllers\Admin\ContributionController;
 use App\Http\Controllers\Admin\DashboardController;
@@ -82,6 +83,35 @@ Route::prefix("admin")->name("admin.")->group(function () {
             ->whereNumber("id")->name("cases.publish");
         Route::post("/cases/{id}/unpublish", [CaseStudyController::class, "unpublish"])
             ->whereNumber("id")->name("cases.unpublish");
+
+        // ── The resource centre ───────────────────────────────────────
+        //
+        // Everything the AI is told, and everything that says whether it is
+        // getting it right. Grouped rather than scattered because the parts
+        // only make sense together: a rule is worth writing when the
+        // corrections say the same mistake keeps happening, and a playbook
+        // edit is worth keeping when the bench says it scored better after.
+        Route::get("/brain", [BrainController::class, "index"])->name("brain.index");
+        Route::get("/brain/prompt", [BrainController::class, "prompt"])->name("brain.prompt");
+
+        Route::get("/brain/playbook", [BrainController::class, "playbook"])->name("brain.playbook");
+        Route::put("/brain/playbook/{key}", [BrainController::class, "savePlaybook"])->name("brain.playbook.save");
+        Route::post("/brain/playbook/{key}/toggle", [BrainController::class, "togglePlaybook"])->name("brain.playbook.toggle");
+
+        Route::get("/brain/briefing", [BrainController::class, "briefing"])->name("brain.briefing");
+        Route::post("/brain/briefing", [BrainController::class, "addTerm"])->name("brain.briefing.add");
+        Route::put("/brain/briefing/{id}", [BrainController::class, "updateTerm"])
+            ->whereNumber("id")->name("brain.briefing.update");
+        Route::delete("/brain/briefing/{id}", [BrainController::class, "deleteTerm"])
+            ->whereNumber("id")->name("brain.briefing.delete");
+
+        Route::get("/brain/bench", [BrainController::class, "bench"])->name("brain.bench");
+        Route::post("/brain/bench/confirm", [BrainController::class, "confirm"])->name("brain.confirm");
+        Route::delete("/brain/bench/{id}", [BrainController::class, "removeBenchItem"])
+            ->whereNumber("id")->name("brain.bench.remove");
+
+        Route::get("/brain/corrections", [BrainController::class, "corrections"])->name("brain.corrections");
+        Route::post("/brain/corrections", [BrainController::class, "correct"])->name("brain.correct");
 
         // Editorial policy, in the newsroom's own words.
         Route::get("/rules", [RuleController::class, "index"])->name("rules.index");

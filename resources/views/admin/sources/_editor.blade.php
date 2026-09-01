@@ -44,6 +44,19 @@
   <p class="hint">How the text is actually obtained: which feed, whether the article page must be fetched separately, what happens when it cannot be.</p>
   <textarea class="ta" id="extract-{{ $s->id }}" name="extract_note" rows="3" maxlength="4000">{{ old('extract_note', $s->extract_note) }}</textarea>
 
+  <label class="lbl" for="strategy-{{ $s->id }}">How the pipeline should read it</label>
+  <p class="hint">
+    The note above is for people; this is the part the extractor obeys. Leave it on the general
+    strategy unless this publisher needs something else &mdash; and if you change it, say why in the
+    note, so the reason and the setting cannot drift apart.
+  </p>
+  <select class="ta" id="strategy-{{ $s->id }}" name="extraction_strategy" style="height:auto;padding:8px 10px;">
+    @php($strategy = old('extraction_strategy', $s->extraction_strategy))
+    <option value="" @selected(!$strategy)>General &mdash; use the feed's text, fetch the page if it is thin</option>
+    <option value="feed_only" @selected($strategy === 'feed_only')>Feed only &mdash; the whole article is already in the feed</option>
+    <option value="page_only" @selected($strategy === 'page_only')>Page only &mdash; the feed carries a teaser worth ignoring</option>
+  </select>
+
   <label class="lbl" for="tech-{{ $s->id }}">What to look for technically</label>
   <p class="hint">The specific trap. A wrong timezone offset, a 403 to identified crawlers, a redirect instead of an article, a selector that moves. This is the field that saves the next person a day.</p>
   <textarea class="ta" id="tech-{{ $s->id }}" name="tech_note" rows="3" maxlength="4000">{{ old('tech_note', $s->tech_note) }}</textarea>

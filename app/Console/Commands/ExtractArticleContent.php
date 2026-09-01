@@ -65,9 +65,18 @@ class ExtractArticleContent extends Command
             // navigation menu, which is long enough to pass for an article and
             // be stored as a success. Preferring the network would mean
             // preferring that menu over the real text we already hold.
-            $extracted = $this->fromFeed($item);
+            // How this publisher should be read, where somebody has said so.
+            // Left null the strategy is the general one: try what the feed
+            // already gave us, then fetch the page.
+            $strategy = $this->strategyFor($item);
 
-            if ($extracted === null) {
+            $extracted = null;
+
+            if ($strategy !== 'page_only') {
+                $extracted = $this->fromFeed($item);
+            }
+
+            if ($extracted === null && $strategy !== 'feed_only') {
                 $extracted = $this->extractWithTrafilatura($item->url);
             }
 
@@ -129,6 +138,27 @@ class ExtractArticleContent extends Command
      * from the fetch to this step, and keeping it afterwards would only grow a
      * second copy of the archive.
      */
+    /**
+     * What the source handbook says about reading this publisher.
+     *
+     * 'feed_only'  - the feed carries the whole article, so fetching the page
+     *                spends a request to get back something worse. True of the
+     *                big Malaysian publishers, whose pages are assembled in the
+     *                browser: fetching them returns a navigation menu that
+     *                looks enough like an article to be stored as one.
+     * 'page_only'  - the feed's text is a teaser worth ignoring.
+     * null         - the general strategy: feed first, then the page.
+     */
+    private function strategyFor(NewsItem $item): ?string
+    {
+        $source = DB::table('sources')
+            ->where('name', $item->source)
+            ->whereNotNull('extraction_strategy')
+            ->value('extraction_strategy');
+
+        return in_array($source, ['feed_only', 'page_only'], true) ? $source : null;
+    }
+
     private function fromFeed(NewsItem $item): ?array
     {
         $row = DB::table('feed_contents')->where('url_hash', sha1((string) $item->url))->first();
