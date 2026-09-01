@@ -41,7 +41,23 @@
           @foreach($recent as $r)
             <tr>
               <td>
-                {{ \Illuminate\Support\Str::limit($r->title, 78) }}
+                {{-- Opens the publisher's article in a new tab, so the source is
+                     one click away and this page is not lost. --}}
+                <a href="{{ $r->url }}" target="_blank" rel="noopener nofollow" class="storylink">
+                  {{ \Illuminate\Support\Str::limit($r->title, 78) }} &#8599;
+                </a>
+
+                {{-- The evidence. If this is a stub, the fault is extraction and
+                     not the judgement, and the answer should not be marked wrong. --}}
+                @if($r->read_text)
+                  <p class="readtext">
+                    <span class="mini">{{ $r->source }} &middot; {{ number_format((int) $r->read_chars) }} chars read</span><br>
+                    {{ $r->read_text }}{{ (int) $r->read_chars > 320 ? '…' : '' }}
+                  </p>
+                @else
+                  <p class="readtext none">Nothing was read for this story &mdash; only the headline.</p>
+                @endif
+
                 <div class="fixform" id="fix-{{ $r->id }}">
                   <form method="POST" action="{{ route('admin.brain.correct') }}">
                     @csrf
@@ -116,7 +132,10 @@
         <tbody>
           @foreach($proposals as $p)
             <tr>
-              <td>{{ \Illuminate\Support\Str::limit($p->title, 62) }}</td>
+              <td>
+                <a href="{{ route('admin.brain.prompt', ['news_item_id' => $p->news_item_id]) }}"
+                   class="storylink">{{ \Illuminate\Support\Str::limit($p->title, 62) }}</a>
+              </td>
               <td class="mini">
                 @if(!$p->expect_keep)
                   <span class="pill nowhere">should not be published</span>

@@ -286,15 +286,26 @@ class BrainController extends Controller
             // Recent stories with what the AI decided, so confirming an answer
             // is one click. Most answers are right; the bench fills fastest by
             // agreeing quickly and stopping to correct only what is wrong.
+            // The link and the text the model was given. An answer can only be
+            // judged against what the model read, and a headline does not say
+            // whether the article named a place.
             'recent' => DB::table('news_items as n')
                 ->leftJoin('bench_items as b', 'b.news_item_id', '=', 'n.id')
+                ->leftJoin(DB::raw('lateral (
+                    select extracted_text from extraction_jobs x
+                    where x.news_item_id = n.id
+                      and x.extraction_status in (\'success\',\'fallback_used\')
+                    order by x.id desc limit 1
+                ) e'), DB::raw('true'), DB::raw('true'))
                 ->whereNotNull('n.ai_processed_at')
                 ->whereNull('b.id')
                 ->orderByDesc('n.ai_processed_at')
                 ->limit(25)
                 ->get([
                     'n.id', 'n.title', 'n.discarded', 'n.ai_category',
-                    'n.sub_category', 'n.main_place_text',
+                    'n.sub_category', 'n.main_place_text', 'n.url', 'n.source',
+                    DB::raw('left(regexp_replace(coalesce(e.extracted_text, \'\'), \'\s+\', \' \', \'g\'), 320) as read_text'),
+                    DB::raw('length(e.extracted_text) as read_chars'),
                 ]),
             'fields' => CorrectionLog::FIELDS,
         ]);

@@ -103,6 +103,15 @@
   .btn-sm.go { background:#1c5a7f; border-color:#1c5a7f; color:#fff; }
   .btn-sm.warn { border-color:#e6c4b4; color:#a1481f; }
 
+  .storylink { color:#123c55; text-decoration:none; font-weight:500; }
+  .storylink:hover { color:#1c5a7f; text-decoration:underline; }
+  /* The text the model was given, quoted rather than paraphrased. */
+  .readtext {
+    margin:6px 0 0; padding:8px 10px; background:#f8fafc; border-left:2px solid #cfe0ec;
+    border-radius:0 8px 8px 0; font-size:0.78rem; line-height:1.55; color:#4a6b80;
+  }
+  .readtext.none { border-left-color:#e6c4b4; color:#a1481f; }
+
   .fixform { display:none; margin-top:8px; padding:10px; background:#f8fafc; border-radius:10px; }
   .fixform.open { display:block; }
   .fixform select, .fixform input { font-size:0.8rem; padding:5px 8px; border:1px solid #cfe0ec; border-radius:7px; }
