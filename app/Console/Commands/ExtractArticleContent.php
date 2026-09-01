@@ -156,7 +156,7 @@ class ExtractArticleContent extends Command
                     'extracted_at' => now(),
                 ]);
                 $item->update(['status' => 'active']);
-                $this->info("✓ Extracted ({$extracted['method']}): {$item->id}");
+                $this->info("✓ Extracted (" . ($extracted['method'] ?? 'trafilatura') . "): {$item->id}");
             } else {
                 $this->useFallback($item, $job);
             }
@@ -322,6 +322,13 @@ class ExtractArticleContent extends Command
             'summary' => null,
             'text'    => $text,
             'date'    => $this->plausibleDate($decoded['date'] ?? null),
+            // ⛔ Without this key the success line below threw "Undefined array
+            // key", the catch swallowed it, and useFallback overwrote a
+            // perfectly good article with the feed's teaser. Every page-fetched
+            // extraction on the site failed this way - BBC Sport, Channel News
+            // Asia, Al Jazeera, Sportstar - and each looked like a publisher
+            // that could not be read.
+            'method'  => 'trafilatura',
         ];
     }
 
@@ -363,7 +370,12 @@ class ExtractArticleContent extends Command
 import json, sys
 import trafilatura
 
-html = sys.stdin.read()
+# The page is passed as a file. It used to arrive on stdin, which deadlocked on
+# anything large: trafilatura's warnings filled an unread stderr pipe, this
+# process stopped reading stdin to wait, and the caller stopped writing to wait
+# for us.
+with open(sys.argv[1], encoding='utf-8', errors='replace') as handle:
+    html = handle.read()
 out = {"text": None, "title": None, "date": None}
 
 if html.strip():
@@ -386,31 +398,27 @@ if html.strip():
 print(json.dumps(out))
 PY;
 
-        $descriptors = [
-            0 => ['pipe', 'r'],
-            1 => ['pipe', 'w'],
-            2 => ['pipe', 'w'],
-        ];
+        // The page goes to disk and the extractor is told where to find it.
+        // Nothing large crosses a pipe, so there is nothing to deadlock, and
+        // stderr is discarded rather than left to fill a buffer nobody reads.
+        $tmp = tempnam(sys_get_temp_dir(), 'np_extract_');
 
-        $command = sprintf(
-            'timeout %d python3 -c %s',
-            self::EXTRACT_TIMEOUT_SECONDS,
-            escapeshellarg($script)
-        );
-
-        $process = proc_open($command, $descriptors, $pipes);
-
-        if (!is_resource($process)) {
+        if ($tmp === false || file_put_contents($tmp, $html) === false) {
             return null;
         }
 
-        fwrite($pipes[0], $html);
-        fclose($pipes[0]);
+        try {
+            $command = sprintf(
+                'timeout %d python3 -c %s %s 2>/dev/null',
+                self::EXTRACT_TIMEOUT_SECONDS,
+                escapeshellarg($script),
+                escapeshellarg($tmp)
+            );
 
-        $output = stream_get_contents($pipes[1]);
-        fclose($pipes[1]);
-        fclose($pipes[2]);
-        proc_close($process);
+            $output = shell_exec($command);
+        } finally {
+            @unlink($tmp);
+        }
 
         if (!is_string($output) || trim($output) === '') {
             return null;
