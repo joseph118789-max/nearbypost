@@ -366,6 +366,42 @@ class EnrichWithAi extends Command
                     $updateData['lat'] = $validation['lat'];
                     $updateData['lng'] = $validation['lng'];
                 }
+
+                // ── The geocode belongs to the place text ──────────────────
+                //
+                // When a re-judgement changes where a story happened - or
+                // decides it happened nowhere in particular - everything
+                // derived from the old answer is now wrong, and none of it
+                // clears itself.
+                //
+                // ⛔ This was doing real damage. The v6 rules correctly emptied
+                // main_place_text on national stories, but canonical_place_name
+                // and the coordinates kept the dateline city the older prompt
+                // had invented - and PopulateFeedReady reads
+                // canonical_place_name, not main_place_text. So an AI training
+                // programme for the whole country, a Kedah gambling row and a
+                // Melaka election story all went on being served as news near
+                // Kuala Lumpur, by a pipeline that had already worked out they
+                // were nothing of the kind.
+                if ($validation['place'] !== $item->main_place_text) {
+                    $updateData['canonical_place_name'] = null;
+                    $updateData['location_label']       = null;
+                    $updateData['latitude']             = null;
+                    $updateData['longitude']            = null;
+                    $updateData['geocode_status']       = null;
+                    $updateData['geocoded_at']          = null;
+                    $updateData['precision_type']       = null;
+                    $updateData['alias_match_status']   = null;
+                    $updateData['alias_match_type']     = null;
+
+                    // Only the classifier's own reading survives, so the
+                    // geocoder starts from the new place rather than agreeing
+                    // with the old one.
+                    if ($validation['place'] === null) {
+                        $updateData['lat'] = null;
+                        $updateData['lng'] = null;
+                    }
+                }
                 if ($validation['is_article'] ?? true) {
                     $relevanceMode = $validation['relevance_mode'] ?? 'category_only';
 
