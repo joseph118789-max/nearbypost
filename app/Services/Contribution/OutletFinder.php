@@ -25,11 +25,20 @@ class OutletFinder
 {
     private const MODEL = 'deepseek-chat';
     private const TIMEOUT = 60;
-    private const MAX_OUTLETS = 40;
+    /**
+     * Past this many places a story is not local to anyone.
+     *
+     * The chain matters less than the spread: a promotion at twelve shops is
+     * news near twelve high streets, while one at two hundred is simply news,
+     * and putting it on two hundred map points would show it to the whole
+     * country as though it were happening next door.
+     */
+    private const NATIONAL_ABOVE = 20;
 
     /**
      * @return array{
      *     brand: ?string,
+     *     scale: string,
      *     outlets: list<array{name: string, place: string, confident: bool}>,
      *     note: string
      * }
@@ -39,7 +48,7 @@ class OutletFinder
         $key = (string) config('services.deepseek.key');
 
         if ($key === '') {
-            return ['brand' => null, 'outlets' => [], 'note' => 'No reviewer configured.'];
+            return ['brand' => null, 'scale' => 'unknown', 'outlets' => [], 'note' => 'No reviewer configured.'];
         }
 
         try {
@@ -47,13 +56,30 @@ class OutletFinder
         } catch (\Throwable $e) {
             Log::warning('Outlet lookup failed', ['error' => $e->getMessage()]);
 
-            return ['brand' => null, 'outlets' => [], 'note' => 'The lookup could not be completed. Add the places by hand.'];
+            return ['brand' => null, 'scale' => 'unknown', 'outlets' => [], 'note' => 'The lookup could not be completed. Add the places by hand.'];
         }
 
         $parsed = $this->parse($raw);
 
         if ($parsed === null) {
-            return ['brand' => null, 'outlets' => [], 'note' => 'The lookup returned nothing usable. Add the places by hand.'];
+            return ['brand' => null, 'scale' => 'unknown', 'outlets' => [], 'note' => 'The lookup returned nothing usable. Add the places by hand.'];
+        }
+
+        $scale = mb_strtolower(trim((string) ($parsed['scale'] ?? '')));
+        $scale = in_array($scale, ['national', 'branches'], true) ? $scale : 'unknown';
+
+        // A national story has no set of places to pin, so anything the model
+        // listed anyway is discarded rather than shown to the editor as a
+        // choice. Offering ten thousand petrol stations for approval is not a
+        // decision anyone can usefully make.
+        if ($scale === 'national') {
+            return [
+                'brand'   => $this->clean($parsed['brand'] ?? null),
+                'scale'   => 'national',
+                'outlets' => [],
+                'note'    => $this->clean($parsed['note'] ?? null)
+                    ?? 'This affects the whole country, so it belongs to no particular place.',
+            ];
         }
 
         $outlets = [];
@@ -71,13 +97,25 @@ class OutletFinder
                 'confident' => (int) ($row['confident'] ?? 0) === 1,
             ];
 
-            if (count($outlets) >= self::MAX_OUTLETS) {
-                break;
-            }
+        }
+
+        // The count is its own answer. A model that listed every petrol station
+        // in the country has told us the story is national whatever it wrote in
+        // the scale field, so the number decides and the list is dropped.
+        if (count($outlets) > self::NATIONAL_ABOVE) {
+            return [
+                'brand'   => $this->clean($parsed['brand'] ?? null),
+                'scale'   => 'national',
+                'outlets' => [],
+                'note'    => 'This came back with ' . count($outlets) . ' places. Past '
+                    . self::NATIONAL_ABOVE . ' the story is not near anyone in particular, so it '
+                    . 'has been treated as national news and no places were added.',
+            ];
         }
 
         return [
             'brand'   => $this->clean($parsed['brand'] ?? null),
+            'scale'   => $scale,
             'outlets' => $outlets,
             'note'    => $this->clean($parsed['note'] ?? null) ?? '',
         ];
@@ -96,7 +134,32 @@ Work out which organisation or brand the story is about, then list the places in
 Malaysia where a reader would be affected - usually that organisation's branches
 or outlets.
 
-RULES
+DECIDE THE SCALE BEFORE YOU LIST ANYTHING
+
+Some stories affect everybody in the country and belong to no particular place.
+A fuel subsidy every motorist can claim, a change to income tax, a new public
+holiday, a nationwide change to the school syllabus: a reader in Ipoh is not
+affected because something stands near them, they are affected because they live
+in Malaysia. Those are national stories.
+
+It is tempting to answer such a story with the places where people would COLLECT
+the benefit - every petrol station, every school, every clinic, every post
+office. Do not. That is an entire class of business, not a list of branches, and
+putting a national story on ten thousand map points would push it at every
+reader as though it were happening at the end of their street.
+
+  "national"  - it applies to everyone everywhere, or to a whole class of
+                business rather than one named organisation's own outlets.
+                Return an EMPTY list and explain in "note".
+
+  "branches"  - one named organisation is doing something at its own premises,
+                and those premises can be listed and counted.
+
+If your list would run past 20 places, it is national. Answer national rather
+than sending a long or truncated list - past that point the story is not near
+anybody in particular.
+
+RULES FOR THE LIST
 
 Be accurate rather than complete. A short list you are sure of is far more use
 than a long list containing branches that have closed or that you are guessing
@@ -112,11 +175,12 @@ If the story is not about an organisation with multiple locations, or you cannot
 name any branch you are sure of, return an empty list and say why in "note".
 That is a perfectly good answer.
 
-At most 40 places.
+At most 20 places.
 
 Reply with JSON only:
 {
   "brand": "the organisation, or null",
+  "scale": "national" or "branches",
   "note": "one sentence for the editor: how sure you are overall, and what to check",
   "outlets": [
     {"name": "branch name as people would say it", "place": "town or suburb, state", "confident": 0 or 1}

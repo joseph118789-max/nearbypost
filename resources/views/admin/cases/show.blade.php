@@ -9,6 +9,7 @@
                font-size:0.7rem;text-transform:uppercase;letter-spacing:0.04em; }
   .places td { padding:11px 14px;border-top:1px solid #eff3f9; }
   .places tr.unsure { background:#fffbeb; }
+  .warn-box { background:#fffbeb; border-left:3px solid #d97706; padding:10px 12px; }
   .places tr.lost { background:#fff5f3; }
   .inline { display:inline; }
 </style>
@@ -41,21 +42,32 @@
        produces a plausible list containing branches that closed and branches
        that never existed, so this list is a draft to be corrected, never a
        result to be accepted. --}}
+  @if($case->outlet_scale === 'national')
+    <p class="lede warn-box">
+      <strong>The model read this as national news.</strong> It affects the whole country rather
+      than a set of premises, so no places were added and none should be: pinning it to a map
+      would push it at every reader as though it were happening on their own street. Publish it
+      with no location and it will be found under its topic instead.
+      @if($case->outlet_note)<br><em>{{ $case->outlet_note }}</em>@endif
+    </p>
+  @else
   <p class="lede">
+    @if($case->outlet_note)<strong>The model's own caveat:</strong> <em>{{ $case->outlet_note }}</em><br>@endif
     <strong>Check every line.</strong> These were suggested by the model and it will have got some
     of them wrong &mdash; branches that have closed, branches in the wrong town, branches that
     never existed. Anything marked <em>unsure</em> is the model's own doubt. Delete what does not
     belong before publishing; this site's name goes on whatever is left.
   </p>
+  @endif
 
   <table class="places">
     <thead><tr><th>Place</th><th>Added by</th><th>On the map</th><th></th></tr></thead>
     <tbody>
       @forelse($locations as $place)
-        <tr class="{{ $place->geocode_status === 'not_found' ? 'lost' : ($place->geocode_status === 'unsure' ? 'unsure' : '') }}">
+        <tr class="{{ $place->geocode_status === 'not_found' ? 'lost' : ($place->ai_confident === false ? 'unsure' : '') }}">
           <td>
             {{ $place->label }}
-            @if($place->geocode_status === 'unsure')
+            @if($place->ai_confident === false)
               <span class="badge badge-warn">model unsure</span>
             @endif
           </td>

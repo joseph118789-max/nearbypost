@@ -43,6 +43,8 @@ class NewsItem extends Model
         "approved_by",
         "approved_at",
         "is_multi_point",
+        "outlet_note",
+        "outlet_scale",
         "status",
         "location_label",
         "canonical_place_name",

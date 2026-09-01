@@ -39,8 +39,12 @@ class CaseStudyController extends Controller
 
     public function index(): View
     {
+        // What makes a row a case study is that this panel wrote it, not
+        // that it ended up with several places. A national story correctly has
+        // none, and used to vanish from its own panel the moment it was
+        // identified as national.
         $cases = NewsItem::query()
-            ->where('is_multi_point', true)
+            ->where('origin', 'editorial')
             ->orderByDesc('created_at')
             ->limit(50)
             ->get();
@@ -108,17 +112,29 @@ class CaseStudyController extends Controller
                 'news_item_id' => $case->id,
                 'label'        => $label,
                 'added_by'     => 'ai',
-                // The model's own doubt, kept where the editor will see it.
-                'geocode_status' => $outlet['confident'] ? null : 'unsure',
+                // The model's own doubt gets its own column. It used to share
+                // geocode_status, which the geocoder then overwrote with
+                // "found" - so every guess arrived at the editor looking as
+                // solid as every certainty.
+                'ai_confident' => $outlet['confident'],
                 'created_at'   => now(),
                 'updated_at'   => now(),
             ]);
         }
 
+        // Kept on the record rather than flashed. A one-shot message is gone by
+        // the first refresh, and the editor needs the caveat in front of them
+        // at the moment they press publish, not once when they arrive.
+        $case->update([
+            'outlet_note'    => $proposal['note'],
+            'outlet_scale'   => $proposal['scale'],
+            'is_multi_point' => $proposal['scale'] !== 'national',
+        ]);
+
         return redirect()
             ->route('admin.cases.show', ['id' => $case->id])
-            ->with('status', $proposal['note'] !== ''
-                ? $proposal['note']
+            ->with('status', $proposal['scale'] === 'national'
+                ? 'This reads as national news, so no places were added.'
                 : 'Check every place below before publishing.');
     }
 
@@ -195,6 +211,8 @@ class CaseStudyController extends Controller
             DB::table('story_locations')->where('id', $place->id)->update([
                 'lat'            => $coords['lat'] ?? null,
                 'lng'            => $coords['lng'] ?? null,
+                // Only ever the geocoder's own verdict. It shares this column
+                // with nothing else, so it can no longer erase anything.
                 'geocode_status' => $coords ? 'found' : 'not_found',
                 'updated_at'     => now(),
             ]);
@@ -335,7 +353,7 @@ class CaseStudyController extends Controller
 
     private function caseStudy(int $id): NewsItem
     {
-        $case = NewsItem::where('id', $id)->where('is_multi_point', true)->first();
+        $case = NewsItem::where('id', $id)->where('origin', 'editorial')->first();
 
         if (!$case) {
             throw new NotFoundHttpException('No such case study');
