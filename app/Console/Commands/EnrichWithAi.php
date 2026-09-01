@@ -133,10 +133,15 @@ class EnrichWithAi extends Command
     {
         // ── Idempotency: preserve previously good output ─────────────────
         if (!$force) {
-            $existing = AiProcessingJob::where('news_item_id', $item->id)
-                ->where('ai_status', 'success')
-                ->first();
-            if ($existing) {
+            // The LATEST job, matching the relation the selecting query uses.
+            // Asking for any success ever disagreed with it: an item whose v4
+            // run succeeded and whose v5 run then returned insufficient_content
+            // passed the query and was refused here, every run, forever - six
+            // rows sitting permanently at the head of a newest-first queue,
+            // spending six slots of every run on nothing.
+            $existing = $item->aiProcessingJob;
+
+            if ($existing && $existing->ai_status === 'success') {
                 $this->line("  SKIP {$item->id}: already processed, good output preserved.");
                 return;
             }
