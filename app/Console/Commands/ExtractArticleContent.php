@@ -26,6 +26,16 @@ class ExtractArticleContent extends Command
     /** The same voice the RSS fetcher uses, which these sites answer. */
     private const USER_AGENT = 'Mozilla/5.0 (compatible; Nearbypost/1.0; +https://nearbypost.com)';
 
+    /**
+     * Below this, we are holding a headline, not an article.
+     *
+     * A summary written from a title is a paraphrase of the title, and a
+     * location inferred from one is a guess. Six hundred characters is about
+     * three sentences: enough to say what happened and where, which is all the
+     * classifier is being asked.
+     */
+    private const MIN_USABLE_CHARS = 600;
+
     public function handle()
     {
         $newsItemId = $this->option('news_item_id');
@@ -33,6 +43,18 @@ class ExtractArticleContent extends Command
         $query = NewsItem::whereDoesntHave('extractionJob', function ($q) {
             $q->whereIn('extraction_status', ['success', 'fallback_used']);
         });
+
+        // ⛔ Stop after two failures. Some links can never yield an article -
+        // an aggregator's wrapper URL answers 200 with a JavaScript page, so
+        // there is nothing behind it however often it is asked - and without a
+        // cap those spend every run forever, ahead of stories that would have
+        // worked. Two attempts covers a site that was briefly down.
+        $query->whereRaw(
+            '(select count(*) from extraction_jobs j
+                where j.news_item_id = news_items.id
+                  and j.extraction_status = ?) < 2',
+            ['failed']
+        );
 
         if ($newsItemId) {
             $query->where('id', $newsItemId);
@@ -78,6 +100,44 @@ class ExtractArticleContent extends Command
 
             if ($extracted === null && $strategy !== 'feed_only') {
                 $extracted = $this->extractWithTrafilatura($item->url);
+            }
+
+            // The feed gave us a teaser. Go and get the article, which is what
+            // the link is for - a headline cannot be summarised or located, and
+            // storing it as though it could is how a classification gets blamed
+            // for an extraction failure.
+            if ($strategy !== 'feed_only'
+                && $extracted !== null
+                && mb_strlen((string) ($extracted['text'] ?? '')) < self::MIN_USABLE_CHARS) {
+                $fromPage = $this->extractWithTrafilatura($item->url);
+
+                if ($fromPage !== null
+                    && mb_strlen((string) ($fromPage['text'] ?? '')) > mb_strlen((string) $extracted['text'])) {
+                    $extracted = $fromPage;
+                }
+            }
+
+            // Still a headline. Say so plainly rather than passing it on: an
+            // honest insufficient_content can be retried and reported, while a
+            // success nobody questions is summarised from a title.
+            if ($extracted !== null
+                && mb_strlen((string) ($extracted['text'] ?? '')) < self::MIN_USABLE_CHARS) {
+                // 'failed' rather than a new status: the table has a check
+                // constraint listing the four it accepts, and inventing a fifth
+                // would throw on every thin story. The distinction that matters
+                // downstream is only whether classification may read it, and
+                // 'failed' answers that correctly. What went wrong is recorded
+                // in the method, where the next person will look.
+                $job->update([
+                    'extraction_status' => 'failed',
+                    'extracted_text'    => $extracted['text'] ?? null,
+                    'extraction_method' => 'too_thin_' . mb_strlen((string) ($extracted['text'] ?? '')) . 'ch',
+                    'extracted_at'      => now(),
+                ]);
+
+                $this->warn("  THIN {$item->id}: " . mb_strlen((string) ($extracted['text'] ?? '')) . ' chars');
+
+                return;
             }
 
             if ($extracted && !empty($extracted['text'])) {
@@ -151,12 +211,42 @@ class ExtractArticleContent extends Command
      */
     private function strategyFor(NewsItem $item): ?string
     {
+        // ⛔ An aggregator credits the original newsroom in its items, so
+        // $item->source can name a publisher that never served this URL. Only
+        // honour a "the feed already has the whole article" rule when the link
+        // actually points at that publisher - otherwise a wrapper URL inherits
+        // the rule and the page is never fetched at all.
         $source = DB::table('sources')
             ->where('name', $item->source)
             ->whereNotNull('extraction_strategy')
-            ->value('extraction_strategy');
+            ->first(['extraction_strategy', 'base_url']);
 
-        return in_array($source, ['feed_only', 'page_only'], true) ? $source : null;
+        if (!$source) {
+            return null;
+        }
+
+        if ($source->extraction_strategy === 'feed_only' && !$this->urlBelongsTo($item->url, $source->base_url)) {
+            return null;
+        }
+
+        return in_array($source->extraction_strategy, ['feed_only', 'page_only'], true)
+            ? $source->extraction_strategy
+            : null;
+    }
+
+    /** Is this link actually on the publisher's own domain? */
+    private function urlBelongsTo(?string $url, ?string $baseUrl): bool
+    {
+        $host = parse_url((string) $url, PHP_URL_HOST);
+        $base = parse_url((string) $baseUrl, PHP_URL_HOST);
+
+        if (!$host || !$base) {
+            return false;
+        }
+
+        $strip = fn (string $h) => preg_replace('/^www\./', '', mb_strtolower($h));
+
+        return $strip($host) === $strip($base);
     }
 
     private function fromFeed(NewsItem $item): ?array
@@ -336,12 +426,21 @@ PY;
         // Fallback order: feed summary → cleaned summary → minimal preserved raw summary
         $summary = $item->summary;
 
+        // ⛔ The feed's own teaser is only a fallback when there is enough of
+        // it to be an article. A thirty-one character summary is the headline
+        // again, and passing it on as fallback_used told the classifier it was
+        // reading a story - which is how a summary came to be written from a
+        // title and a location guessed from nothing.
+        $usable = $summary !== null && mb_strlen($summary) >= self::MIN_USABLE_CHARS;
+
         $job->update([
             'extracted_title' => $item->title,
             'extracted_summary' => $summary,
             'extracted_text' => $summary, // use summary as text fallback
-            'extraction_status' => $summary ? 'fallback_used' : 'failed',
-            'extraction_method' => $summary ? 'feed_summary_fallback' : 'failed',
+            'extraction_status' => $usable ? 'fallback_used' : 'failed',
+            'extraction_method' => $usable
+                ? 'feed_summary_fallback'
+                : 'too_thin_' . mb_strlen((string) $summary) . 'ch',
             'extracted_at' => now(),
         ]);
 

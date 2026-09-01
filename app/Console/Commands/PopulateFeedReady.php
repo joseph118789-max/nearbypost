@@ -6,6 +6,7 @@ use App\Models\NewsItem;
 use App\Models\FeedReadyItem;
 use App\Models\AiProcessingJob;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Services\DuplicateGuard;
 
@@ -176,7 +177,15 @@ class PopulateFeedReady extends Command
 
         $row = [
             'title'              => $item->title,
-            'summary'            => $aiJob->validated_summary ?: $item->summary,
+            // ⛔ A summary is only served when there was something to summarise.
+            //
+            // A story whose stored text was 111 characters - cut off mid-word,
+            // before any figures - was shown to readers as "the new prices are
+            // RM3.35, RM3.18 and RM3.08". The model filled the gap and the site
+            // published the result under the publisher's name. Where too little
+            // was read, the genuine excerpt goes out instead: short, stopping
+            // mid-sentence, and true.
+            'summary'            => $this->honestSummary($item, $aiJob),
             'source'             => $item->source,
             'url'               => $item->url,
             'published_at'       => $item->published_at,
@@ -236,5 +245,34 @@ class PopulateFeedReady extends Command
         FeedReadyItem::create($row);
         Log::debug('FeedReady created', ['news_item_id' => $item->id]);
         return 'created';
+    }
+
+    /**
+     * Below this there was not enough text to summarise from.
+     *
+     * Six hundred characters is about three sentences - enough to say what
+     * happened. Under that, a two-sentence summary is the model filling gaps.
+     */
+    private const MIN_TO_SUMMARISE = 600;
+
+    /**
+     * The model's summary where it had an article to read, the article's own
+     * opening where it did not.
+     */
+    private function honestSummary($item, $aiJob): ?string
+    {
+        $held = DB::table('extraction_jobs')
+            ->where('news_item_id', $item->id)
+            ->whereIn('extraction_status', ['success', 'fallback_used'])
+            ->orderByDesc('id')
+            ->value('extracted_text');
+
+        if ($held !== null && mb_strlen($held) < self::MIN_TO_SUMMARISE) {
+            $excerpt = trim(preg_replace('/\s+/u', ' ', $held));
+
+            return $excerpt !== '' ? mb_substr($excerpt, 0, 400) : null;
+        }
+
+        return $aiJob->validated_summary ?: $item->summary;
     }
 }
