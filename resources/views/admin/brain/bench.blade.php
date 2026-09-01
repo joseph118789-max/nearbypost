@@ -28,11 +28,12 @@
     <h2>Recently judged &mdash; is this right?</h2>
     <p class="sub">
       What the AI decided for each story. Agree and it becomes a confirmed answer; correct it and the
-      mistake is recorded and measured from now on.
+      mistake is recorded and measured from now on. Either way it moves down to
+      <a href="#reviewed">what you have said</a>, where you can change your mind.
     </p>
 
     @if($recent->isEmpty())
-      <p class="mini">Everything recent is already on the bench.</p>
+      <p class="mini">Everything recent has been reviewed already.</p>
     @else
       <table class="tidy">
         <thead><tr><th>Story</th><th style="width:170px;">The AI said</th><th style="width:210px;"></th></tr></thead>
@@ -83,6 +84,90 @@
     @endif
   </div>
 
+  {{-- Directly under the thing that fills it. This used to sit below the runs,
+       which meant the answer to "where do I see what I just said" was three
+       screens down, past a table of numbers. --}}
+  <div class="card" id="reviewed">
+    <h2>What you have said ({{ number_format($count) }})</h2>
+    <p class="sub">
+      Every answer you have confirmed or corrected, and what the bench will hold the model to.
+      Change any of them &mdash; a bench answer that is itself wrong is worse than none, because it
+      marks the model down for being right.
+    </p>
+
+    @if($items->isEmpty())
+      <p class="mini">Nothing yet. Start with the table above.</p>
+    @else
+      <table class="tidy">
+        <thead>
+          <tr><th>Story</th><th style="width:110px;">Should be</th><th style="width:150px;">Where</th>
+              <th style="width:130px;">How you answered</th><th style="width:150px;"></th></tr>
+        </thead>
+        <tbody>
+          @foreach($items as $item)
+            <tr>
+              <td>
+                {{ \Illuminate\Support\Str::limit($item->title, 66) }}
+                <div class="fixform" id="edit-{{ $item->id }}">
+                  <form method="POST" action="{{ route('admin.brain.bench.update', $item->id) }}">
+                    @csrf @method('PUT')
+                    <label class="mini" style="display:block;margin-bottom:6px;">
+                      <input type="checkbox" name="expect_keep" value="1" @checked($item->expect_keep)>
+                      should be published
+                    </label>
+                    <input type="text" name="expect_category" value="{{ $item->expect_category }}" placeholder="Category, e.g. government &amp; policy">
+                    <input type="text" name="expect_place" value="{{ $item->expect_place }}" placeholder="Where it happened — leave blank if nowhere">
+                    <label class="mini" style="display:block;margin-top:6px;">
+                      <input type="checkbox" name="expect_nowhere" value="1" @checked($item->expect_nowhere)>
+                      the right answer is <strong>nowhere</strong>
+                    </label>
+                    <input type="text" name="note" value="{{ $item->note }}" placeholder="Note to yourself" style="margin-top:6px;">
+                    <div style="margin-top:8px;"><button class="btn-sm go" type="submit">Save the change</button></div>
+                  </form>
+                </div>
+              </td>
+              <td class="mini">
+                {{ $item->expect_keep ? 'published' : 'discarded' }}
+                @if($item->expect_category)<br>{{ $item->expect_category }}@endif
+              </td>
+              <td>
+                @if($item->expect_nowhere)
+                  <span class="pill nowhere">nowhere</span>
+                @elseif($item->expect_place)
+                  <span class="pill">{{ $item->expect_place }}</span>
+                @else
+                  <span class="mini">not asserted</span>
+                @endif
+              </td>
+              <td class="mini">
+                @if($item->note === 'Confirmed as correct')
+                  <span class="pill">you agreed</span>
+                @else
+                  <span class="pill nowhere">you corrected</span>
+                  @if($item->note)<div class="mini" style="margin-top:4px;">{{ $item->note }}</div>@endif
+                @endif
+              </td>
+              <td style="text-align:right;white-space:nowrap;">
+                <button class="btn-sm" type="button"
+                        onclick="document.getElementById('edit-{{ $item->id }}').classList.toggle('open')">Change</button>
+                <form method="POST" action="{{ route('admin.brain.bench.remove', $item->id) }}" style="display:inline;">
+                  @csrf @method('DELETE')
+                  <button class="btn-sm warn" type="submit">Remove</button>
+                </form>
+              </td>
+            </tr>
+          @endforeach
+        </tbody>
+      </table>
+
+      <p class="mini" style="margin-top:12px;">
+        Corrections are also kept in full on the
+        <a href="{{ route('admin.brain.corrections') }}">Corrections</a> page, with what the AI said
+        beside what you said it should have been.
+      </p>
+    @endif
+  </div>
+
   <div class="card">
     <h2>Runs</h2>
     <p class="sub">
@@ -116,45 +201,6 @@
         an overall place score hides it &mdash; a model that pins everything to its dateline still
         scores well on the stories that genuinely have a location.
       </p>
-    @endif
-  </div>
-
-  <div class="card">
-    <h2>Confirmed answers ({{ number_format($count) }})</h2>
-    @if($items->isEmpty())
-      <p class="mini">Nothing yet.</p>
-    @else
-      <table class="tidy">
-        <thead><tr><th>Story</th><th style="width:110px;">Should be</th><th style="width:160px;">Where</th><th style="width:90px;"></th></tr></thead>
-        <tbody>
-          @foreach($items as $item)
-            <tr>
-              <td>{{ \Illuminate\Support\Str::limit($item->title, 72) }}
-                @if($item->note)<div class="mini">{{ $item->note }}</div>@endif
-              </td>
-              <td class="mini">
-                {{ $item->expect_keep ? 'published' : 'discarded' }}
-                @if($item->expect_category)<br>{{ $item->expect_category }}@endif
-              </td>
-              <td>
-                @if($item->expect_nowhere)
-                  <span class="pill nowhere">nowhere</span>
-                @elseif($item->expect_place)
-                  <span class="pill">{{ $item->expect_place }}</span>
-                @else
-                  <span class="mini">not asserted</span>
-                @endif
-              </td>
-              <td style="text-align:right;">
-                <form method="POST" action="{{ route('admin.brain.bench.remove', $item->id) }}">
-                  @csrf @method('DELETE')
-                  <button class="btn-sm warn" type="submit">Remove</button>
-                </form>
-              </td>
-            </tr>
-          @endforeach
-        </tbody>
-      </table>
     @endif
   </div>
 </div>

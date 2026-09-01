@@ -107,6 +107,8 @@ Route::prefix("admin")->name("admin.")->group(function () {
 
         Route::get("/brain/bench", [BrainController::class, "bench"])->name("brain.bench");
         Route::post("/brain/bench/confirm", [BrainController::class, "confirm"])->name("brain.confirm");
+        Route::put("/brain/bench/{id}", [BrainController::class, "updateBenchItem"])
+            ->whereNumber("id")->name("brain.bench.update");
         Route::delete("/brain/bench/{id}", [BrainController::class, "removeBenchItem"])
             ->whereNumber("id")->name("brain.bench.remove");
 

@@ -282,6 +282,38 @@ class BrainController extends Controller
         return back()->with('status', 'Added to the bench as a correct answer.');
     }
 
+    /**
+     * Change an answer already on the bench.
+     *
+     * A wrong answer here is worse than no bench at all: it marks the model
+     * down for being right, and the numbers then argue against the change that
+     * actually helped.
+     */
+    public function updateBenchItem(Request $request, int $id): RedirectResponse
+    {
+        $data = $request->validate([
+            'expect_category' => ['nullable', 'string', 'max:60'],
+            'expect_place'    => ['nullable', 'string', 'max:200'],
+            'note'            => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $nowhere = $request->boolean('expect_nowhere');
+
+        DB::table('bench_items')->where('id', $id)->update([
+            'expect_keep'     => $request->boolean('expect_keep'),
+            'expect_category' => $data['expect_category'] ?: null,
+            // A place and "the answer is nowhere" are contradictory claims, so
+            // the checkbox wins and the text is cleared rather than left to sit
+            // there looking like it still means something.
+            'expect_place'    => $nowhere ? null : ($data['expect_place'] ?: null),
+            'expect_nowhere'  => $nowhere,
+            'note'            => $data['note'] ?: null,
+            'updated_at'      => now(),
+        ]);
+
+        return back()->with('status', 'Changed. The next bench run will hold the model to this.');
+    }
+
     public function removeBenchItem(int $id): RedirectResponse
     {
         DB::table('bench_items')->where('id', $id)->delete();
