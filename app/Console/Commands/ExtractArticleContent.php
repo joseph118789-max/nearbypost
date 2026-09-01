@@ -123,9 +123,16 @@ class ExtractArticleContent extends Command
             }
 
             // Still a headline. Say so plainly rather than passing it on: an
-            // honest insufficient_content can be retried and reported, while a
-            // success nobody questions is summarised from a title.
+            // honest failure can be retried and reported, while a success
+            // nobody questions is summarised from a title.
+            //
+            // Unless an editor has said this publisher will never give more.
+            // A paywalled outlet's free opening is short but it is genuinely
+            // theirs, and refusing it loses the outlet altogether - the point
+            // of teaser_ok is that it is published as written and never
+            // expanded, so its shortness costs nothing but length.
             if ($extracted !== null
+                && $strategy !== 'teaser_ok'
                 && mb_strlen((string) ($extracted['text'] ?? '')) < self::MIN_USABLE_CHARS) {
                 // 'failed' rather than a new status: the table has a check
                 // constraint listing the four it accepts, and inventing a fifth
