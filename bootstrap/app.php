@@ -19,6 +19,27 @@ return Application::configure(basePath: dirname(__DIR__))
             LogApiTiming::class,
         ]);
         $middleware->trustProxies('*');
+
+        // Where an unauthenticated request is sent. There are two logins on
+        // this site and one global default cannot serve both: sending a guest
+        // who asked for /admin to the public chooser, whose admin door leads
+        // back to /admin, is a loop.
+        $middleware->redirectGuestsTo(function ($request) {
+            return $request->is('admin', 'admin/*')
+                ? route('admin.login')
+                : route('login');
+        });
+
+        // And where an already-authenticated one is sent when it asks for a
+        // login form. The default is the site root, so an administrator who was
+        // already signed in and clicked through to the panel landed on the
+        // public homepage - which reads exactly like a login that does not
+        // work.
+        $middleware->redirectUsersTo(function ($request) {
+            return $request->is('admin', 'admin/*')
+                ? route('admin.dashboard')
+                : route('contribute.index');
+        });
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

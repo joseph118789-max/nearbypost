@@ -16,7 +16,12 @@
       <span class="door-go">{{ __('site.door_contributor_action') }} &rarr;</span>
     </a>
 
-    <a class="door" href="{{ route('admin.login') }}">
+    {{-- The panel, not the login form. /admin/login is behind guest:admin, so
+         sending an already-signed-in administrator there bounces them to the
+         public homepage - which looks exactly like a login that does not work.
+         /admin resolves for both: the dashboard when signed in, the login page
+         by way of auth:admin when not. --}}
+    <a class="door" href="{{ route('admin.index') }}">
       <h2>{{ __('site.door_admin') }}</h2>
       <p>{{ __('site.door_admin_hint') }}</p>
       <span class="door-go">{{ __('site.door_admin_action') }} &rarr;</span>
