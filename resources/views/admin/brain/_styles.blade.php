@@ -103,6 +103,18 @@
   .btn-sm.go { background:#1c5a7f; border-color:#1c5a7f; color:#fff; }
   .btn-sm.warn { border-color:#e6c4b4; color:#a1481f; }
 
+  /* The bulk bar states what will happen and to how many, so a batch action is
+     never taken blind. */
+  .bulkbar {
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    padding:10px 12px; background:#f8fafc; border:1px solid #e2edf6;
+    border-radius:12px; margin-bottom:12px;
+  }
+  .bulkbar .count { font-size:0.84rem; color:#4a6b80; margin-right:auto; }
+  .bulkbar .count strong { color:#123c55; }
+  .tickcol { width:34px; }
+  .tickcol input { width:16px; height:16px; cursor:pointer; }
+
   .storylink { color:#123c55; text-decoration:none; font-weight:500; }
   .storylink:hover { color:#1c5a7f; text-decoration:underline; }
   /* The text the model was given, quoted rather than paraphrased. */

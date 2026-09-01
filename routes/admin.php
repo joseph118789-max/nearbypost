@@ -107,11 +107,8 @@ Route::prefix("admin")->name("admin.")->group(function () {
 
         Route::get("/brain/bench", [BrainController::class, "bench"])->name("brain.bench");
         Route::post("/brain/bench/confirm", [BrainController::class, "confirm"])->name("brain.confirm");
-        Route::post("/brain/bench/accept", [BrainController::class, "acceptProposal"])->name("brain.bench.accept.all");
-        Route::post("/brain/bench/{id}/accept", [BrainController::class, "acceptProposal"])
-            ->whereNumber("id")->name("brain.bench.accept");
-        Route::delete("/brain/bench/{id}/reject", [BrainController::class, "rejectProposal"])
-            ->whereNumber("id")->name("brain.bench.reject");
+        Route::post("/brain/bench/accept", [BrainController::class, "acceptProposal"])->name("brain.bench.accept");
+        Route::post("/brain/bench/reject", [BrainController::class, "rejectProposal"])->name("brain.bench.reject");
         Route::put("/brain/bench/{id}", [BrainController::class, "updateBenchItem"])
             ->whereNumber("id")->name("brain.bench.update");
         Route::delete("/brain/bench/{id}", [BrainController::class, "removeBenchItem"])

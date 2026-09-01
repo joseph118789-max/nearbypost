@@ -111,59 +111,102 @@
 
   @if($proposals->isNotEmpty())
     <div class="card" style="border-color:#cfe0ec;">
-      <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;">
-        <h2>Proposed answers ({{ $proposals->count() }})</h2>
-        <form method="POST" action="{{ route('admin.brain.bench.accept.all') }}">
-          @csrf
-          <button class="btn-sm go" type="submit">Accept all</button>
-        </form>
-      </div>
+      <h2>Proposed answers ({{ $proposals->count() }})</h2>
       <p class="sub">
         A review pass, offered as suggestions with the reason attached. <strong>None of these count
         until you accept one</strong> &mdash; a bench is worth having because a person confirmed each
         answer, and one confirmed by a machine would be measuring the model against its own opinion.
-        Read the reason, then accept it or throw it away.
+        Tick the ones you agree with, or handle them one at a time.
       </p>
 
-      <table class="tidy">
-        <thead>
-          <tr><th>Story</th><th style="width:150px;">Proposed</th><th>Why</th><th style="width:140px;"></th></tr>
-        </thead>
-        <tbody>
-          @foreach($proposals as $p)
+      {{-- One form for the whole table. HTML will not nest a form inside a
+           form, so the per-row buttons carry their own id rather than being
+           little forms of their own - which keeps single-click accept working
+           alongside the checkboxes instead of trading one for the other. --}}
+      <form method="POST" action="{{ route('admin.brain.bench.accept') }}" id="proposals">
+        @csrf
+
+        <div class="bulkbar">
+          <span class="count"><strong id="tickcount">0</strong> ticked</span>
+          <button class="btn-sm go" type="submit">Accept ticked</button>
+          <button class="btn-sm warn" type="submit"
+                  formaction="{{ route('admin.brain.bench.reject') }}">Throw away ticked</button>
+          <button class="btn-sm" type="submit" name="all" value="1"
+                  onclick="return confirm('Accept all {{ $proposals->count() }} proposals without reading them?');">Accept all</button>
+        </div>
+
+        <table class="tidy">
+          <thead>
             <tr>
-              <td>
-                <a href="{{ route('admin.brain.prompt', ['news_item_id' => $p->news_item_id]) }}"
-                   class="storylink">{{ \Illuminate\Support\Str::limit($p->title, 62) }}</a>
-              </td>
-              <td class="mini">
-                @if(!$p->expect_keep)
-                  <span class="pill nowhere">should not be published</span>
-                @else
-                  {{ $p->expect_category ?: '—' }}<br>
-                  @if($p->expect_nowhere)
-                    <span class="pill nowhere">nowhere</span>
-                  @elseif($p->expect_place)
-                    <span class="pill">{{ $p->expect_place }}</span>
-                  @endif
-                @endif
-              </td>
-              <td class="mini">{{ $p->proposed_reason }}</td>
-              <td style="text-align:right;white-space:nowrap;">
-                <form method="POST" action="{{ route('admin.brain.bench.accept', $p->id) }}" style="display:inline;">
-                  @csrf
-                  <button class="btn-sm go" type="submit">Accept</button>
-                </form>
-                <form method="POST" action="{{ route('admin.brain.bench.reject', $p->id) }}" style="display:inline;">
-                  @csrf @method('DELETE')
-                  <button class="btn-sm warn" type="submit">No</button>
-                </form>
-              </td>
+              <th class="tickcol"><input type="checkbox" id="tickall" aria-label="Tick every proposal"></th>
+              <th>Story</th><th style="width:150px;">Proposed</th><th>Why</th><th style="width:120px;"></th>
             </tr>
-          @endforeach
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            @foreach($proposals as $p)
+              <tr>
+                <td class="tickcol">
+                  <input type="checkbox" name="ids[]" value="{{ $p->id }}" class="tick"
+                         aria-label="Tick {{ \Illuminate\Support\Str::limit($p->title, 40) }}">
+                </td>
+                <td>
+                  <a href="{{ route('admin.brain.prompt', ['news_item_id' => $p->news_item_id]) }}"
+                     class="storylink">{{ \Illuminate\Support\Str::limit($p->title, 62) }}</a>
+                </td>
+                <td class="mini">
+                  @if(!$p->expect_keep)
+                    <span class="pill nowhere">should not be published</span>
+                  @else
+                    {{ $p->expect_category ?: '—' }}<br>
+                    @if($p->expect_nowhere)
+                      <span class="pill nowhere">nowhere</span>
+                    @elseif($p->expect_place)
+                      <span class="pill">{{ $p->expect_place }}</span>
+                    @endif
+                  @endif
+                </td>
+                <td class="mini">{{ $p->proposed_reason }}</td>
+                <td style="text-align:right;white-space:nowrap;">
+                  <button class="btn-sm go" type="submit" name="only" value="{{ $p->id }}">Accept</button>
+                  <button class="btn-sm warn" type="submit" name="only" value="{{ $p->id }}"
+                          formaction="{{ route('admin.brain.bench.reject') }}">No</button>
+                </td>
+              </tr>
+            @endforeach
+          </tbody>
+        </table>
+      </form>
     </div>
+
+    <script>
+      (function () {
+        var form = document.getElementById('proposals');
+        if (!form) { return; }
+
+        var all = form.querySelector('#tickall');
+        var ticks = form.querySelectorAll('.tick');
+        var count = form.querySelector('#tickcount');
+
+        // The bar says how many are ticked, so a batch action is never taken
+        // blind - the difference between accepting two and accepting eleven is
+        // otherwise invisible at the moment of pressing.
+        function refresh() {
+          var n = 0;
+          ticks.forEach(function (t) { if (t.checked) { n++; } });
+          count.textContent = n;
+          all.checked = n === ticks.length && n > 0;
+          all.indeterminate = n > 0 && n < ticks.length;
+        }
+
+        all.addEventListener('change', function () {
+          ticks.forEach(function (t) { t.checked = all.checked; });
+          refresh();
+        });
+
+        ticks.forEach(function (t) { t.addEventListener('change', refresh); });
+        refresh();
+      })();
+    </script>
   @endif
 
   {{-- Directly under the thing that fills it. This used to sit below the runs,

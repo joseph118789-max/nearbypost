@@ -379,12 +379,47 @@ class BrainController extends Controller
      * is never looked at costs nothing and changes nothing - which is the point
      * of keeping the two apart.
      */
-    public function acceptProposal(Request $request, ?int $id = null): RedirectResponse
+    /**
+     * Which proposals an action applies to.
+     *
+     * One row (a per-row button), the ticked ones, or every proposal. Returned
+     * as null for "all", which the caller turns into an unfiltered query -
+     * distinct from an empty list, which means nothing was ticked and nothing
+     * should happen.
+     *
+     * @return list<int>|null
+     */
+    private function chosen(Request $request): ?array
     {
+        if ($request->filled('only')) {
+            return [(int) $request->input('only')];
+        }
+
+        if ($request->boolean('all')) {
+            return null;
+        }
+
+        return array_map('intval', (array) $request->input('ids', []));
+    }
+
+    /**
+     * Accept proposals, which is what turns them into answers.
+     *
+     * Until this happens they are excluded from every run, so a proposal nobody
+     * looks at costs nothing and changes nothing.
+     */
+    public function acceptProposal(Request $request): RedirectResponse
+    {
+        $ids = $this->chosen($request);
+
+        if ($ids === []) {
+            return back()->with('status', 'Nothing was ticked, so nothing was accepted.');
+        }
+
         $query = DB::table('bench_items')->where('proposed', true);
 
-        if ($id !== null) {
-            $query->where('id', $id);
+        if ($ids !== null) {
+            $query->whereIn('id', $ids);
         }
 
         $accepted = $query->update([
@@ -399,11 +434,25 @@ class BrainController extends Controller
             : "Accepted {$accepted} answers.");
     }
 
-    public function rejectProposal(int $id): RedirectResponse
+    public function rejectProposal(Request $request): RedirectResponse
     {
-        DB::table('bench_items')->where('id', $id)->where('proposed', true)->delete();
+        $ids = $this->chosen($request);
 
-        return back()->with('status', 'Thrown away. Nothing was added to the bench.');
+        if ($ids === []) {
+            return back()->with('status', 'Nothing was ticked, so nothing was thrown away.');
+        }
+
+        $query = DB::table('bench_items')->where('proposed', true);
+
+        if ($ids !== null) {
+            $query->whereIn('id', $ids);
+        }
+
+        $thrown = $query->delete();
+
+        return back()->with('status', $thrown === 1
+            ? 'Thrown away. Nothing was added to the bench.'
+            : "Thrown away {$thrown} proposals. Nothing was added to the bench.");
     }
 
     public function removeBenchItem(int $id): RedirectResponse
