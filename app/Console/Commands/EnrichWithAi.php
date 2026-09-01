@@ -11,6 +11,7 @@ use App\Services\SubCategoryTaxonomy;
 use App\Services\Classification\ContentPolicy;
 use App\Services\Contribution\CaseStudyExamples;
 use App\Services\Contribution\ReviewRules;
+use App\Services\Ai\AiSpend;
 use App\Services\Knowledge\PromptAssembler;
 use App\Services\Classification\CategoryScorer;
 use App\Services\Classification\BatchSlots;
@@ -359,6 +360,11 @@ class EnrichWithAi extends Command
                     'lng'                => $validation['lng'],
                     'tokens_in'          => $response['usage']['prompt_tokens'] ?? null,
                     'tokens_out'         => $response['usage']['completion_tokens'] ?? null,
+                    // Cached input is billed at about a tenth of fresh input, so
+                    // the split is the whole story: a total token count no longer
+                    // says anything useful about what a call cost.
+                    'cache_hit_tokens'   => $response['usage']['prompt_cache_hit_tokens'] ?? null,
+                    'cache_miss_tokens'  => $response['usage']['prompt_cache_miss_tokens'] ?? null,
                     'estimated_cost'      => $this->estimateCost($response),
                     'processed_at'       => now(),
                 ]);
@@ -814,8 +820,27 @@ class EnrichWithAi extends Command
         ];
     }
 
+    /**
+     * What this call cost, counting cached input at the cached rate.
+     *
+     * Charging every input token at the fresh rate overstated the bill by
+     * roughly three times once the prompt was reordered and most of it started
+     * arriving from cache.
+     */
     private function estimateCost(array $response): string
     {
+        $usage = $response['usage'] ?? [];
+
+        if (isset($usage['prompt_cache_hit_tokens']) || isset($usage['prompt_cache_miss_tokens'])) {
+            return (string) (new AiSpend())->costOf(
+                (int) ($usage['prompt_cache_hit_tokens'] ?? 0),
+                (int) ($usage['prompt_cache_miss_tokens'] ?? 0),
+                (int) ($usage['completion_tokens'] ?? 0),
+                self::MODEL
+            );
+        }
+
+        // A provider that reports no cache split: everything is fresh input.
         $in  = $response['usage']['prompt_tokens'] ?? 0;
         $out = $response['usage']['completion_tokens'] ?? 0;
         $cost = ($in * 0.15 / 1_000_000) + ($out * 0.60 / 1_000_000);

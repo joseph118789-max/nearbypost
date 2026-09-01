@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Services\Ai\Adapters;
+use App\Services\Ai\AiSpend;
 use App\Services\Knowledge\Briefing;
 use App\Services\Knowledge\CorrectionLog;
 use App\Services\Knowledge\Playbook;
@@ -162,6 +163,41 @@ class BrainController extends Controller
                 ->limit(12)
                 ->get(['id', 'title']),
         ]);
+    }
+
+    /**
+     * What is left to spend, and what it went on.
+     */
+    public function spend(AiSpend $spend): View
+    {
+        $balance = $spend->balance();
+
+        $cached = DB::selectOne("
+            select coalesce(sum(cache_hit_tokens), 0) as hit,
+                   coalesce(sum(cache_miss_tokens), 0) as miss
+            from ai_processing_jobs
+            where created_at >= now() - interval '7 days'
+        ");
+
+        $total = (int) $cached->hit + (int) $cached->miss;
+
+        return view('admin.brain.spend', [
+            'balance'     => $balance,
+            'daysLeft'    => $spend->daysLeft($balance['balance']),
+            'daily'       => $spend->daily(14),
+            'cachedPct'   => $total > 0 ? (int) round($cached->hit * 100 / $total) : null,
+            'cachedDays'  => 7,
+            'ratesReadOn' => AiSpend::RATES_READ_ON,
+        ]);
+    }
+
+    /** Ask the provider again rather than trusting the cached reading. */
+    public function refreshBalance(AiSpend $spend): RedirectResponse
+    {
+        $balance = $spend->balance(true);
+
+        return back()->with('status', $balance['error']
+            ?? 'Checked: ' . number_format((float) $balance['balance'], 2) . ' ' . $balance['currency'] . ' remaining.');
     }
 
     // ── The playbook ──────────────────────────────────────────────────────

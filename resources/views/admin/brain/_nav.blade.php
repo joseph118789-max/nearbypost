@@ -27,6 +27,7 @@
     <a href="{{ route('admin.rules.index') }}" class="{{ request()->routeIs('admin.rules.*') ? 'on' : '' }}">Rules</a>
     <a href="{{ route('admin.cases.index') }}" class="{{ request()->routeIs('admin.cases.*') ? 'on' : '' }}">Case studies</a>
     <a href="{{ route('admin.brain.briefing') }}" class="{{ request()->routeIs('admin.brain.briefing') ? 'on' : '' }}">Malaysia briefing</a>
+    <a href="{{ route('admin.brain.spend') }}" class="{{ request()->routeIs('admin.brain.spend') ? 'on' : '' }}">Cost</a>
   </span>
 
   <span class="navgroup"><b>3</b> Published</span>

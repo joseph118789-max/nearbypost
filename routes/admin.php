@@ -94,6 +94,9 @@ Route::prefix("admin")->name("admin.")->group(function () {
         Route::get("/brain", [BrainController::class, "index"])->name("brain.index");
         Route::get("/brain/prompt", [BrainController::class, "prompt"])->name("brain.prompt");
 
+        Route::get("/brain/spend", [BrainController::class, "spend"])->name("brain.spend");
+        Route::post("/brain/spend/refresh", [BrainController::class, "refreshBalance"])->name("brain.spend.refresh");
+
         Route::get("/brain/playbook", [BrainController::class, "playbook"])->name("brain.playbook");
         Route::put("/brain/playbook/{key}", [BrainController::class, "savePlaybook"])->name("brain.playbook.save");
         Route::post("/brain/playbook/{key}/toggle", [BrainController::class, "togglePlaybook"])->name("brain.playbook.toggle");
