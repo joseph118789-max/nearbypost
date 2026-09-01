@@ -9,6 +9,8 @@ return [
     'marketplace'    => 'Pasaran',
     'sections'       => 'Bahagian',
     'topics'         => 'Topik',
+    'all_topics_option'    => 'Semua topik',
+    'all_subtopics_option' => 'Semua sub-topik',
     'side_panel'     => 'Pilihan lain',
     'subtopics'      => 'Sub-topik',
     'no_subtopics'   => 'Belum ada topik yang lebih khusus di sini.',

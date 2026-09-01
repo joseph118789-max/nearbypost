@@ -115,10 +115,19 @@ a { color: inherit; }
 
 .controls { max-width: 720px; margin: 10px auto 0; padding: 0 14px; }
 
+/* Place and buttons on the first line, the topic pickers on the second. Five
+   controls sharing 375px truncates all five. */
 .controls-row {
-  display: flex; align-items: center; gap: 6px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center; gap: 6px;
   background: var(--paper); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 6px;
+}
+.picks { grid-column: 1 / -1; display: flex; gap: 6px; }
+.picks .pick { flex: 1 1 0; min-width: 0; }
+.place-input.as-label {
+  display: flex; align-items: center; font-weight: 600; color: var(--ink-soft);
 }
 
 .place-input, .pick {
@@ -255,6 +264,10 @@ h1 { font-size: 1.35rem; line-height: 1.25; margin-bottom: 6px; text-wrap: balan
 
 /* A little more room to breathe once there is room to breathe in. */
 @media (min-width: 700px) {
+  /* Room for everything on one line again. */
+  .controls-row { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) auto auto; }
+  .picks { grid-column: auto; display: contents; }
+
   body { font-size: 16.5px; }
   .topbar { padding: 12px 20px; }
   .story { padding: 15px 18px; }

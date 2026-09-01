@@ -9,6 +9,8 @@ return [
     'marketplace'    => '市集',
     'sections'       => '栏目',
     'topics'         => '主题',
+    'all_topics_option'    => '所有主题',
+    'all_subtopics_option' => '所有子主题',
     'side_panel'     => '更多选项',
     'subtopics'      => '子主题',
     'no_subtopics'   => '这里暂时没有更细的主题。',

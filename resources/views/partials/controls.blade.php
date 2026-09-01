@@ -1,45 +1,26 @@
-{{-- Everything a reader can change, in one row on a phone.
+{{-- Everything a reader can change, in one form.
 
-     One form, submitted by one button, working with no JavaScript at all. The
-     radius and the period are behind a toggle because they are set once and
-     then forgotten, while the place and the topic are what people actually
-     reach for - and on a phone the difference between "always visible" and
-     "one tap away" is most of the screen. --}}
+     On a phone the place and the buttons take the first line and the two topic
+     pickers take the second, because five controls on one line truncates every
+     one of them to "Kuala Lum", "Crime" and "Sub-t(" - which tells a reader
+     neither what is selected nor what they are choosing between.
+
+     Radius, period and source stay behind a toggle: they are set once and then
+     forgotten, while the place and the topic are what people reach for. One
+     GET form, one submit button, no JavaScript required. --}}
 @php
-  $hasAdvanced = request()->hasAny(['radius', 'days', 'source'])
-      || ($radius ?? null) !== 20 || ($days ?? null) !== 7 || !empty($source);
+  $hasAdvanced = ($radius ?? null) !== 20 || ($days ?? null) !== 7 || !empty($source);
 @endphp
 
-<form class="controls" method="get" action="{{ \App\Support\Loc::route(($tab ?? '') === 'interest' ? 'interest' : 'home') }}">
+<form class="controls" method="get" id="feed-controls"
+      action="{{ \App\Support\Loc::route(($tab ?? '') === 'interest' ? 'interest' : 'home') }}">
   <div class="controls-row">
     @if(($tab ?? '') !== 'interest')
       <label class="visually-hidden" for="place">{{ __('site.field_place') }}</label>
       <input class="place-input" id="place" type="text" name="place" value="{{ $place ?? '' }}"
              placeholder="{{ __('site.field_place') }}" maxlength="120" enterkeyhint="search">
-    @endif
-
-    <label class="visually-hidden" for="category">{{ __('site.topics') }}</label>
-    <select class="pick" id="category" name="category">
-      <option value="">{{ __('site.topics') }} &middot; {{ __('site.all') }}</option>
-      @foreach($categories ?? [] as $cat)
-        <option value="{{ $cat }}" {{ !empty($category) && mb_strtolower($category) === mb_strtolower($cat) ? 'selected' : '' }}>
-          {{ \App\Support\Taxonomy::category($cat) }}
-        </option>
-      @endforeach
-    </select>
-
-    {{-- Only shown once a topic is chosen, because it is empty until then and
-         an empty control is a question a reader cannot answer. --}}
-    @if(!empty($subCategories))
-      <label class="visually-hidden" for="sub">{{ __('site.subtopics') }}</label>
-      <select class="pick" id="sub" name="sub">
-        <option value="">{{ __('site.subtopics') }} &middot; {{ __('site.all') }}</option>
-        @foreach($subCategories as $s)
-          <option value="{{ $s['name'] }}" {{ !empty($sub) && mb_strtolower($sub) === mb_strtolower($s['name']) ? 'selected' : '' }}>
-            {{ \App\Support\Taxonomy::subCategory($s['name']) }} ({{ $s['count'] }})
-          </option>
-        @endforeach
-      </select>
+    @else
+      <span class="place-input as-label">{{ __('site.latest_news') }}</span>
     @endif
 
     <button class="go" type="submit" aria-label="{{ __('site.show_news_here') }}">
@@ -87,5 +68,58 @@
         <button class="go wide" type="submit">{{ __('site.show_news_here') }}</button>
       </div>
     </details>
+
+    {{-- Their own line, so each is wide enough to read. --}}
+    <div class="picks">
+      <label class="visually-hidden" for="category">{{ __('site.topics') }}</label>
+      <select class="pick" id="category" name="category">
+        <option value="">{{ __('site.all_topics_option') }}</option>
+        @foreach($categories ?? [] as $cat)
+          <option value="{{ $cat }}" {{ !empty($category) && mb_strtolower($category) === mb_strtolower($cat) ? 'selected' : '' }}>
+            {{ \App\Support\Taxonomy::category($cat) }}
+          </option>
+        @endforeach
+      </select>
+
+      {{-- Offered only once a topic is chosen: until then it has nothing in it,
+           and an empty control is a question a reader cannot answer. --}}
+      @if(!empty($subCategories))
+        <label class="visually-hidden" for="sub">{{ __('site.subtopics') }}</label>
+        <select class="pick" id="sub" name="sub">
+          <option value="">{{ __('site.all_subtopics_option') }}</option>
+          @foreach($subCategories as $s)
+            <option value="{{ $s['name'] }}" {{ !empty($sub) && mb_strtolower($sub) === mb_strtolower($s['name']) ? 'selected' : '' }}>
+              {{ \App\Support\Taxonomy::subCategory($s['name']) }} ({{ $s['count'] }})
+            </option>
+          @endforeach
+        </select>
+      @endif
+    </div>
   </div>
 </form>
+
+<script>
+  (function () {
+    var form = document.getElementById('feed-controls');
+    if (!form) { return; }
+
+    var category = form.querySelector('#category');
+    var sub = form.querySelector('#sub');
+
+    // Choosing a topic reloads at once, so its sub-topics appear without the
+    // reader having to guess that a second tap is needed. The submit button
+    // still works and is what happens with no JavaScript.
+    if (category) {
+      category.addEventListener('change', function () {
+        // A sub-topic belongs to the topic it was chosen under; carrying
+        // Badminton into Health would filter to nothing.
+        if (sub) { sub.value = ''; }
+        form.submit();
+      });
+    }
+
+    if (sub) {
+      sub.addEventListener('change', function () { form.submit(); });
+    }
+  })();
+</script>

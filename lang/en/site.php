@@ -15,6 +15,8 @@ return [
     'marketplace'    => 'Marketplace',
     'sections'       => 'Sections',
     'topics'         => 'Topics',
+    'all_topics_option'    => 'All topics',
+    'all_subtopics_option' => 'All sub-topics',
     'side_panel'     => 'More options',
     'subtopics'      => 'Sub-topics',
     'no_subtopics'   => 'No narrower topics here yet.',
