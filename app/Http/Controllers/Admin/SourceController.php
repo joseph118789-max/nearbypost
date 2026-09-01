@@ -105,6 +105,19 @@ class SourceController extends Controller
             ->orderBy('name')
             ->get();
 
+        // Today, and the daily average over the week, per publisher - its own
+        // sections folded in, because a publisher's sections are that
+        // publisher delivering.
+        $daily = DB::table('source_daily_stats as s')
+            ->join('sources as src', 'src.id', '=', 's.source_id')
+            ->where('s.day', '>=', now()->subDays(7)->toDateString())
+            ->selectRaw('coalesce(src.parent_source_id, src.id) as root_id,
+                         coalesce(sum(s.items_new) FILTER (WHERE s.day = CURRENT_DATE), 0) as today,
+                         round(coalesce(sum(s.items_new), 0) / 7.0) as per_day')
+            ->groupBy('root_id')
+            ->get()
+            ->keyBy('root_id');
+
         $children = DB::table('sources')
             ->where('country', $country)
             ->whereNotNull('parent_source_id')
@@ -120,6 +133,7 @@ class SourceController extends Controller
             'name'      => self::COUNTRIES[$country] ?? $country,
             'roots'     => $roots,
             'children'  => $children,
+            'daily'     => $daily,
             'canLeave'  => (Auth::guard('admin')->user()->country ?? null) === null,
         ]);
     }

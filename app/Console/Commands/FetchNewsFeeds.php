@@ -899,6 +899,18 @@ class FetchNewsFeeds extends Command
             DB::table('sources')->where('id', $sourceId)->update([
                 'items_contributed' => DB::raw('items_contributed + ' . (int) $count),
             ]);
+
+            // Kept per day and per source, so "how much is this giving me now"
+            // has an answer that can go down as well as up - and one that
+            // survives the stories themselves being deleted.
+            DB::statement(
+                'INSERT INTO source_daily_stats (source_id, day, items_new, created_at, updated_at)
+                 VALUES (?, CURRENT_DATE, ?, NOW(), NOW())
+                 ON CONFLICT (source_id, day)
+                 DO UPDATE SET items_new = source_daily_stats.items_new + EXCLUDED.items_new,
+                               updated_at = NOW()',
+                [$sourceId, (int) $count]
+            );
         }
 
         $this->info("Done. new={$created} already-held={$duplicate} rejected={$rejected}");
