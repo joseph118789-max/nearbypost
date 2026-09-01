@@ -58,6 +58,9 @@ class PostController extends Controller
             'pageTitle'   => $title,
             'description' => mb_substr((string) ($translation->summary ?? $post->summary), 0, 200),
             'canonical'   => url()->current(),
+            // A reader's own photograph, where they attached one. Sharing their
+            // post to WhatsApp should show what they saw, not the site's logo.
+            'ogImage'     => $post->image_path ? asset($post->image_path) : null,
             'categories'  => $this->feed->categories(),
             'place'       => $post->location_label ?: $post->main_place_text,
             'coords'      => $post->latitude !== null

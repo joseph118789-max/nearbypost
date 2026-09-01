@@ -10,6 +10,14 @@
   <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large">
   <link rel="canonical" href="{{ $canonical ?? url()->current() }}">
 
+  {{-- Sized files rather than one bitmap scaled by the browser: at 16 pixels
+       the three bars inside the pin smear into a grey block unless the icon was
+       drawn for that size. --}}
+  <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon-32.png') }}">
+  <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('favicon-16.png') }}">
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('apple-touch-icon.png') }}">
+
   {{-- The same page in the other reading languages. Without these a search
        engine treats the three as competing duplicates rather than one page. --}}
   @foreach(\App\Support\Loc::alternatesForCurrent() as $alt)
@@ -26,7 +34,23 @@
   <meta property="og:description" content="{{ $description ?? 'Local news and hyperlocal updates from across Malaysia.' }}">
   <meta property="og:url" content="{{ $canonical ?? url()->current() }}">
   <meta property="og:locale" content="en_MY">
-  <meta name="twitter:card" content="summary">
+
+  {{-- Without this a link shared to WhatsApp or Facebook renders as a grey box
+       with a URL under it. $ogImage lets a page that has its own picture - a
+       reader's photograph on their own post - use it instead of the brand card. --}}
+  <meta property="og:image" content="{{ $ogImage ?? asset('og-image.png') }}">
+  @empty($ogImage)
+    {{-- Only for the brand card, whose size we know. Declaring 1200x630 over a
+         reader's portrait photograph would be a measurement we made up, and the
+         scrapers that trust it would crop the picture to it. --}}
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+  @endempty
+  <meta property="og:image:alt" content="{{ $pageTitle ?? config('app.name') }}">
+  <meta name="twitter:image" content="{{ $ogImage ?? asset('og-image.png') }}">
+
+  {{-- summary_large_image, because there is now an image worth the space. --}}
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:site" content="@nearbypost">
 
   {{-- Geographic signals. On a place page these describe that place, so a
