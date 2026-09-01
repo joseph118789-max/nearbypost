@@ -29,7 +29,6 @@ Route::middleware('throttle:60,1')->group(function () {
 Route::post('/report-content', [ReportController::class, 'store']);
 Route::post('/internal/ingest/news', [IngestController::class, 'ingest']);
 Route::post('/internal/ingest/batch', [IngestController::class, 'ingestBatch']);
-    Route::post('/internal/ingest/classify', [IngestController::class, 'classifyWithDeepSeek']);
 
 Route::prefix('admin')->group(function () {
     Route::get('/subscribers', [SubscriberController::class, 'index']);
