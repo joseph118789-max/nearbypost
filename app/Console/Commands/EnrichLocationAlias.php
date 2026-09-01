@@ -58,7 +58,10 @@ class EnrichLocationAlias extends Command
         }
 
         $limit = max(1, (int) $this->option('limit'));
-        $items = $query->limit($limit)->get();
+        // Newest first: a stage that cannot clear its backlog should
+        // spend its limit on today's news, not on the same old stories
+        // that have failed every run for months.
+        $items = $query->orderByDesc('published_at')->limit($limit)->get();
 
         $this->info("Alias enrichment: processing {$items->count()} items.");
 

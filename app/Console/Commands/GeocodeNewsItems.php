@@ -49,13 +49,16 @@ class GeocodeNewsItems extends Command
                   ->orWhereNotIn('geocode_status', ['success']);
             })
             ->where('relevance_mode', '!=', 'category_only')  // explicit skip
-            ->orderBy('id');
+            ;
 
         if ($newsItemId) {
             $query->where('id', $newsItemId);
         }
 
-        $items = $query->limit($limit)->get();
+        // Newest first: a stage that cannot clear its backlog should
+        // spend its limit on today's news, not on the same old stories
+        // that have failed every run for months.
+        $items = $query->orderByDesc('published_at')->limit($limit)->get();
         $this->info("Geocoding: {$items->count()} items (provider={$this->geocoder->getProvider()}).");
 
         $rateLimited = 0;

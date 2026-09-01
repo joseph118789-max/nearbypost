@@ -116,7 +116,10 @@ class EnrichWithAi extends Command
         }
 
         $limit = (int) ($this->option('limit') ?: 50);
-        $items = $query->limit($limit)->get();
+        // Newest first: a stage that cannot clear its backlog should
+        // spend its limit on today's news, not on the same old stories
+        // that have failed every run for months.
+        $items = $query->orderByDesc('published_at')->limit($limit)->get();
         $this->info("AI Enrichment pipeline=" . self::PIPELINE_VERSION . " | processing {$items->count()} items (limit={$limit}).");
 
         foreach ($items as $item) {
@@ -801,6 +804,17 @@ Return a place when being near it genuinely matters:
 Be as specific as the text allows: "Desa ParkCity, Kuala Lumpur" beats "Kuala
 Lumpur", and a district beats a state. If the story is about somewhere outside
 Malaysia, give that place - Kathmandu, Bangkok - rather than where it was filed.
+
+A SPEAKER'S ADDRESS IS NOT A LOCATION EITHER. When someone comments on a
+national matter, the story is not located where they work. An academic in Penang
+saying affordable housing is a national problem is a national housing story, not
+a Penang story; an industry body in Petaling Jaya calling for a policy rethink is
+not a Petaling Jaya story. Locate the event being discussed, and where there is
+no event in one place, return null.
+
+The same goes for the office that published the piece. A car review, a buyer's
+guide or a product write-up belongs to nowhere, whatever city the reviewer sat
+in.
 
 Ask yourself: would a reader standing in this place be more interested than a
 reader anywhere else in the country? If not, the answer is null.

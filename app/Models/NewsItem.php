@@ -131,7 +131,12 @@ class NewsItem extends Model
 
     public function extractionJob(): HasOne
     {
-        return $this->hasOne(ExtractionJob::class);
+        // The newest, not whichever the database happens to return first.
+        // Extraction inserts a row per run rather than updating, so a
+        // re-processed story has several - and a plain hasOne was handing the
+        // classifier a failed run from weeks ago, which then reported
+        // INSUFFICIENT_CONTENT about an article we were holding the text of.
+        return $this->hasOne(ExtractionJob::class)->latestOfMany();
     }
 
     public function aiProcessingJob(): HasOne
