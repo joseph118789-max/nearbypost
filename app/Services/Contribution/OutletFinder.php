@@ -126,6 +126,10 @@ class OutletFinder
         $safeTitle = mb_substr(trim($title), 0, 300);
         $safeBody = mb_substr(trim($body), 0, 3000);
 
+        // The same worked examples the classifier gets. This is the decision
+        // they are most directly about, so the precedent belongs here first.
+        $worked = (new CaseStudyExamples())->promptBlock();
+
         return <<<PROMPT
 A Malaysian local news site wants to show the story below to readers who live
 near each place it affects, rather than pinning it to a single point.
@@ -134,6 +138,7 @@ Work out which organisation or brand the story is about, then list the places in
 Malaysia where a reader would be affected - usually that organisation's branches
 or outlets.
 
+{$worked}
 DECIDE THE SCALE BEFORE YOU LIST ANYTHING
 
 Some stories affect everybody in the country and belong to no particular place.

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\FeedReadyItem;
 use App\Models\NewsItem;
+use App\Services\Contribution\CaseStudyExamples;
 use App\Services\Contribution\OutletFinder;
 use App\Services\LocationResolver;
 use Illuminate\Http\RedirectResponse;
@@ -242,8 +243,18 @@ class CaseStudyController extends Controller
             ->orderBy('id')
             ->get();
 
-        if ($places->isEmpty()) {
+        // A national story correctly has no places. Refusing to publish it was
+        // right while every case study had places and became wrong the moment
+        // one could properly have none - it left the petrol-subsidy kind of
+        // story with nowhere to go at all.
+        if ($places->isEmpty() && $case->outlet_scale !== 'national') {
             return back()->withErrors(['primary_category' => 'Nothing is on the map yet, so there is nowhere to serve this.']);
+        }
+
+        if ($places->isEmpty()) {
+            $this->publishNationally($case, mb_strtolower($data['primary_category']));
+
+            return back()->with('status', 'Published with no location, under its topic.');
         }
 
         $case->update([
@@ -290,7 +301,58 @@ class CaseStudyController extends Controller
             ]);
         }
 
+        // The model learns from published cases, so a decision made here should
+        // reach the next story rather than waiting out a cache.
+        (new CaseStudyExamples())->bumpVersion();
+
         return back()->with('status', 'Published at ' . $places->count() . ' location(s).');
+    }
+
+    /**
+     * Serve a national story: one row, no coordinates, found by topic.
+     *
+     * The same shape the site already uses for a story that happened nowhere in
+     * particular - a foreign tennis result, a policy that applies to everyone.
+     * It appears under By Interest and is never shown to anyone as news near
+     * them, which is the whole point of calling it national.
+     */
+    private function publishNationally(NewsItem $case, string $category): void
+    {
+        $case->update([
+            'primary_category' => $category,
+            'ai_category'      => $category,
+            'status'           => 'active',
+            'review_status'    => 'published',
+            'relevance_mode'   => 'category_only',
+            'ai_status'        => 'success',
+            'is_article'       => true,
+            'is_multi_point'   => false,
+            'main_place_text'  => null,
+            'location_label'   => null,
+            'latitude'         => null,
+            'longitude'        => null,
+            'precision_type'   => null,
+        ]);
+
+        FeedReadyItem::where('news_item_id', $case->id)->delete();
+
+        FeedReadyItem::create([
+            'news_item_id'        => $case->id,
+            'title'               => $case->title,
+            'summary'             => $case->summary,
+            'source'              => $case->source,
+            'url'                 => $case->url,
+            'published_at'        => $case->published_at,
+            'primary_category'    => $category,
+            'relevance_mode'      => 'category_only',
+            'sort_timestamp'      => $case->published_at,
+            'origin'              => 'editorial',
+            'is_article'          => true,
+            'is_active'           => true,
+            'is_primary_location' => true,
+        ]);
+
+        (new CaseStudyExamples())->bumpVersion();
     }
 
     /** Take it out of the feed everywhere at once. */
@@ -319,6 +381,10 @@ class CaseStudyController extends Controller
             'created_at'       => now(),
             'updated_at'       => now(),
         ]);
+
+        // It is no longer a decision this newsroom stands behind, so it stops
+        // being taught as one.
+        (new CaseStudyExamples())->bumpVersion();
 
         return back()->with('status', 'Taken down from every location.');
     }

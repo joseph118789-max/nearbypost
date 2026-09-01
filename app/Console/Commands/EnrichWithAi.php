@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
 use App\Services\SubCategoryTaxonomy;
 use App\Services\Classification\ContentPolicy;
+use App\Services\Contribution\CaseStudyExamples;
 use App\Services\Contribution\ReviewRules;
 use App\Services\Classification\CategoryScorer;
 use App\Services\Classification\BatchSlots;
@@ -684,6 +685,13 @@ class EnrichWithAi extends Command
         // gathered articles, so the prompt is unchanged rather than gaining an
         // empty heading - which a model reads as "there are no rules".
         $houseRules = (new ReviewRules())->promptBlock('scraper');
+
+        // Cases an editor published, as precedent. A rule states the policy; a
+        // case shows a judgement this newsroom made and stood behind, which is
+        // how the awkward calls get taught - where the line falls between one
+        // chain's branches and a whole class of business, or between a policy
+        // announced in Putrajaya and a policy that happens in Putrajaya.
+        $worked = (new CaseStudyExamples())->promptBlock();
         $subList      = (new SubCategoryTaxonomy())->promptBlockWithIds();
         $slots        = json_encode($slots);
 
@@ -722,6 +730,7 @@ resolution, clickbait without substance, or no actual event. Set e when a listed
 code applies. When d = 1, rel and sub may be empty.
 
 {$houseRules}
+{$worked}
 RELEVANCE
 - Include only categories with non-zero relevance. Omit the rest.
 - 1.0 is RARE: it needs a specific place, a specific action, and a verifiable
