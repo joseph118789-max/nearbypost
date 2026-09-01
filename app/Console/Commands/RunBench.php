@@ -153,7 +153,10 @@ class RunBench extends Command
     /** @return list<object> */
     private function items(int $limit): array
     {
-        $query = DB::table('bench_items')->orderBy('id');
+        // ⛔ Proposals are excluded. A bench is worth having because a person
+        // confirmed each answer; scoring a model against a machine's own
+        // opinion would always look good and mean nothing.
+        $query = DB::table('bench_items')->where('proposed', false)->orderBy('id');
 
         if ($limit > 0) {
             $query->limit($limit);

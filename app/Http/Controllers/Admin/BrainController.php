@@ -229,8 +229,9 @@ class BrainController extends Controller
         $runs = DB::table('bench_runs')->orderByDesc('id')->limit(10)->get();
 
         return view('admin.brain.bench', [
-            'items' => DB::table('bench_items')->orderByDesc('id')->limit(60)->get(),
-            'count' => DB::table('bench_items')->count(),
+            'items' => DB::table('bench_items')->where('proposed', false)->orderByDesc('id')->limit(60)->get(),
+            'count' => DB::table('bench_items')->where('proposed', false)->count(),
+            'proposals' => DB::table('bench_items')->where('proposed', true)->orderBy('expect_keep')->orderBy('id')->get(),
             'runs'  => $runs->map(function ($run) {
                 $run->parsed = $run->scores ? json_decode($run->scores, true) : null;
 
@@ -312,6 +313,40 @@ class BrainController extends Controller
         ]);
 
         return back()->with('status', 'Changed. The next bench run will hold the model to this.');
+    }
+
+    /**
+     * Accept a proposed answer, which is what turns it into an answer.
+     *
+     * Until this happens the row is excluded from every run, so a proposal that
+     * is never looked at costs nothing and changes nothing - which is the point
+     * of keeping the two apart.
+     */
+    public function acceptProposal(Request $request, ?int $id = null): RedirectResponse
+    {
+        $query = DB::table('bench_items')->where('proposed', true);
+
+        if ($id !== null) {
+            $query->where('id', $id);
+        }
+
+        $accepted = $query->update([
+            'proposed'     => false,
+            'note'         => DB::raw("COALESCE(proposed_reason, 'Accepted from review')"),
+            'confirmed_by' => Auth::guard('admin')->id(),
+            'updated_at'   => now(),
+        ]);
+
+        return back()->with('status', $accepted === 1
+            ? 'Accepted. The bench will hold the model to it from the next run.'
+            : "Accepted {$accepted} answers.");
+    }
+
+    public function rejectProposal(int $id): RedirectResponse
+    {
+        DB::table('bench_items')->where('id', $id)->where('proposed', true)->delete();
+
+        return back()->with('status', 'Thrown away. Nothing was added to the bench.');
     }
 
     public function removeBenchItem(int $id): RedirectResponse

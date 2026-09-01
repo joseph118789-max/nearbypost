@@ -23,13 +23,21 @@ use Illuminate\Support\Facades\DB;
 class CorrectionLog
 {
     /** What can be corrected. Each maps to a dimension the bench scores. */
+    /**
+     * What can be corrected, in the order the form offers it.
+     *
+     * ⛔ THE ORDER IS THE POINT. "Should not have been published" was first,
+     * which made it the default, and five corrections about a wrong location
+     * were recorded as requests to delete the story. Location is what people
+     * actually correct; deletion is rare and destructive, so it goes last.
+     */
     public const FIELDS = [
-        'keep'     => 'Should not have been published',
-        'refused'  => 'Should have been published',
-        'place'    => 'Wrong location',
-        'nowhere'  => 'Should have no location',
-        'category' => 'Wrong category',
-        'sub'      => 'Wrong sub-category',
+        'place'    => 'The location is wrong — it happened somewhere else',
+        'nowhere'  => 'It should have no location at all',
+        'category' => 'The category is wrong',
+        'sub'      => 'The sub-category is wrong',
+        'refused'  => 'It was refused, but should have been published',
+        'keep'     => 'It should not have been published at all',
     ];
 
     /**

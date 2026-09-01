@@ -46,11 +46,20 @@
                   <form method="POST" action="{{ route('admin.brain.correct') }}">
                     @csrf
                     <input type="hidden" name="news_item_id" value="{{ $r->id }}">
+                    {{-- Nothing preselected. When the first option was the
+                         default, corrections about a wrong location were
+                         recorded as requests to delete the story. --}}
                     <select name="field" required>
+                      <option value="" selected disabled>— what is wrong with it? —</option>
                       @foreach($fields as $k => $label)<option value="{{ $k }}">{{ $label }}</option>@endforeach
                     </select>
-                    <input type="text" name="correct_answer" placeholder="The right answer — a place, a category, or leave blank">
-                    <input type="text" name="reason" placeholder="Why? This is what teaches the next rule.">
+                    <input type="text" name="correct_answer"
+                           placeholder="The right answer: the place, or the category. This is what gets recorded.">
+                    <input type="text" name="reason"
+                           placeholder="Why — in your words. This is what the next rule gets written from.">
+                    <p class="mini" style="margin:6px 0 0;">
+                      The dropdown decides what is recorded; the last box is the explanation.
+                    </p>
                     <div style="margin-top:8px;"><button class="btn-sm go" type="submit">Record the correction</button></div>
                   </form>
                 </div>
@@ -83,6 +92,60 @@
       </table>
     @endif
   </div>
+
+  @if($proposals->isNotEmpty())
+    <div class="card" style="border-color:#cfe0ec;">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;">
+        <h2>Proposed answers ({{ $proposals->count() }})</h2>
+        <form method="POST" action="{{ route('admin.brain.bench.accept.all') }}">
+          @csrf
+          <button class="btn-sm go" type="submit">Accept all</button>
+        </form>
+      </div>
+      <p class="sub">
+        A review pass, offered as suggestions with the reason attached. <strong>None of these count
+        until you accept one</strong> &mdash; a bench is worth having because a person confirmed each
+        answer, and one confirmed by a machine would be measuring the model against its own opinion.
+        Read the reason, then accept it or throw it away.
+      </p>
+
+      <table class="tidy">
+        <thead>
+          <tr><th>Story</th><th style="width:150px;">Proposed</th><th>Why</th><th style="width:140px;"></th></tr>
+        </thead>
+        <tbody>
+          @foreach($proposals as $p)
+            <tr>
+              <td>{{ \Illuminate\Support\Str::limit($p->title, 62) }}</td>
+              <td class="mini">
+                @if(!$p->expect_keep)
+                  <span class="pill nowhere">should not be published</span>
+                @else
+                  {{ $p->expect_category ?: '—' }}<br>
+                  @if($p->expect_nowhere)
+                    <span class="pill nowhere">nowhere</span>
+                  @elseif($p->expect_place)
+                    <span class="pill">{{ $p->expect_place }}</span>
+                  @endif
+                @endif
+              </td>
+              <td class="mini">{{ $p->proposed_reason }}</td>
+              <td style="text-align:right;white-space:nowrap;">
+                <form method="POST" action="{{ route('admin.brain.bench.accept', $p->id) }}" style="display:inline;">
+                  @csrf
+                  <button class="btn-sm go" type="submit">Accept</button>
+                </form>
+                <form method="POST" action="{{ route('admin.brain.bench.reject', $p->id) }}" style="display:inline;">
+                  @csrf @method('DELETE')
+                  <button class="btn-sm warn" type="submit">No</button>
+                </form>
+              </td>
+            </tr>
+          @endforeach
+        </tbody>
+      </table>
+    </div>
+  @endif
 
   {{-- Directly under the thing that fills it. This used to sit below the runs,
        which meant the answer to "where do I see what I just said" was three
