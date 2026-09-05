@@ -130,9 +130,13 @@ class AiSpend
      */
     public function daily(int $days = 14): array
     {
+        // ⛔ KL, not UTC. The page above this says "Malaysia time" and this
+        // grouped by the raw UTC date, so every call between 16:00 and 23:59
+        // KL was counted against the previous day - eight hours of the busiest
+        // part of the day, on the wrong row. The owner's basis is GMT+8.
         $estimated = DB::table('ai_processing_jobs')
             ->where('created_at', '>=', now()->subDays($days)->startOfDay())
-            ->selectRaw("to_char(created_at, 'YYYY-MM-DD') as day,
+            ->selectRaw("to_char(created_at + interval '8 hours', 'YYYY-MM-DD') as day,
                          count(*) as calls,
                          coalesce(sum(estimated_cost), 0) as estimated,
                          coalesce(sum(cache_hit_tokens), 0) as hit,
@@ -146,6 +150,12 @@ class AiSpend
         // what was actually spent in between.
         $closing = DB::table('ai_balance_log')
             ->where('recorded_at', '>=', now()->subDays($days + 1)->startOfDay())
+            // ⛔ DELIBERATELY NOT SHIFTED, unlike the token totals above.
+            // ai:balance runs at 16:00 UTC *because* that is midnight in KL, so
+            // a reading already sits at the close of a Malaysian day and its
+            // UTC date is that day's date. Adding eight hours moves it into the
+            // next day and every "actual" slides one row down - which it did,
+            // for about a minute, until the numbers were read back.
             ->selectRaw("to_char(recorded_at, 'YYYY-MM-DD') as day, min(balance) as closing")
             ->groupBy('day')
             ->orderBy('day')
@@ -156,7 +166,9 @@ class AiSpend
         $previous = null;
 
         for ($i = $days - 1; $i >= 0; $i--) {
-            $day = now()->subDays($i)->toDateString();
+            // The day list must be KL too, or the newest row is missing for
+            // the eight hours before UTC midnight.
+            $day = now()->addHours(8)->subDays($i)->toDateString();
             $row = $estimated[$day] ?? null;
             $hit = (int) ($row->hit ?? 0);
             $miss = (int) ($row->miss ?? 0);

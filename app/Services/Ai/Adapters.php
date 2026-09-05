@@ -27,6 +27,13 @@ class Adapters
         $registry = self::registry();
 
         if (!isset($registry[$key])) {
+            // any provider set up in the AI panel
+            $fromPanel = AiRouter::adapter($key);
+
+            if ($fromPanel) {
+                return $fromPanel;
+            }
+
             throw new \InvalidArgumentException(
                 "No adapter named '{$key}'. Known: " . implode(', ', array_keys($registry))
             );

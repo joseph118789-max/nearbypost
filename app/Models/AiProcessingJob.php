@@ -21,6 +21,22 @@ class AiProcessingJob extends Model
         'pipeline_version',
         'tokens_in',
         'tokens_out',
+
+        // ⛔ THE $fillable TRAP, FOR THE THIRD TIME ON THIS PROJECT.
+        //
+        // These two columns exist, EnrichWithAi passes them on every call, and
+        // DeepSeek returns them in its usage block - but they were not listed
+        // here, so Eloquent dropped them silently on every write. Not one row
+        // in the table had a cache split, which meant estimateCost() could
+        // never take the cache-aware branch and fell through to a generic
+        // rate. Cached input is a quarter the price of fresh, and most input
+        // here IS cached by design, so the estimate ran far above the bill.
+        //
+        // Nothing errors when a field is missing from $fillable. It is simply
+        // not written. Add the column, add it HERE, and check a real row.
+        'cache_hit_tokens',
+        'cache_miss_tokens',
+
         'estimated_cost',
         'error_message',
         'raw_ai_output',
@@ -33,8 +49,10 @@ class AiProcessingJob extends Model
     ];
 
     protected $casts = [
-        'tokens_in'  => 'integer',
-        'tokens_out' => 'integer',
+        'tokens_in'         => 'integer',
+        'tokens_out'        => 'integer',
+        'cache_hit_tokens'  => 'integer',
+        'cache_miss_tokens' => 'integer',
         'estimated_cost' => 'decimal:6',
         'is_article' => 'boolean',
     ];
