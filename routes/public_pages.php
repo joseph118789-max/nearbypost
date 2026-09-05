@@ -14,7 +14,22 @@ use Illuminate\Support\Facades\Route;
 return function (string $locale): void {
     Route::get('/', [HomeController::class, 'index'])->name('home');
     Route::get('/interest', [HomeController::class, 'interest'])->name('interest');
+    // "Send us your news" - the invitation, and the form behind it.
+    Route::get('/share-your-news', [HomeController::class, 'share'])->name('share');
+    Route::post('/share-your-news', [HomeController::class, 'shareSubmit'])
+        ->middleware('throttle:10,60')->name('share.submit');
     Route::get('/marketplace', [HomeController::class, 'marketplace'])->name('marketplace');
+    // One section. Constrained to the codes that exist, so /marketplace/offer
+    // keeps its own route and a typo 404s instead of rendering an empty page.
+    Route::get('/marketplace/{section}', [HomeController::class, 'marketplaceSection'])
+        ->whereIn('section', ['property','food_dining','home_renovation','buy_sell','professional_services','car_pool'])
+        ->name('marketplace.section');
+
+    // The browser hands over a point; this turns it into the same kind of place
+    // name a reader would have typed and redirects there, so the address bar
+    // ends up somewhere shareable and a refresh does not ask for a position
+    // again. Registered per language like everything else here.
+    Route::get('/locate', [HomeController::class, 'locate'])->name('locate');
 
     Route::get('/category/{slug}', [HomeController::class, 'category'])
         ->where('slug', '[a-z0-9-]+')->name('category');

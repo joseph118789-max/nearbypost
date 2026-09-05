@@ -234,6 +234,19 @@
     const Utils = {
       escapeHtml(str) { if (!str) return ''; const div = document.createElement('div'); div.textContent = str; return div.innerHTML; },
       generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2); },
+      // What the card can honestly say about when: a relative time only when
+      // the publisher gave a time; the day when it gave a day; when we found
+      // it when it gave nothing.
+      formatNewsTime(story) {
+        const p = story.published_precision || 'time';
+        if (!story.published_at) return '';
+        if (p === 'time') return Utils.formatTimeAgoFromDate(story.published_at);
+        const d = new Date(story.published_at);
+        const day = d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', timeZone: 'Asia/Kuala_Lumpur' });
+        if (p === 'date') return day;
+        const hm = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kuala_Lumpur' });
+        return @json(__('site.added')) + ' ' + day + ' ' + hm;
+      },
       formatTimeAgoFromDate(dateValue) {
         if (!dateValue) return 'Just now';
         const date = new Date(dateValue);
@@ -329,7 +342,7 @@
         const card = document.createElement('article');
         card.className = isDesktop ? "desktop-story-card" : "story-card";
         const badge = story.distance_km !== undefined ? '<span class="story-nearby">' + story.distance_km + ' km</span>' : '';
-        card.innerHTML = '<div class="story-meta"><span class="story-source">' + Utils.escapeHtml(story.source || 'Unknown') + '</span><span class="story-category">' + Utils.escapeHtml(Utils.categoryLabel(story)) + '</span>' + badge + '</div><h3 class="story-title">' + Utils.escapeHtml(story.title) + '</h3><p class="story-summary">' + Utils.escapeHtml(story.summary || '') + '</p><div class="story-footer"><span>' + Utils.formatTimeAgoFromDate(story.published_at) + '</span><span>' + Utils.escapeHtml(story.location_label || story.locationName || 'Malaysia') + '</span></div>';
+        card.innerHTML = '<div class="story-meta"><span class="story-source">' + Utils.escapeHtml(story.source || 'Unknown') + '</span><span class="story-category">' + Utils.escapeHtml(Utils.categoryLabel(story)) + '</span>' + badge + '</div><h3 class="story-title">' + Utils.escapeHtml(story.title) + '</h3><p class="story-summary">' + Utils.escapeHtml(story.summary || '') + '</p><div class="story-footer"><span>' + Utils.formatNewsTime(story) + '</span><span>' + Utils.escapeHtml(story.location_label || story.locationName || 'Malaysia') + '</span></div>';
         card.addEventListener('click', () => { if (story.url) window.open(story.url, '_blank', 'noopener,noreferrer'); });
         return card;
       },

@@ -47,6 +47,11 @@ class StoryController extends Controller
 
         $place = $story->location_label ?: null;
 
+        // readers see our own headline; the publisher's stays on the row for the link and for matching
+        if (!empty($story->ai_title)) {
+            $story->title = $story->ai_title;
+        }
+
         return view('pages.story', [
             'tab'         => null,
             'story'       => $story,

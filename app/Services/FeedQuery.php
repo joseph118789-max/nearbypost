@@ -33,7 +33,8 @@ class FeedQuery
         return [
             // news_item_id, not id: id is the feed row, and a multi-point story
             // has one row per place. The page is about the story.
-            'id', 'news_item_id', 'title', 'summary', 'source', 'published_at',
+            'id', 'news_item_id', 'title', 'summary', 'source', 'published_at', 'published_precision',
+            'event_start', 'event_end',
             'primary_category', 'secondary_category', 'sub_category',
             'url', 'lat', 'lng', 'location_label', 'precision_type',
             'origin', 'image_path',
@@ -62,7 +63,8 @@ class FeedQuery
         int $limit = 20,
         ?string $locale = null,
         ?string $sub = null,
-        ?string $source = null
+        ?string $source = null,
+        ?string $country = null
     ): array {
         $locale = $locale ?? Loc::current();
 
@@ -76,11 +78,27 @@ class FeedQuery
             // a feed that does not sort by distance has no reason to prefer any
             // of them - so exactly one carries this flag.
             ->where('feed_ready_items.is_primary_location', true)
-            ->where('feed_ready_items.published_at', '>=', now()->subDays($days));
+            ->where(function ($q) use ($days) {
+                $q->where('feed_ready_items.published_at', '>=', now()->subDays($days))
+                  // Still running counts as still current, whatever its age.
+                  ->orWhere('feed_ready_items.event_end', '>=', now()->toDateString());
+            });
 
         if ($category !== null && $category !== '' && $category !== 'all') {
             // Categories are stored lower-case; accept any casing from the URL.
             $query->whereRaw('LOWER(feed_ready_items.primary_category) = ?', [mb_strtolower($category)]);
+        }
+
+        // The country the story is IN, from the polygon layer's code on the
+        // served row. Malaysia also takes the stories with no pin at all -
+        // the national ones - because they are Malaysian by relevance; any
+        // other country is only what was placed inside it.
+        if ($country !== null && $country !== '') {
+            if (strtoupper($country) === 'MYS') {
+                $query->where(fn ($q) => $q->where('feed_ready_items.geo_country_code', 'MYS')->orWhereNull('feed_ready_items.geo_country_code'));
+            } else {
+                $query->where('feed_ready_items.geo_country_code', strtoupper($country));
+            }
         }
 
         // A sub-category narrows within its parent: Sports, then Badminton.
@@ -137,9 +155,18 @@ class FeedQuery
         ?string $category = null,
         ?string $locale = null,
         ?string $sub = null,
-        ?string $source = null
+        ?string $source = null,
+        ?string $sort = null
     ): array {
         $locale = $locale ?? Loc::current();
+
+        // Nearest first is the right default for a feed whose whole promise is
+        // proximity - but a reader who has been away wants to know what is new,
+        // and to them a story 300 metres away from Tuesday is not the answer.
+        // Whichever they pick, the other is the tie-breaker.
+        $orderBy = $sort === 'time'
+            ? 'ORDER BY published_at DESC, distance_km ASC'
+            : 'ORDER BY distance_km ASC, published_at DESC';
 
         $categoryClause = '';
         $bindings = [
@@ -181,7 +208,7 @@ class FeedQuery
                    f.news_item_id,
                    f.source, f.published_at,
                    f.primary_category, f.secondary_category, f.sub_category,
-                   f.url, f.location_label, f.lat, f.lng,
+                   f.url, f.location_label, f.lat, f.lng, f.event_start, f.event_end,
                    f.origin, f.image_path,
                    ROUND(
                        (6371.0 * acos(
@@ -201,12 +228,19 @@ class FeedQuery
               AND f.lat IS NOT NULL
               AND f.lng IS NOT NULL
               AND f.relevance_mode != 'category_only'
-              AND f.published_at >= NOW() - make_interval(days => :days)
+              AND (
+                f.published_at >= NOW() - make_interval(days => :days)
+                -- A sale running to the 20th is worth reading about ON the
+                -- 19th. Ordering it by publication buries it the morning
+                -- after it appears, while it is still on. So a story with a
+                -- window stays until the window closes, however old it is.
+                OR (f.event_end IS NOT NULL AND f.event_end >= CURRENT_DATE)
+              )
               {$categoryClause}
             ORDER BY COALESCE(f.news_item_id, -f.id), distance_km ASC
         ) AS nearby
         WHERE distance_km <= :radius
-        ORDER BY distance_km ASC, published_at DESC
+        {$orderBy}
         LIMIT {$limit}";
 
         return array_map(
@@ -228,7 +262,7 @@ class FeedQuery
         string $category,
         int $days = 30,
         ?array $coords = null,
-        float $radiusKm = 20.0
+        float $radiusKm = 10.0
     ): array {
         // Beside a Near Me feed the count has to mean what that feed will
         // return, so it is taken within the radius rather than nationally.
@@ -239,7 +273,10 @@ class FeedQuery
         return FeedReadyItem::query()
             ->where('is_active', true)
             ->where('is_primary_location', true)
-            ->where('published_at', '>=', now()->subDays($days))
+            ->where(function ($q) use ($days) {
+                $q->where('published_at', '>=', now()->subDays($days))
+                  ->orWhere('event_end', '>=', now()->toDateString());
+            })
             ->whereRaw('LOWER(primary_category) = ?', [mb_strtolower($category)])
             ->whereNotNull('sub_category')
             ->whereNotIn('sub_category', ['Others', 'General'])
@@ -279,7 +316,14 @@ class FeedQuery
               AND f.lat IS NOT NULL
               AND f.lng IS NOT NULL
               AND f.relevance_mode != 'category_only'
-              AND f.published_at >= NOW() - make_interval(days => :days)
+              AND (
+                f.published_at >= NOW() - make_interval(days => :days)
+                -- A sale running to the 20th is worth reading about ON the
+                -- 19th. Ordering it by publication buries it the morning
+                -- after it appears, while it is still on. So a story with a
+                -- window stays until the window closes, however old it is.
+                OR (f.event_end IS NOT NULL AND f.event_end >= CURRENT_DATE)
+              )
               AND LOWER(f.primary_category) = :category
               AND f.sub_category IS NOT NULL
               AND f.sub_category NOT IN ('Others', 'General')
@@ -298,6 +342,129 @@ class FeedQuery
         ]);
 
         return array_map(fn ($row) => ['name' => $row->name, 'count' => (int) $row->n], $rows);
+    }
+
+    /**
+     * Every category's sub-topics in one go, keyed by category.
+     *
+     * The topic browser opens a category without going back to the server, so
+     * it needs the whole tree in the page rather than the branch the URL
+     * happens to name. One query for all of it: fourteen separate ones, or a
+     * page load per click, is what this replaces.
+     *
+     * Ordered alphabetically rather than by count. A reader opening "Sports"
+     * is looking for a particular sport, and hunting for it down a list that
+     * reorders itself as the news changes is harder than reading an A-Z.
+     *
+     * @param  array{lat: float, lng: float}|null  $coords
+     * @return array<string, list<array{name: string, count: int}>>
+     */
+    public function allSubCategories(int $days = 30, ?array $coords = null, float $radiusKm = 10.0): array
+    {
+        // The taxonomy first, then the counts on top of it.
+        //
+        // Built the other way round - from whatever the feed happens to hold -
+        // "Property & Real Estate" opened onto "No narrower topics here yet",
+        // which reads as a fault in the site rather than as quiet news. The
+        // eight property sub-topics exist whether or not anything was filed
+        // under them this week, and a reader deciding where to look is better
+        // served by seeing them.
+        $tree = [];
+
+        $taxonomy = DB::table('subcategories')
+            ->whereNotIn('sub_category', ['Others', 'General'])
+            ->orderBy('sub_category')
+            ->get(['primary_category', 'sub_category']);
+
+        foreach ($taxonomy as $row) {
+            $tree[mb_strtolower($row->primary_category)][$row->sub_category] = 0;
+        }
+
+        $rows = $coords !== null
+            ? $this->allSubCategoriesNear($days, $coords, $radiusKm)
+            : FeedReadyItem::query()
+                ->where('is_active', true)
+                ->where('is_primary_location', true)
+                ->where(function ($q) use ($days) {
+                $q->where('published_at', '>=', now()->subDays($days))
+                  ->orWhere('event_end', '>=', now()->toDateString());
+            })
+                ->whereNotNull('primary_category')
+                ->whereNotNull('sub_category')
+                ->whereNotIn('sub_category', ['Others', 'General'])
+                ->selectRaw('LOWER(primary_category) AS cat, sub_category AS name, count(*) AS n')
+                ->groupByRaw('LOWER(primary_category), sub_category')
+                ->get()
+                ->all();
+
+        // A sub-topic the classifier has just invented is in the feed before it
+        // is in the taxonomy - taxonomy:sub sync catches up later. It belongs
+        // in the list now, not next week.
+        foreach ($rows as $row) {
+            $tree[$row->cat][$row->name] = (int) $row->n;
+        }
+
+        $out = [];
+
+        foreach ($tree as $cat => $subs) {
+            uksort($subs, 'strcasecmp');
+
+            foreach ($subs as $name => $count) {
+                $out[$cat][] = ['name' => $name, 'count' => $count];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * The same tree, counted only over stories the Near Me feed would show.
+     *
+     * Mirrors subCategoriesNear, minus the single-category filter. If that
+     * query gains a condition this one needs it too, or the counts drift from
+     * the feed standing next to them.
+     *
+     * @param  array{lat: float, lng: float}  $coords
+     */
+    private function allSubCategoriesNear(int $days, array $coords, float $radiusKm): array
+    {
+        $sql = "SELECT cat, name, count(*) AS n FROM (
+            SELECT LOWER(f.primary_category) AS cat,
+                   f.sub_category AS name,
+                   (6371.0 * acos(
+                       LEAST(1.0,
+                           cos(radians(:lat)) * cos(radians(f.lat)) *
+                           cos(radians(f.lng) - radians(:lng)) +
+                           sin(radians(:lat)) * sin(radians(f.lat))
+                       )
+                   )) AS distance_km
+            FROM feed_ready_items f
+            WHERE f.is_active = true
+              AND f.is_article = true
+              AND f.lat IS NOT NULL
+              AND f.lng IS NOT NULL
+              AND f.relevance_mode != 'category_only'
+              AND (
+                f.published_at >= NOW() - make_interval(days => :days)
+                -- A sale running to the 20th is worth reading about ON the
+                -- 19th. Ordering it by publication buries it the morning
+                -- after it appears, while it is still on. So a story with a
+                -- window stays until the window closes, however old it is.
+                OR (f.event_end IS NOT NULL AND f.event_end >= CURRENT_DATE)
+              )
+              AND f.primary_category IS NOT NULL
+              AND f.sub_category IS NOT NULL
+              AND f.sub_category NOT IN ('Others', 'General')
+        ) AS s
+        WHERE distance_km <= :radius
+        GROUP BY cat, name";
+
+        return DB::select($sql, [
+            'lat'    => $coords['lat'],
+            'lng'    => $coords['lng'],
+            'days'   => $days,
+            'radius' => $radiusKm,
+        ]);
     }
 
     /** Distinct primary categories currently present in the feed. */

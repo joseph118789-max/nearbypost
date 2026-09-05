@@ -84,7 +84,19 @@ class PostPublisher
             'is_article'       => true,
         ]);
 
-        if ($coords) {
+        if ($item->latitude !== null && $item->longitude !== null) {
+            // Community Reports: the reader put a pin on the map. The pin is the
+            // place - exact, theirs - and the place text only names it.
+            $item->fill([
+                'canonical_place_name' => $place ?: ($coords['label'] ?? null),
+                'location_label'       => $place ?: ($coords['label'] ?? null),
+                'precision_type'       => 'exact',
+                'geocode_status'       => 'success',
+                'geocode_provider'     => 'reader_pin',
+                'geocoded_at'          => now(),
+                'relevance_mode'       => 'location_and_category',
+            ]);
+        } elseif ($coords) {
             $item->fill([
                 'latitude'             => $coords['lat'],
                 'longitude'            => $coords['lng'],
@@ -111,7 +123,7 @@ class PostPublisher
         if ($item->section === 'marketplace') {
             $item->status = 'held';
             $item->review_status = 'awaiting_marketplace';
-        } elseif ($this->contributorIsTrusted($item)) {
+        } elseif ($this->contributorIsTrusted($item) && $item->review_status === 'published') {
             $item->status = 'active';
         } else {
             // The automatic check says this is news. Whether it is TRUE, and
@@ -153,6 +165,17 @@ class PostPublisher
     {
         if (config('services.contributions.always_review')) {
             return false;
+        }
+
+        // Community Reports (owner's guide): a suitable report publishes at
+        // once as "Unverified"; only a contributor whose credibility has
+        // fallen to Restricted (below 20) waits for a person.
+        if (config('services.community.enabled') && $item->contributor_id) {
+            $credibility = \Illuminate\Support\Facades\DB::table('users')->where('id', $item->contributor_id)->value('credibility');
+
+            if ($credibility !== null && (int) $credibility >= 20) {
+                return true;
+            }
         }
 
         if (!$item->contributor_id) {

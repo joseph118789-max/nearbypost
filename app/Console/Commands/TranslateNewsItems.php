@@ -48,7 +48,7 @@ class TranslateNewsItems extends Command
 
     public function handle(): int
     {
-        $apiKey = config('services.deepseek.key');
+        $apiKey = (\App\Services\Ai\AiRouter::for('translate')->isConfigured() ? 'via-ai-panel' : '');
 
         if (!$apiKey) {
             $this->error('DeepSeek API key not configured');
@@ -106,7 +106,7 @@ class TranslateNewsItems extends Command
             ->limit($limit)
             ->get([
                 'f.news_item_id as id',
-                'n.title',
+                DB::raw('COALESCE(n.ai_title, n.title) as title'),
                 DB::raw('COALESCE(n.ai_summary, n.summary) as summary'),
             ]);
     }
@@ -199,9 +199,7 @@ PROMPT;
     /** @return list<array<string,mixed>> */
     private function callModel(string $apiKey, string $prompt): array
     {
-        $response = Http::withToken($apiKey)
-            ->timeout(120)
-            ->post('https://api.deepseek.com/v1/chat/completions', [
+        $response = \App\Services\Ai\AiRouter::for('translate')->post(120, [
                 'model'       => self::MODEL,
                 'messages'    => [['role' => 'user', 'content' => $prompt]],
                 'temperature' => 0.2,

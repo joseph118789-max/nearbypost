@@ -35,14 +35,21 @@ class RuleController extends Controller
 
     public function index(): View
     {
-        $rules = DB::table('review_rules')->orderBy('sort_order')->orderBy('id')->get();
+        $country = \App\Support\BrainCountry::iso2();
+
+        // All: every rule, with its country shown. A country: the base rules and that country's own.
+        $rules = DB::table('review_rules')
+            ->when($country !== null, fn ($q) => $q->where(fn ($w) => $w->whereNull('country')->orWhere('country', $country)))
+            ->orderBy('sort_order')->orderBy('id')->get();
 
         return view('admin.rules', [
             'rules'     => $rules,
+            'country'   => $country,
+            'countryName' => \App\Support\BrainCountry::name($country),
             'suggested' => self::SUGGESTED,
             'inUse'     => [
-                'contributor' => $this->rules->active('contributor'),
-                'scraper'     => $this->rules->active('scraper'),
+                'contributor' => $this->rules->active('contributor', $country),
+                'scraper'     => $this->rules->active('scraper', $country),
             ],
         ]);
     }
@@ -57,6 +64,7 @@ class RuleController extends Controller
         DB::table('review_rules')->insert([
             'rule'       => trim($data['rule']),
             'applies_to' => $data['applies_to'],
+            'country'    => \App\Support\BrainCountry::iso2(),   // a rule added while looking at a country is that country's
             'is_active'  => true,
             'sort_order' => (int) DB::table('review_rules')->max('sort_order') + 1,
             'created_by' => Auth::guard('admin')->id(),

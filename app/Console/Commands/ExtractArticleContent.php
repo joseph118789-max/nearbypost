@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Http;
 
 class ExtractArticleContent extends Command
 {
-    protected $signature = 'ingest:extract {--news_item_id=}';
+    protected $signature = 'ingest:extract {--news_item_id=} {--redate= : days back: re-read the page for the publication time of stories that carry a scraped time (or --precision=date for day-only ones)} {--precision=scraped} {--limit=300}';
     protected $description = 'Extract content from news items';
 
     /** Manual V6 section 9: keep roughly the first 500 words. */
@@ -49,8 +49,47 @@ class ExtractArticleContent extends Command
      */
     private const MIN_USABLE_CHARS = 600;
 
+    /**
+     * The same demand, in a script where each character carries more.
+     *
+     * Not a guess at a ratio: 250 sits in the measured gap between China
+     * Press's boilerplate (145 characters of related-news links and comment
+     * policy) and its shortest real article (302 characters reporting a drone
+     * strike with a death toll).
+     */
+    private const MIN_USABLE_CHARS_CJK = 250;
+
+    /**
+     * How much text is enough, judged by the writing system in front of us.
+     *
+     * Measured from the text rather than taken from the source's declared
+     * language: a Chinese paper runs English wire copy, an English one quotes
+     * Chinese, and the story in hand is the only thing that knows which it is.
+     */
+    private function minUsableChars(?string $text): int
+    {
+        $text = (string) $text;
+        $length = mb_strlen($text);
+
+        if ($length === 0) {
+            return self::MIN_USABLE_CHARS;
+        }
+
+        preg_match_all('/\p{Han}/u', $text, $han);
+
+        // A third is enough to say the piece is written in Han rather than
+        // merely quoting a name in it.
+        return (count($han[0]) / $length) >= 0.30
+            ? self::MIN_USABLE_CHARS_CJK
+            : self::MIN_USABLE_CHARS;
+    }
+
     public function handle()
     {
+        if ($this->option('redate')) {
+            return $this->redate((int) $this->option('redate'), (string) $this->option('precision'), (int) $this->option('limit'));
+        }
+
         $newsItemId = $this->option('news_item_id');
 
         $query = NewsItem::whereDoesntHave('extractionJob', function ($q) {
@@ -85,6 +124,64 @@ class ExtractArticleContent extends Command
         foreach ($items as $item) {
             $this->processItem($item);
         }
+    }
+
+    /**
+     * The publication time, read again from the page, for stories that were
+     * stamped with the moment we fetched them. Text is not touched: only the
+     * time, and only upward (a clock beats a day beats our own clock).
+     */
+    private function redate(int $days, string $precision, int $limit): int
+    {
+        $items = NewsItem::whereNotNull('url')->where('created_at', '>=', now()->subDays($days))
+            ->where('published_precision', $precision === 'date' ? 'date' : 'scraped')
+            ->orderByDesc('id')->limit($limit)->get();
+
+        $this->info("Re-dating {$items->count()} stories with a {$precision} time from the last {$days} days.");
+        $fixed = 0;
+        $rank = ['scraped' => 0, 'date' => 1, 'time' => 2];
+
+        foreach ($items as $item) {
+            try {
+                $response = Http::withHeaders(['User-Agent' => self::USER_AGENT])->timeout(self::EXTRACT_TIMEOUT_SECONDS)->get($item->url);
+            } catch (\Throwable $e) {
+                continue;
+            }
+
+            if (!$response->successful()) {
+                continue;
+            }
+
+            $extracted = $this->runExtractor((string) $response->body());
+            $date = $this->plausibleDate($extracted['date'] ?? null);
+
+            if ($date === null) {
+                continue;
+            }
+
+            $pagePrecision = $this->clockIn($extracted['date']);
+            $have = $item->published_precision ?? 'time';
+
+            // We fetch fresh feeds, so a page date more than a week before we
+            // found the story is some other date on the page (a filing's
+            // quarter, a related article), not its publication.
+            if (strtotime($date) < $item->created_at->getTimestamp() - 7 * 86400) {
+                $this->line("  {$item->id} {$item->source}: page says {$date}, found " . $item->created_at->toDateString() . " - not believed");
+                continue;
+            }
+
+            if ($rank[$pagePrecision] > $rank[$have]) {
+                $item->update(['published_at' => $date, 'published_precision' => $pagePrecision]);
+                $fixed++;
+                $this->line("  {$item->id} {$item->source}: {$have} -> {$pagePrecision} {$date}");
+            }
+
+            usleep(300000);
+        }
+
+        $this->info("re-dated {$fixed} of {$items->count()}");
+
+        return self::SUCCESS;
     }
 
     private function processItem(NewsItem $item)
@@ -126,7 +223,8 @@ class ExtractArticleContent extends Command
             // for an extraction failure.
             if ($strategy !== 'feed_only'
                 && $extracted !== null
-                && mb_strlen((string) ($extracted['text'] ?? '')) < self::MIN_USABLE_CHARS) {
+                && mb_strlen((string) ($extracted['text'] ?? ''))
+                   < $this->minUsableChars($extracted['text'] ?? null)) {
                 $fromPage = $this->extractWithTrafilatura($item->url);
 
                 if ($fromPage !== null
@@ -150,7 +248,8 @@ class ExtractArticleContent extends Command
             // them to process. Every one had to be deleted afterwards, and the
             // model calls spent on them were spent on nothing.
             if ($extracted !== null
-                && mb_strlen((string) ($extracted['text'] ?? '')) < self::MIN_USABLE_CHARS) {
+                && mb_strlen((string) ($extracted['text'] ?? ''))
+                   < $this->minUsableChars($extracted['text'] ?? null)) {
                 // 'failed' rather than a new status: the table has a check
                 // constraint listing the four it accepts, and inventing a fifth
                 // would throw on every thin story. The distinction that matters
@@ -171,9 +270,20 @@ class ExtractArticleContent extends Command
 
             if ($extracted && !empty($extracted['text'])) {
                 // Prefer the article's own publication time over whatever the
-                // feed or section page implied.
+                // feed or section page implied - but only ever upward. A page
+                // that states a clock time wins outright; a page that states
+                // only a day improves on a scrape time and nothing else. It
+                // used to overwrite a real feed time with midnight.
                 if (!empty($extracted['date'])) {
-                    $item->update(['published_at' => $extracted['date']]);
+                    $pagePrecision = $extracted['date_precision'] ?? 'time';
+                    $have = $item->published_precision ?? 'time';
+                    $rank = ['scraped' => 0, 'date' => 1, 'time' => 2];
+                    // more than a week before we found it: some other date on the page
+                    $believable = strtotime((string) $extracted['date']) >= $item->created_at->getTimestamp() - 7 * 86400;
+
+                    if ($believable && ($rank[$pagePrecision] > $rank[$have] || $pagePrecision === 'time')) {
+                        $item->update(['published_at' => $extracted['date'], 'published_precision' => $pagePrecision]);
+                    }
                 }
 
                 $job->update([
@@ -338,6 +448,7 @@ class ExtractArticleContent extends Command
             'summary' => null,
             'text'    => $text,
             'date'    => $this->plausibleDate($post['date_gmt'] ?? $post['date'] ?? null),
+            'date_precision' => $this->clockIn($post['date_gmt'] ?? $post['date'] ?? null),
             'method'  => 'wp_json',
         ];
     }
@@ -415,6 +526,7 @@ class ExtractArticleContent extends Command
             'summary' => null,
             'text'    => $text,
             'date'    => $this->plausibleDate($decoded['date'] ?? null),
+            'date_precision' => $this->clockIn($decoded['date'] ?? null),
             // ⛔ Without this key the success line below threw "Undefined array
             // key", the catch swallowed it, and useFallback overwrote a
             // perfectly good article with the feed's teaser. Every page-fetched
@@ -432,6 +544,12 @@ class ExtractArticleContent extends Command
      * A page claiming tomorrow, or 1970, is reporting broken metadata rather
      * than a publication time, and the ingested date is the better guess.
      */
+    /** 'time' when the raw value carries a clock, 'date' when it is a day only. */
+    private function clockIn($raw): string
+    {
+        return is_string($raw) && preg_match('/\d{1,2}:\d{2}/', $raw) ? 'time' : 'date';
+    }
+
     private function plausibleDate($raw): ?string
     {
         if (!is_string($raw) || trim($raw) === '') {
@@ -493,6 +611,31 @@ if html.strip():
     except Exception:
         pass
 
+    # trafilatura returns the DAY only. The page usually states the clock too
+    # - in JSON-LD datePublished or the article:published_time meta - and a
+    # day without a clock was being treated as no better than our own scrape
+    # time. Take the full timestamp when the page has it.
+    import re
+    stamp = None
+    for pattern in (r'"datePublished"\s*:\s*"([^"]{10,40})"',
+                    r'property=["\']article:published_time["\'][^>]*content=["\']([^"\']{10,40})["\']',
+                    r'content=["\']([^"\']{10,40})["\'][^>]*property=["\']article:published_time["\']',
+                    r'<time[^>]+datetime=["\']([^"\']{10,40})["\']'):
+        m = re.search(pattern, html)
+        if m and re.search(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}', m.group(1)):
+            stamp = m.group(1)
+            break
+    if stamp is None:
+        try:
+            from htmldate import find_date
+            found = find_date(html, extensive_search=True, original_date=True, outputformat="%Y-%m-%dT%H:%M:%S")
+            if found and not found.endswith("T00:00:00"):
+                stamp = found
+        except Exception:
+            pass
+    if stamp:
+        out["date"] = stamp
+
 print(json.dumps(out))
 PY;
 
@@ -546,7 +689,7 @@ PY;
         $teaserOk = $this->strategyFor($item) === 'teaser_ok';
 
         $usable = $summary !== null
-            && ($teaserOk ? mb_strlen($summary) > 0 : mb_strlen($summary) >= self::MIN_USABLE_CHARS);
+            && ($teaserOk ? mb_strlen($summary) > 0 : mb_strlen($summary) >= $this->minUsableChars($summary));
 
         $job->update([
             'extracted_title' => $item->title,

@@ -50,18 +50,26 @@ class SettingsController extends Controller
 
     public function getCategories(): JsonResponse
     {
-        $cats = $this->loadSubcategories();
-        return response()->json(["success" => true, "data" => $cats]);
+        // The tables the pipeline reads, not the JSON file this used to show
+        // (which listed one sub-category under Sports where the table has 50).
+        $primary = \Illuminate\Support\Facades\DB::table('categories')->orderBy('id')->pluck('name')->all();
+        $map = [];
+
+        foreach (\Illuminate\Support\Facades\DB::table('subcategories')->orderBy('primary_category')->orderBy('id')->get() as $s) {
+            $map[$s->primary_category][] = $s->sub_category;
+        }
+
+        return response()->json(["success" => true, "data" => ["primary_categories" => $primary, "sub_categories_map" => $map],
+            "readonly" => true, "message" => "Shown from the live taxonomy tables. Edit them on Resource centre > Taxonomy; this modal cannot save."]);
     }
 
     public function saveCategories(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            "primary_categories" => "required|array",
-            "sub_categories_map" => "required|array",
-        ]);
-        Cache::put(self::CACHE_KEY_CATEGORIES, $validated, now()->addDays(365));
-        return response()->json(["success" => true, "message" => "Categories saved successfully.", "data" => $validated]);
+        // It used to write to a cache key nothing read, and report success.
+        // Stories are keyed to sub-category rows, so the taxonomy is changed
+        // with `taxonomy:sub rename`, never by overwriting a list here.
+        return response()->json(["success" => false,
+            "message" => "Not saved. The taxonomy lives in the categories and subcategories tables (Resource centre > Taxonomy); this screen only displays it."], 409);
     }
 
     const DEFAULT_WA_GROUPS = [

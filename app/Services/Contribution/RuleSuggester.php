@@ -31,7 +31,7 @@ class RuleSuggester
      */
     public function propose(array $removals, array $existing): array
     {
-        $key = (string) config('services.deepseek.key');
+        $key = (string) (\App\Services\Ai\AiRouter::for('rule_suggester')->isConfigured() ? 'via-ai-panel' : '');
 
         if ($key === '' || $removals === []) {
             return [];
@@ -152,9 +152,7 @@ PROMPT;
 
     private function ask(string $key, string $prompt): string
     {
-        $response = Http::withToken($key)
-            ->timeout(self::TIMEOUT)
-            ->post('https://api.deepseek.com/v1/chat/completions', [
+        $response = \App\Services\Ai\AiRouter::for('rule_suggester')->post(self::TIMEOUT, [
                 'model'       => self::MODEL,
                 'messages'    => [['role' => 'user', 'content' => $prompt]],
                 'temperature' => 0.2,

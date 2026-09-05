@@ -1,4 +1,5 @@
 @extends('layouts.public')
+@php $wide = true; @endphp
 
 @section('main')
   <div class="page-head">

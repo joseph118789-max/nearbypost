@@ -46,7 +46,20 @@ class ContentPolicy
     private const MIN_WORDS         = 50;
     private const MIN_UNIQUE_RATIO  = 0.30;
     private const MAX_AD_DENSITY    = 0.10;
-    private const BLACKLIST_HITS    = 3;
+    /**
+     * Raised from 3 to 8, on evidence rather than instinct.
+     *
+     * Measured over 1,500 recent extractions, a threshold of 3 refused exactly
+     * ONE article - "KL personal driver wins RM23.95m jackpot after 10 years",
+     * a straight Malaysian news story that says "jackpot" five times. No spam
+     * was caught at all. The highest score any real article reached was 5.
+     *
+     * A page that is actually a casino advert repeats these words dozens of
+     * times, so 8 still stops one while letting a lottery win, a police raid on
+     * an illegal gambling den, or a court case about one be read - all of which
+     * are ordinary local news that this screen was quietly refusing.
+     */
+    private const BLACKLIST_HITS    = 8;
 
     /**
      * Spec 4.2 - judge a URL before spending a request on it.

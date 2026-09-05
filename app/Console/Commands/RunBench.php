@@ -66,7 +66,8 @@ class RunBench extends Command
             'updated_at'     => now(),
         ]);
 
-        $tally = ['keep' => 0, 'category' => 0, 'place' => 0, 'nowhere' => 0, 'nowhere_total' => 0, 'errors' => 0];
+        $tally = ['keep' => 0, 'category' => 0, 'place' => 0, 'nowhere' => 0, 'nowhere_total' => 0, 'errors' => 0,
+                  'keep_total' => 0, 'category_total' => 0, 'place_total' => 0];
         $assembler = new PromptAssembler();
 
         foreach ($items as $i => $item) {
@@ -90,8 +91,28 @@ class RunBench extends Command
 
             $correct = $this->compare($item, $answer);
 
+            // ⛔ COUNT THE DENOMINATOR PER DIMENSION, NOT ONCE FOR ALL THREE.
+            //
+            // compare() returns null for category and place on a story that
+            // should be DISCARDED - there is no category or place for it to be
+            // right or wrong about. Those nulls used to land in the denominator
+            // anyway, so every discarded story counted against the category and
+            // place scores while being impossible to get right.
+            //
+            // Measured 4 Sep 2026 on run 7: place was reported as 70.0%, and
+            // was actually 42 correct out of the 46 items where a place was
+            // scored - 91.3%. Category read 58.3% and was 77.8%. The whole gap
+            // between the bench and the training runs was this line.
             foreach (['keep', 'category', 'place'] as $dimension) {
-                if (($correct[$dimension] ?? null) === true) {
+                $verdict = $correct[$dimension] ?? null;
+
+                if ($verdict === null) {
+                    continue;   // not applicable to this item, so not part of its score
+                }
+
+                $tally[$dimension . '_total']++;
+
+                if ($verdict === true) {
                     $tally[$dimension]++;
                 }
             }
@@ -123,12 +144,16 @@ class RunBench extends Command
 
         $scored = count($items) - $tally['errors'];
         $scores = [
-            'kept_or_discarded' => $this->pct($tally['keep'], $scored),
-            'category'          => $this->pct($tally['category'], $scored),
-            'place'             => $this->pct($tally['place'], $scored),
+            'kept_or_discarded' => $this->pct($tally['keep'], $tally['keep_total']),
+            'category'          => $this->pct($tally['category'], $tally['category_total']),
+            'place'             => $this->pct($tally['place'], $tally['place_total']),
             'nowhere'           => $this->pct($tally['nowhere'], $tally['nowhere_total']),
             'errors'            => $tally['errors'],
             'scored'            => $scored,
+            // how many items each percentage is actually out of, so a score
+            // computed over nine items is never read as one computed over sixty
+            'category_of'       => $tally['category_total'],
+            'place_of'          => $tally['place_total'],
         ];
 
         DB::table('bench_runs')->where('id', $runId)->update([
@@ -139,8 +164,8 @@ class RunBench extends Command
         $this->newLine();
         $this->info("Run #{$runId} — {$adapter->key()} ({$adapter->model()})");
         $this->line(sprintf('  kept or discarded correctly   %s', $this->show($scores['kept_or_discarded'])));
-        $this->line(sprintf('  category                      %s', $this->show($scores['category'])));
-        $this->line(sprintf('  place                         %s', $this->show($scores['place'])));
+        $this->line(sprintf('  category                      %s  (of %d)', $this->show($scores['category']), $scores['category_of'] ?? 0));
+        $this->line(sprintf('  place                         %s  (of %d)', $this->show($scores['place']), $scores['place_of'] ?? 0));
         $this->line(sprintf('  of which "nowhere"            %s  (%d items)', $this->show($scores['nowhere']), $tally['nowhere_total']));
 
         if ($tally['errors'] > 0) {

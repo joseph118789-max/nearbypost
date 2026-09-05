@@ -1,4 +1,5 @@
 @extends('layouts.public')
+@php $wide = true; @endphp
 
 @section('main')
   <div class="page-head">
@@ -46,6 +47,21 @@
 
       @if($post->review_reason)
         <p class="story-summary">{{ $post->review_reason }}</p>
+      @endif
+      @if(config('services.community.enabled') && in_array($post->review_status, ['rejected', 'removed'], true) || ($post->status === 'held' && $post->review_status === 'pending_review'))
+        @php $openAppeal = \Illuminate\Support\Facades\DB::table('community_appeals')->where('news_item_id', $post->id)->orderByDesc('id')->first(); @endphp
+        @if($openAppeal)
+          <p class="mini">{{ __('site.appeal_' . $openAppeal->status) }} @if($openAppeal->resolution)— {{ $openAppeal->resolution }}@endif</p>
+        @else
+          <details class="inline-details"><summary>{{ __('site.appeal') }}</summary>
+            <form method="post" action="{{ route('community.appeal', ['id' => $post->id]) }}" style="display:grid;gap:8px;max-width:520px">
+              @csrf
+              <textarea class="modal-input" name="text" rows="3" required minlength="10" maxlength="2000" placeholder="{{ __('site.appeal_hint') }}"></textarea>
+              <button type="submit" class="desktop-action-btn">{{ __('site.send_appeal') }}</button>
+              <span class="mini">{{ __('site.appeal_deadline') }}</span>
+            </form>
+          </details>
+        @endif
       @endif
 
       <div class="story-footer">

@@ -45,7 +45,7 @@ class OutletFinder
      */
     public function propose(string $title, string $body): array
     {
-        $key = (string) config('services.deepseek.key');
+        $key = (string) (\App\Services\Ai\AiRouter::for('outlet_finder')->isConfigured() ? 'via-ai-panel' : '');
 
         if ($key === '') {
             return ['brand' => null, 'scale' => 'unknown', 'outlets' => [], 'note' => 'No reviewer configured.'];
@@ -200,9 +200,7 @@ PROMPT;
 
     private function ask(string $key, string $prompt): string
     {
-        $response = Http::withToken($key)
-            ->timeout(self::TIMEOUT)
-            ->post('https://api.deepseek.com/v1/chat/completions', [
+        $response = \App\Services\Ai\AiRouter::for('outlet_finder')->post(self::TIMEOUT, [
                 'model'       => self::MODEL,
                 'messages'    => [['role' => 'user', 'content' => $prompt]],
                 'temperature' => 0.1,

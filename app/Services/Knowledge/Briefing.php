@@ -37,9 +37,9 @@ class Briefing
     /**
      * The briefing, as a prompt block, or an empty string when there is none.
      */
-    public function promptBlock(): string
+    public function promptBlock(?string $country = null): string
     {
-        $terms = $this->active();
+        $terms = $this->active($country);
 
         if ($terms === []) {
             return '';
@@ -57,7 +57,8 @@ class Briefing
             $lines[] = $line;
         }
 
-        return "MALAYSIA BRIEFING - local knowledge you may not have. Where one of\n"
+        return "LOCAL BRIEFING FOR " . strtoupper($country ? \App\Support\BrainCountry::name($country) : 'this country')
+             . " - local knowledge you may not have. Where one of\n"
              . "these appears, the note tells you what it means for the answer:\n\n"
              . implode("\n", $lines) . "\n";
     }
@@ -71,10 +72,13 @@ class Briefing
      *
      * @return list<array<string, mixed>>
      */
-    public function active(): array
+    public function active(?string $country = null): array
     {
-        return Cache::remember('briefing:' . $this->version(), self::TTL_SECONDS, function () {
+        $country = $country ? strtoupper($country) : null;
+
+        return Cache::remember('briefing:' . ($country ?? 'base') . ':' . $this->version(), self::TTL_SECONDS, function () use ($country) {
             return DB::table('briefing_terms')
+                ->where(function ($q) use ($country) { $q->whereNull('country'); if ($country) { $q->orWhere('country', $country); } })
                 ->where('is_active', true)
                 ->whereNotNull('implication')
                 ->where('implication', '!=', '')
@@ -91,8 +95,14 @@ class Briefing
         return (string) Cache::get('briefing:version', '1');
     }
 
+    /**
+     * Same fault as the playbook had: time() has one-second resolution, so two
+     * saves in the same second reuse the cache key and the second is invisible.
+     */
     public function bumpVersion(): void
     {
-        Cache::forever('briefing:version', (string) time());
+        static $counter = 0;
+
+        Cache::forever('briefing:version', sprintf('%s-%d', microtime(true), ++$counter));
     }
 }

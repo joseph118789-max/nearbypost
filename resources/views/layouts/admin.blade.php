@@ -13,22 +13,23 @@
 <body class="admin-body">
     <div class="admin-wrapper">
         <div class="admin-main">
-            <header class="admin-header">
+            @if (!View::hasSection('own-header'))
+            {{-- The admin IS the Resource centre (owner, 4 Sep 2026): the old
+                 dashboard with its News, Subscribers and Intel tabs is gone. --}}
+            <header class="admin-header" style="display:flex;align-items:center;justify-content:space-between;gap:16px;max-width:1400px;margin:0 auto 14px;padding:10px 16px;box-sizing:border-box;">
                 <div style="display:flex;align-items:center;gap:16px;">
-                    <a href="{{ route('admin.dashboard') }}"
-                       style="font-weight:600;color:#1c5a7f;text-decoration:none;">NearbyPost Admin</a>
-                    {{-- Reachable from every admin page, so the queue is not
-                         something you have to remember the address of. --}}
-                    <a href="{{ route('admin.contributions.index') }}"
-                       style="font-size:0.85rem;color:#1f5679;text-decoration:none;">News &mdash; official &amp; unofficial</a>
-                    {{-- Sources, Rules, Case studies and Removed are inside the
-                         resource centre now. They are all the same job - teaching
-                         the AI to do its work - and two routes to each of them
-                         would hide that. --}}
-                    <a href="{{ route('admin.brain.index') }}"
-                       style="font-size:0.85rem;color:#1f5679;text-decoration:none;font-weight:600;">Resource centre</a>
+                    <a href="{{ route('admin.brain.index') }}" style="font-weight:700;color:#1c5a7f;text-decoration:none;">NearbyPost Admin</a>
+                    <a href="{{ route('admin.brain.index') }}" style="font-size:0.85rem;color:#1f5679;text-decoration:none;">Resource centre</a>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <a href="{{ url('/') }}" class="admin-settings-btn" style="text-decoration:none;display:inline-flex;align-items:center;">Main page</a>
+                    <form method="post" action="{{ route('admin.logout') }}" onsubmit="return confirm('Log out of the admin?')" style="margin:0;">
+                        @csrf
+                        <button type="submit" class="admin-settings-btn" style="background:#bc4e2c;">Logout</button>
+                    </form>
                 </div>
             </header>
+            @endif
             <main class="admin-content">
                 @yield('content')
             </main>

@@ -15,6 +15,8 @@ class ExtractionJob extends Model
         'extracted_title',
         'extracted_summary',
         'extracted_text',
+        'original_length',
+        'body_opening',
         'extraction_status',
         'extraction_method',
         'extracted_at',

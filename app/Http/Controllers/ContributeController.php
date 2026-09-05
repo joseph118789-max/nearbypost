@@ -66,6 +66,7 @@ class ContributeController extends Controller
         $this->throttleSubmissions($request);
 
         $data = $this->validated($request);
+        $pin  = $this->pin($request);
 
         $post = new NewsItem([
             'title'           => $data['title'],
@@ -87,11 +88,68 @@ class ContributeController extends Controller
             $post->image_path = $this->intake($request);
         }
 
+        if ($pin !== null) {
+            // the reader's pin is the story's place - no geocoding to wait for
+            $post->latitude  = $pin['lat'];
+            $post->longitude = $pin['lng'];
+            $post->main_place_text = $data['place'] ?? $pin['label'] ?? null;
+        }
+
         $post = $this->publisher->submit($post);
+
+        // Community Reports: the photo's hashes, EXIF (private) and duplicates - before the editor sees it
+        if ($request->hasFile('image') && $post->id && config('services.community.enabled')) {
+            try {
+                $img = \App\Services\Community\ImageChecks::analyse($request->file('image'), $post->id, $pin, $post->image_path);
+
+                if ($img['duplicate_of'] && $post->status === 'active') {
+                    $post->update(['status' => 'held', 'review_status' => 'pending_review', 'review_reason' => __('site.image_duplicate_held')]);
+                    $post = $post->fresh();
+                }
+            } catch (\Throwable $x) {
+                \Illuminate\Support\Facades\Log::warning('Image checks failed', ['news_item_id' => $post->id, 'error' => mb_substr($x->getMessage(), 0, 160)]);
+            }
+        }
+
+        // Community Reports: the editor's pass (improved title and body,
+        // facts preserved), the immutable original, the pin's provenance
+        (new \App\Services\Community\CommunityPublisher())->afterSubmit($post, $data, $pin);
+
+        if ($post->status === 'active' && $post->review_status === 'published' && config('services.community.enabled')) {
+            return redirect()->route('post.show', ['id' => $post->id])->with('status', __('site.report_published'));
+        }
 
         return redirect()
             ->route('contribute.index')
             ->with('status', $this->outcomeMessage($post));
+    }
+
+    /**
+     * The pin from the create form: where the phone said the reader was,
+     * where they put the pin, how far apart, and how the location came about.
+     *
+     * @return ?array{lat: float, lng: float, gps_lat: ?float, gps_lng: ?float, accuracy: ?int, adjusted: bool, source: string, label: ?string}
+     */
+    private function pin(Request $request): ?array
+    {
+        $lat = $request->input('pin_lat');
+        $lng = $request->input('pin_lng');
+
+        if ($lat === null || $lng === null || !is_numeric($lat) || !is_numeric($lng) || abs((float) $lat) > 90 || abs((float) $lng) > 180) {
+            return null;
+        }
+
+        $gpsLat = is_numeric($request->input('gps_lat')) ? (float) $request->input('gps_lat') : null;
+        $gpsLng = is_numeric($request->input('gps_lng')) ? (float) $request->input('gps_lng') : null;
+
+        return [
+            'lat' => round((float) $lat, 7), 'lng' => round((float) $lng, 7),
+            'gps_lat' => $gpsLat, 'gps_lng' => $gpsLng,
+            'accuracy' => is_numeric($request->input('gps_accuracy')) ? (int) $request->input('gps_accuracy') : null,
+            'adjusted' => $request->boolean('pin_adjusted'),
+            'source' => in_array($request->input('location_source'), ['gps', 'manual', 'denied', 'timeout', 'unavailable'], true) ? $request->input('location_source') : 'manual',
+            'label' => $request->filled('pin_label') ? mb_substr((string) $request->input('pin_label'), 0, 160) : null,
+        ];
     }
 
     public function edit(int $id): View
@@ -129,7 +187,14 @@ class ContributeController extends Controller
             $this->images->forget($previous);
         }
 
+        $wasLive = $post->getOriginal('review_status') === 'published';
         $post = $this->publisher->submit($post);
+
+        (new \App\Services\Community\CommunityPublisher())->afterSubmit($post, $data, $this->pin($request) ?? ($post->latitude !== null ? ['lat' => (float) $post->latitude, 'lng' => (float) $post->longitude, 'gps_lat' => null, 'gps_lng' => null, 'accuracy' => null, 'adjusted' => false, 'source' => 'manual', 'label' => $post->main_place_text] : null));
+
+        if ($wasLive && $post->status === 'active') {
+            \Illuminate\Support\Facades\DB::table('community_post_meta')->where('news_item_id', $post->id)->update(['last_materially_updated_at' => now(), 'updated_at' => now()]);
+        }
 
         return redirect()
             ->route('contribute.index')
@@ -175,10 +240,14 @@ class ContributeController extends Controller
 
     private function validated(Request $request): array
     {
+        if (config('services.community.enabled')) {
+            $request->merge(['section' => 'nearme']);   // a community report is always Near Me
+        }
+
         return $request->validate([
             'title'   => ['required', 'string', 'min:8', 'max:200'],
             'body'    => ['required', 'string', 'min:40', 'max:5000'],
-            'section' => ['required', 'string', 'in:' . implode(',', self::SECTIONS)],
+            'section' => [config('services.community.enabled') ? 'nullable' : 'required', 'string', 'in:' . implode(',', self::SECTIONS)],
             'place'   => ['nullable', 'string', 'max:160'],
             'image'   => [
                 'nullable', 'file', 'image',

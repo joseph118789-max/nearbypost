@@ -1,6 +1,6 @@
 <style>
   body { background: #eef2f5; font-family: Inter, system-ui, sans-serif; color: #0a2a3b; }
-  .srcpage { max-width: 1000px; margin: 0 auto; padding: 20px 16px 60px; }
+  .srcpage { max-width: 1400px; margin: 0 auto; padding: 20px 16px 60px; }
   .srcpage h1 { font-size: 1.5rem; font-weight: 700; color: #1c5a7f; margin-bottom: 4px; }
   .srcpage h2 { font-size: 1.1rem; color: #1c5a7f; margin: 28px 0 10px; }
   .lede { color: #5f7f9a; font-size: 0.9rem; line-height: 1.6; margin-bottom: 18px; }

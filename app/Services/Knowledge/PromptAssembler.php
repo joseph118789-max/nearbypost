@@ -27,7 +27,7 @@ class PromptAssembler
         'playbook' => 'Playbook — editable here',
         'rules'    => 'House rules — editable here',
         'cases'    => 'Case studies — editable here',
-        'briefing' => 'Malaysia briefing — editable here',
+        'briefing' => 'Country briefing — editable here, per country',
         'taxonomy' => 'Category taxonomy — from the database',
         'article'  => 'The story being judged',
     ];
@@ -58,6 +58,13 @@ class PromptAssembler
      */
     public function parts(string $title, string $text, string $source, array $slots = []): array
     {
+        // The publisher's country picks the playbook and the rules: a Tamil
+        // or Chinese newsroom in Singapore is judged by Singapore's own text
+        // where one has been written, and by the base text where not.
+        $country  = \App\Services\Geo\SourceCountry::iso2($source);
+        $playbook = $this->playbook->forCountry($country);
+        $rules    = (new ReviewRules())->promptBlock('scraper', $country);
+
         $safeTitle = htmlspecialchars(mb_substr(trim($title), 0, 300), ENT_QUOTES, 'UTF-8');
         $safeSrc   = htmlspecialchars(trim($source), ENT_QUOTES, 'UTF-8');
         $safeText  = htmlspecialchars(mb_substr($text, 0, 3000), ENT_NOQUOTES, 'UTF-8');
@@ -65,14 +72,14 @@ class PromptAssembler
         return [
             $this->part('role', 'Who the model is', 'code', $this->role()),
             $this->part('contract', 'The reply shape', 'code', $this->contract()),
-            $this->part('discard', 'What is not news', 'playbook', $this->playbook->block('discard')),
-            $this->part('rules', 'House rules', 'rules', (new ReviewRules())->promptBlock('scraper')),
+            $this->part('discard', 'What is not news', 'playbook', $playbook->block('discard')),
+            $this->part('rules', 'House rules', 'rules', $rules),
             $this->part('cases', 'Worked examples', 'cases', (new CaseStudyExamples())->promptBlock()),
-            $this->part('relevance', 'Scoring relevance', 'playbook', $this->playbook->block('relevance')),
-            $this->part('malaysia_angle', 'The Malaysian angle', 'playbook', $this->playbook->block('malaysia_angle')),
-            $this->part('where', 'Where a story happened', 'playbook', $this->playbook->block('where')),
-            $this->part('briefing', 'Malaysia briefing', 'briefing', $this->briefing->promptBlock()),
-            $this->part('reporting', 'GPS, ambiguity and sub-categories', 'playbook', $this->playbook->block('reporting')),
+            $this->part('relevance', 'Scoring relevance', 'playbook', $playbook->block('relevance')),
+            $this->part('malaysia_angle', 'The Malaysian angle', 'playbook', $playbook->block('malaysia_angle')),
+            $this->part('where', 'Where a story happened', 'playbook', $playbook->block('where')),
+            $this->part('briefing', 'Country briefing', 'briefing', $this->briefing->promptBlock($country)),
+            $this->part('reporting', 'GPS, ambiguity and sub-categories', 'playbook', $playbook->block('reporting')),
             $this->part('taxonomy', 'Categories and sub-categories', 'taxonomy', $this->taxonomy()),
 
             // ── Everything above this line is identical on every call ──────
@@ -84,7 +91,7 @@ class PromptAssembler
             // thousand characters after it look new every time.
             $this->part('batch', 'This batch', 'code', $this->batch($slots)),
             $this->part('article', 'The story', 'article',
-                "Article title: {$safeTitle}\nSource: {$safeSrc}\nContent:\n{$safeText}\n"),
+                "Article title: {$safeTitle}\nSource: {$safeSrc}\n" . $this->masthead($source) . "Content:\n{$safeText}\n"),
         ];
     }
 
@@ -123,6 +130,13 @@ class PromptAssembler
         from your own list. Answering "place" from memory of the first line is
         how a story about Semporna and Lahad Datu ends up filed as "Sabah".
 
+        For every place you list, say what it DOES in the story and quote the
+        words that tell you. Most places in a news article are not where the
+        news happened - they are where it was filed, where an office sits,
+        where somebody was taken afterwards, where a person is from. Deciding
+        that per place, against the text, is the whole job; "place" is then
+        just the one you marked "happened".
+
         Return this exact shape:
         {
           "is_article": true or false,
@@ -132,16 +146,18 @@ class PromptAssembler
           "a": 0 or 1,
           "my": 0 or 1,
           "why": "a few words on the Malaysian angle, or why there is none",
-          "rel": {"<category id>": <relevance 0-1>, ...},
+          "rel": {"<category id>": <relevance 0-1>, ...}   ALWAYS fill this, even when d=1. A story you are discarding still has a subject: a foreign election is politics, a foreign match is sport. The category is what it is about, not whether we publish it,
           "sub": {"S<sub-category id>": <relevance 0-1>, ...},
-          "summary": "2-3 sentence summary. Where the story has a location, say it in the first sentence.",
-          "places_named": ["every place the text names, in the order it names them, however small - a village, a road, a building, a district, a town, a state. [] if none."],
-          "place": "the ONE place from places_named where the story HAPPENED, or null - see WHERE below",
+          "new_sub": null, or {"name": "...", "why": "..."} ONLY when no existing sub-category fits the story at all. Name the thing, not the story: "Baseball", not "Arsenal owner buys baseball team". Leave it null if anything on the list is even roughly right - a near-miss is better than a taxonomy nobody can navigate,
+          "title": "YOUR OWN headline for the story, in the language the article is written in: at most 90 characters, factual, plain, your own wording. Never reuse the publisher's headline or its phrasing - rewrite it from the facts, folding in the key point of the body where that reads better. SWAPPING A WORD OR TWO IS NOT A REWRITE: if your headline still tracks the publisher's line word for word with synonyms in place (try/attempt, say/report, married/weds), throw it away and write a new one from what the body says - who, what, where, how much. AND ADD NOTHING THAT IS NOT IN THE ARTICLE: never introduce a city, a number, a name or a cause the text does not state. Keep names, places and numbers exactly as written. No quotation marks around it, no clickbait.",
+          "summary": "2-3 sentence summary in your own words. Where the story has a location, say it in the first sentence.",
+          "places_named": [{"p": "the place, written as the text writes it", "role": "one of: happened, dateline, office, aftermath, speaker, origin, subject, mention - defined under WHERE", "why": "the words in the article that put it in this role"}],
+          "place": "the narrowest p you marked \"happened\", written narrow-first with its wider place after it. null if you marked nothing \"happened\". THEN THE LAST STEP: stand at this point - what makes the story matter to a reader HERE more than anywhere else in Malaysia? Say it in \"why\". If nothing does, place is null and the story is national - see the end of WHERE",
           "lang": "ISO 639-1 code of the language the article is written in",
           "t": {
-            "en": {"title": "headline in natural English", "summary": "summary in natural English"},
-            "ms": {"title": "headline in natural Malay", "summary": "summary in natural Malay"},
-            "zh": {"title": "headline in Simplified Chinese", "summary": "summary in Simplified Chinese"}
+            "en": {"title": "your own headline in natural English (same rules as title)", "summary": "summary in natural English"},
+            "ms": {"title": "your own headline in natural Malay (same rules as title)", "summary": "summary in natural Malay"},
+            "zh": {"title": "your own headline in Simplified Chinese (same rules as title)", "summary": "summary in Simplified Chinese"}
           }
         }
 
@@ -152,6 +168,27 @@ class PromptAssembler
      * The only instruction that changes between calls, kept to one line and
      * kept at the end so it cannot break the cache above it.
      */
+    /**
+     * Whose paper this is, and what that means for a place the text does not
+     * qualify. A Malaysian paper writes Malaysian news without naming the
+     * country and names the country or city when it reports from abroad; so
+     * an unqualified place in its pages is Malaysian. Data, not code: the
+     * country comes from the sources table, and a publisher with none gets no
+     * prior at all.
+     */
+    private function masthead(string $source): string
+    {
+        $iso2 = \App\Services\Geo\SourceCountry::iso2($source);
+
+        if ($iso2 === null) {
+            return "Publisher: an international outlet with no home country. Do not assume a country for any place the text does not name one for.\n";
+        }
+
+        $country = \App\Services\Geo\Boundaries\Iso3166::name(\App\Services\Geo\Boundaries\Iso3166::iso3($iso2) ?? '') ?? $iso2;
+
+        return "Publisher: {$country}-based. It writes {$country}'s own news without naming the country, and names the country or city when reporting from abroad. So: a place the text does not qualify is in {$country}; a place abroad will have its country or city stated - write that country after it.\n";
+    }
+
     private function batch(array $slots): string
     {
         if ($slots === []) {

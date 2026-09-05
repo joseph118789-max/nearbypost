@@ -32,6 +32,25 @@ return [
 
     'connections' => [
 
+        /*
+         | The road and place geometry of our own OpenStreetMap import - the
+         | Nominatim container's PostGIS, read only. Used by RoadGeocoder for
+         | junctions and kilometre markers. Down = those two are simply not
+         | computed; nothing else depends on it.
+         */
+        'osm' => [
+            'driver'   => 'pgsql',
+            'host'     => env('OSM_DB_HOST', '127.0.0.1'),
+            'port'     => env('OSM_DB_PORT', '5433'),
+            'database' => env('OSM_DB_DATABASE', 'nominatim'),
+            'username' => env('OSM_DB_USERNAME', 'nominatim'),
+            'password' => env('OSM_DB_PASSWORD', ''),
+            'charset'  => 'utf8',
+            'prefix'   => '',
+            'search_path' => 'public',
+            'sslmode'  => 'prefer',
+        ],
+
         'sqlite' => [
             'driver' => 'sqlite',
             'url' => env('DB_URL'),

@@ -7,6 +7,54 @@
 @include('admin.brain._styles')
 @endpush
 
+@push('styles')
+<style>
+    .benchfind { display:flex; gap:8px; align-items:center; margin:10px 0 6px; flex-wrap:wrap; }
+    .benchfind input[type=text] { flex:1 1 380px; min-width:220px; padding:7px 10px; font:inherit;
+      border:1px solid #c9cdd4; border-radius:6px; }
+    .benchfind button { padding:7px 14px; font:inherit; border:1px solid #b6bcc6; border-radius:6px;
+      background:#f3f4f6; cursor:pointer; }
+    .benchfind a { font-size:12px; }
+    .benchwarn { margin:6px 0 12px; padding:8px 11px; border:1px solid #e6c98a; background:#fdf6e6;
+      border-radius:6px; font-size:13px; }
+
+  .sortlink { color:#41637d; text-decoration:none; border-bottom:1px dotted #a9bccb; }
+  .sortlink:hover { color:#1c5a7f; }
+  td.judged { white-space:nowrap; vertical-align:top; line-height:1.5; }
+  td.judged .jd { font-weight:600; color:#41637d; }
+  td.judged .jt { color:#5a6b78; font-variant-numeric:tabular-nums; }
+  td.judged .jr { color:#9aa8b3; font-size:0.92em; }
+
+  /* Declared widths win. Without this the widest single cell sets every
+     column, so one long answer decides the whole table's shape. */
+  table.tidy.laidout { table-layout:fixed; }
+  table.tidy.laidout td { overflow-wrap:anywhere; }
+
+  /* A pill that still runs long wraps instead of pushing the table wider. */
+  table.tidy.laidout td .pill { white-space:normal; display:inline-block;
+                                max-width:100%; line-height:1.45; }
+
+  /* An explanation rather than a label: readable, and allowed to wrap. */
+  .tidy.laidout td { padding-top:7px; padding-bottom:7px; }
+  .tidy.laidout .btn-sm { padding:4px 9px; font-size:0.74rem; }
+  /* One story, two rows: no rule between them, one beneath the pair. */
+  tr.detailrow > td { border-bottom:1px solid #e7eef5; padding-top:0; padding-bottom:14px; }
+  tr.detailrow + tr > td { border-top:0; }
+  .tidy tr:has(+ tr.detailrow) > td { border-bottom:0; padding-bottom:4px; }
+  td.titlecell { vertical-align:top; }
+  tr.detailrow .readtext { max-width:none; margin:0; line-height:1.6; }
+  .saidtext { display:block; color:#41637d; line-height:1.55; font-size:0.82rem; }
+
+  /* Takedown is not the same kind of act as agreeing, and should not look
+     like it. Red, and never the first button under the cursor. */
+  .btn-sm.kill { background:#a1281f; color:#fff; border:1px solid #a1281f; }
+  .btn-sm.kill:hover { background:#8a1f18; }
+
+  .stillup { display:inline-block; margin-top:6px; font-size:0.68rem; font-weight:700;
+             padding:3px 9px; border-radius:20px; background:#fbe9e7; color:#a1281f; }
+</style>
+@endpush
+
 @section('content')
 <div class="srcpage">
   @include('admin.brain._nav')
@@ -25,7 +73,7 @@
   @if($errors->any())<div class="warn">{{ $errors->first() }}</div>@endif
 
   <div class="card">
-    <h2>Recently judged &mdash; is this right?</h2>
+    <h2 id="judged">Recently judged &mdash; is this right?</h2>
     <p class="sub">
       What the AI decided for each story. Agree and it becomes a confirmed answer; correct it and the
       mistake is recorded and measured from now on. Either way it moves down to
@@ -36,17 +84,79 @@
       <p class="mini">Everything recent has been reviewed already.</p>
     @else
       <table class="tidy">
-        <thead><tr><th>Story</th><th style="width:170px;">The AI said</th><th style="width:210px;"></th></tr></thead>
+        <thead>
+          <tr>
+            <th>Story</th>
+            <th style="width:170px;">The AI said</th>
+            {{-- Stored in UTC, read in Malaysia. The heading says which one you
+                 are looking at, because a time with no zone is a guess. --}}
+            <th style="width:112px;">
+              <a class="sortlink" href="{{ route('admin.brain.bench', ['sort' => $oldestFirst ? 'newest' : 'oldest']) }}#judged">
+                Judged (KL) {!! $oldestFirst ? '&uarr;' : '&darr;' !!}
+              </a>
+            </th>
+            <th style="width:210px;"></th>
+          </tr>
+        </thead>
         <tbody>
           @foreach($recent as $r)
             <tr>
-              <td>
+              <td class="titlecell">
                 {{-- Opens the publisher's article in a new tab, so the source is
                      one click away and this page is not lost. --}}
                 <a href="{{ $r->url }}" target="_blank" rel="noopener nofollow" class="storylink">
                   {{ \Illuminate\Support\Str::limit($r->title, 78) }} &#8599;
                 </a>
 
+              </td>
+              <td class="mini">
+                @if($r->discarded)
+                  <span class="pill nowhere">discarded</span>
+                @else
+                  {{ $r->ai_category ?: '—' }}@if($r->sub_category) / {{ $r->sub_category }}@endif
+                  <br>
+                  @if($r->main_place_text)
+                    <span class="pill">{{ $r->main_place_text }}</span>
+                  @else
+                    <span class="pill nowhere">nowhere</span>
+                  @endif
+                @endif
+              </td>
+              <td class="mini judged">
+                @if($r->ai_processed_at)
+                  @php $kl = \Carbon\Carbon::parse($r->ai_processed_at, 'UTC')->timezone('Asia/Kuala_Lumpur'); @endphp
+                  <span class="jd">{{ $kl->format('j M') }}</span><br>
+                  <span class="jt">{{ $kl->format('g:ia') }}</span><br>
+                  <span class="jr">{{ $kl->diffForHumans(null, true) }} ago</span>
+                @else
+                  &mdash;
+                @endif
+              </td>
+              <td style="text-align:right;white-space:nowrap;">
+                @if($r->is_live)
+                  <form method="POST" action="{{ route('admin.contributions.unpublish', $r->id) }}"
+                        style="display:inline;"
+                        onsubmit="return confirm('Take this off the site?\n\n{{ addslashes(\Illuminate\Support\Str::limit($r->title, 70)) }}')">
+                    @csrf
+                    <input type="hidden" name="reason" value="Taken down from Check answers - not fit to publish.">
+                    <button class="btn-sm kill" type="submit">Take off the site</button>
+                  </form>
+                @endif
+                <form method="POST" action="{{ route('admin.brain.confirm') }}" style="display:inline;">
+                  @csrf
+                  <input type="hidden" name="news_item_id" value="{{ $r->id }}">
+                  <button class="btn-sm go" type="submit">That is right</button>
+                </form>
+                <button class="btn-sm warn" type="button"
+                        onclick="document.getElementById('fix-{{ $r->id }}').classList.toggle('open')">Not right</button>
+              </td>
+            </tr>
+            {{-- The article, and the form for saying what is wrong with the
+                 judgement, across the whole table. Both are long; the cells
+                 above are short. Splitting them lets each have the shape it
+                 needs instead of forcing one to live inside the other. --}}
+            <tr class="detailrow">
+              <td colspan="4">
                 {{-- The evidence. If this is a stub, the fault is extraction and
                      not the judgement, and the answer should not be marked wrong. --}}
                 @if($r->read_text)
@@ -79,28 +189,6 @@
                     <div style="margin-top:8px;"><button class="btn-sm go" type="submit">Record the correction</button></div>
                   </form>
                 </div>
-              </td>
-              <td class="mini">
-                @if($r->discarded)
-                  <span class="pill nowhere">discarded</span>
-                @else
-                  {{ $r->ai_category ?: '—' }}@if($r->sub_category) / {{ $r->sub_category }}@endif
-                  <br>
-                  @if($r->main_place_text)
-                    <span class="pill">{{ $r->main_place_text }}</span>
-                  @else
-                    <span class="pill nowhere">nowhere</span>
-                  @endif
-                @endif
-              </td>
-              <td style="text-align:right;white-space:nowrap;">
-                <form method="POST" action="{{ route('admin.brain.confirm') }}" style="display:inline;">
-                  @csrf
-                  <input type="hidden" name="news_item_id" value="{{ $r->id }}">
-                  <button class="btn-sm go" type="submit">That is right</button>
-                </form>
-                <button class="btn-sm warn" type="button"
-                        onclick="document.getElementById('fix-{{ $r->id }}').classList.toggle('open')">Not right</button>
               </td>
             </tr>
           @endforeach
@@ -236,13 +324,37 @@
       marks the model down for being right.
     </p>
 
+    <form method="GET" action="{{ route('admin.brain.bench') }}" class="benchfind">
+      <input type="text" name="q" value="{{ $find ?? '' }}" placeholder="Find an answer &mdash; type a number for its id, or words from the headline">
+      <button type="submit">Find</button>
+      @if(($find ?? '') !== '' || ($broken ?? false))
+        <a href="{{ route('admin.brain.bench') }}">show the newest instead</a>
+      @endif
+    </form>
+
+    @if(($brokenCount ?? 0) > 0 && !($broken ?? false))
+      <p class="benchwarn">
+        <strong>{{ $brokenCount }}</strong>
+        {{ $brokenCount === 1 ? 'answer holds a note where a category should be' : 'answers hold a note where a category should be' }},
+        so {{ $brokenCount === 1 ? 'it can' : 'they can' }} never match and always
+        {{ $brokenCount === 1 ? 'counts' : 'count' }} against the model.
+        <a href="{{ route('admin.brain.bench', ['show' => 'broken']) }}">Show {{ $brokenCount === 1 ? 'it' : 'them' }}</a>
+      </p>
+    @endif
+
+    @if(($find ?? '') !== '')
+      <p class="mini">Showing answers matching &ldquo;{{ $find }}&rdquo;.</p>
+    @elseif($broken ?? false)
+      <p class="mini">Showing only the answers that can never match.</p>
+    @endif
+
     @if($items->isEmpty())
       <p class="mini">Nothing yet. Start with the table above.</p>
     @else
-      <table class="tidy">
+      <table class="tidy laidout">
         <thead>
-          <tr><th>Story</th><th style="width:110px;">Should be</th><th style="width:150px;">Where</th>
-              <th style="width:130px;">How you answered</th><th style="width:150px;"></th></tr>
+          <tr><th style="width:22%;">Story</th><th style="width:96px;">Should be</th><th>Where</th>
+              <th style="width:130px;">How you answered</th><th style="width:212px;"></th></tr>
         </thead>
         <tbody>
           @foreach($items as $item)
@@ -275,7 +387,14 @@
                 @if($item->expect_nowhere)
                   <span class="pill nowhere">nowhere</span>
                 @elseif($item->expect_place)
-                  <span class="pill">{{ $item->expect_place }}</span>
+                  {{-- Long enough to be an explanation rather than a place
+                       name, so it is set as text. A pill promises a short
+                       label and a sentence in one breaks the row it sits in. --}}
+                  @if(mb_strlen($item->expect_place) > 42)
+                    <span class="saidtext">{{ $item->expect_place }}</span>
+                  @else
+                    <span class="pill">{{ $item->expect_place }}</span>
+                  @endif
                 @else
                   <span class="mini">not asserted</span>
                 @endif
@@ -287,13 +406,20 @@
                   <span class="pill nowhere">you corrected</span>
                   @if($item->note)<div class="mini" style="margin-top:4px;">{{ $item->note }}</div>@endif
                 @endif
+
+                {{-- Said it should not have been published, and it still is.
+                     Worth shouting about: this page recorded that judgement
+                     for weeks while the story went on being served. --}}
+                @if(!$item->expect_keep && $item->is_live)
+                  <div class="stillup">still on the site</div>
+                @endif
               </td>
               <td style="text-align:right;white-space:nowrap;">
                 <button class="btn-sm" type="button"
                         onclick="document.getElementById('edit-{{ $item->id }}').classList.toggle('open')">Change</button>
                 <form method="POST" action="{{ route('admin.brain.bench.remove', $item->id) }}" style="display:inline;">
                   @csrf @method('DELETE')
-                  <button class="btn-sm warn" type="submit">Remove</button>
+                  <button class="btn-sm warn" type="submit">Forget this answer</button>
                 </form>
               </td>
             </tr>

@@ -41,7 +41,7 @@ class NewsworthinessReview
      */
     public function review(string $section, string $title, string $body, ?string $place): array
     {
-        $key = (string) config('services.deepseek.key');
+        $key = (string) (\App\Services\Ai\AiRouter::for('newsworthiness')->isConfigured() ? 'via-ai-panel' : '');
 
         if ($key === '') {
             // Without a reviewer nothing can be judged, and publishing
@@ -250,13 +250,12 @@ TEST;
 
     private function ask(string $key, string $prompt): string
     {
-        $response = Http::withToken($key)
-            ->timeout(self::TIMEOUT)
-            ->post('https://api.deepseek.com/v1/chat/completions', [
+        $accept = fn (string $text) => $this->parse($text) === null ? 'not JSON' : (array_key_exists('ok', $this->parse($text)) ? true : 'no verdict');
+        $response = \App\Services\Ai\AiRouter::for('newsworthiness')->post(self::TIMEOUT, [
                 'model'       => self::MODEL,
                 'messages'    => [['role' => 'user', 'content' => $prompt]],
                 'temperature' => 0.2,
-            ]);
+            ], false, $accept);
 
         if (!$response->successful()) {
             throw new \RuntimeException('DeepSeek ' . $response->status());

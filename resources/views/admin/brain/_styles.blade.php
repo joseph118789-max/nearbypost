@@ -7,8 +7,9 @@
     align-items:center; gap:8px 14px; margin:0 0 22px;
     padding:14px 16px; background:#fff; border:1px solid #e2edf6; border-radius:16px;
   }
+  .brainnav .homerow { grid-column:1 / -1; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
   .brainnav .home {
-    grid-column:1 / -1; justify-self:start;
+    justify-self:start;
     padding:7px 15px; border-radius:20px; font-size:0.84rem; text-decoration:none;
     background:#f2f7fb; border:1px solid #e2edf6; color:#1f5679; font-weight:600;
   }
@@ -26,6 +27,8 @@
   }
 
   .brainnav .navlinks { display:flex; flex-wrap:wrap; gap:6px; }
+  .brainnav .country-switch { display:inline-block; margin:0; }
+  .brainnav .country-switch select { padding:6px 10px; border:1px solid #cfe0ec; border-radius:999px; background:#fff; color:#1c5a7f; font-size:0.82rem; font-weight:600; }
   .brainnav a {
     padding:7px 13px; border-radius:20px; font-size:0.84rem; text-decoration:none;
     background:#fff; border:1px solid #e2edf6; color:#1f5679; white-space:nowrap;

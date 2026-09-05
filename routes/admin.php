@@ -3,9 +3,13 @@
 use App\Http\Controllers\Admin\BrainController;
 use App\Http\Controllers\Admin\CaseStudyController;
 use App\Http\Controllers\Admin\ContributionController;
+use App\Http\Controllers\Admin\MarketplaceAdminController;
+use App\Http\Controllers\Admin\SourceRequestsAdmin;
+use App\Http\Controllers\Admin\ProfessionalsAdminController;
+use App\Http\Controllers\Admin\CountriesReportController;
 use App\Http\Controllers\Admin\DashboardController;
-use App\Http\Controllers\Admin\IntelController;
 use App\Http\Controllers\Admin\NewsController;
+use App\Http\Controllers\Admin\PlaceReviewController;
 use App\Http\Controllers\Admin\RemovalController;
 use App\Http\Controllers\Admin\RuleController;
 use App\Http\Controllers\Admin\SettingsController;
@@ -44,10 +48,55 @@ Route::prefix("admin")->name("admin.")->group(function () {
         Route::get("/settings/wa-groups", [SettingsController::class, "getWAGroups"])->name("settings.wa-groups");
         Route::post("/settings/wa-groups", [SettingsController::class, "saveWAGroups"])->name("settings.wa-groups.save");
 
-        Route::get("/intel/analytics", [IntelController::class, "analytics"])->name("intel.analytics");
+        // Intel Analytics was removed on the owner's instruction ("News
+        // management is redundant can remove / delete... Intel Analytics"),
+        // but this route survived the removal and went on answering.
+        //
+        // ⛔ It threw on EVERY call: news_items has no click_count column and
+        // has not had one for as long as the log goes back. 100 five-hundreds
+        // between 01:04 and 12:44 on 4 Sep 2026 alone, roughly one every seven
+        // minutes, from something still polling a page nobody can reach from
+        // the admin menu. A removed feature that still has a route is not
+        // removed; it is invisible and still failing.
 
         // Reader submissions waiting for a person to read them.
         Route::get("/contributions", [ContributionController::class, "index"])->name("contributions.index");
+
+        // the desks beside Official / Unofficial (owner, 4 Sep 2026)
+        // The Marketplace desk. Was a placeholder view; now the real thing.
+        // Publishers who offered their own site through the public form.
+        Route::get("/source-requests", [SourceRequestsAdmin::class, "index"])->name("source-requests.index");
+        Route::post("/source-requests/{id}/approve", [SourceRequestsAdmin::class, "approve"])->name("source-requests.approve");
+        Route::post("/source-requests/{id}/decline", [SourceRequestsAdmin::class, "decline"])->name("source-requests.decline");
+        Route::post("/source-requests/{id}/recheck", [SourceRequestsAdmin::class, "recheck"])->name("source-requests.recheck");
+        Route::post("/source-requests/{id}/verify", [SourceRequestsAdmin::class, "verify"])->name("source-requests.verify");
+        Route::post("/sources/{id}/revoke", [SourceRequestsAdmin::class, "revoke"])->name("sources.revoke");
+        Route::get("/marketplace", [MarketplaceAdminController::class, "index"])->name("marketplace.index");
+        // What the whole module is waiting on, derived at request time.
+        Route::get("/marketplace/status", [MarketplaceAdminController::class, "status"])->name("marketplace.status");
+        Route::post("/marketplace/listings/{id}/approve",  [MarketplaceAdminController::class, "approve"])->name("marketplace.approve");
+        Route::post("/marketplace/listings/{id}/reject",   [MarketplaceAdminController::class, "reject"])->name("marketplace.reject");
+        Route::post("/marketplace/listings/{id}/suspend",  [MarketplaceAdminController::class, "suspend"])->name("marketplace.suspend");
+        Route::post("/marketplace/listings/{id}/restore",  [MarketplaceAdminController::class, "restore"])->name("marketplace.restore");
+        Route::post("/marketplace/reports/{id}/resolve",   [MarketplaceAdminController::class, "resolveReport"])->name("marketplace.report.resolve");
+
+        // The credential queue. Spec 25.1: professional credential verification
+        // is its own queue because the decision is a different kind - one
+        // moderator checking one number against one register.
+        Route::get("/marketplace/professionals", [ProfessionalsAdminController::class, "index"])->name("professionals.index");
+        Route::post("/marketplace/credentials/{id}/register", [ProfessionalsAdminController::class, "confirmFromRegister"])->name("professionals.register");
+        Route::post("/marketplace/credentials/{id}/document", [ProfessionalsAdminController::class, "confirmFromDocument"])->name("professionals.document");
+        Route::post("/marketplace/credentials/{id}/unable",   [ProfessionalsAdminController::class, "unableToVerify"])->name("professionals.unable");
+        Route::post("/marketplace/credentials/{id}/reject",   [ProfessionalsAdminController::class, "reject"])->name("professionals.reject");
+        Route::post("/marketplace/credentials/{id}/suspend",  [ProfessionalsAdminController::class, "suspend"])->name("professionals.suspend");
+        Route::get("/members", [\App\Http\Controllers\Admin\MembersController::class, "index"])->name("members.index");
+        Route::post("/members/{id}/trust", [\App\Http\Controllers\Admin\MembersController::class, "trust"])->whereNumber("id")->name("members.trust");
+        Route::get("/admins", [\App\Http\Controllers\Admin\AdminsController::class, "index"])->name("admins.index");
+        Route::post("/admins", [\App\Http\Controllers\Admin\AdminsController::class, "store"])->name("admins.store");
+        Route::delete("/admins/{id}", [\App\Http\Controllers\Admin\AdminsController::class, "destroy"])->whereNumber("id")->name("admins.destroy");
+        // the admin posts with the reader's form and it goes live at once (owner, 4 Sep 2026)
+        Route::get("/post/{kind}", [\App\Http\Controllers\Admin\AdminPostController::class, "create"])->where("kind", "official|unofficial")->name("post.create");
+        Route::post("/post/{kind}", [\App\Http\Controllers\Admin\AdminPostController::class, "store"])->where("kind", "official|unofficial")->name("post.store");
         Route::post("/contributions/{id}/approve", [ContributionController::class, "approve"])
             ->whereNumber("id")->name("contributions.approve");
         Route::post("/contributions/{id}/reject", [ContributionController::class, "reject"])
@@ -94,6 +143,14 @@ Route::prefix("admin")->name("admin.")->group(function () {
         Route::get("/brain", [BrainController::class, "index"])->name("brain.index");
         Route::get("/brain/prompt", [BrainController::class, "prompt"])->name("brain.prompt");
 
+        // the AI panel: which model does which job, who helps, what each is told (4 Sep 2026)
+        Route::get("/brain/ai", [\App\Http\Controllers\Admin\AiPanelController::class, "index"])->name("brain.ai");
+        Route::post("/brain/ai/provider/{key}", [\App\Http\Controllers\Admin\AiPanelController::class, "saveProvider"])->name("brain.ai.provider");
+        Route::post("/brain/ai/provider/{key}/test", [\App\Http\Controllers\Admin\AiPanelController::class, "testProvider"])->name("brain.ai.test");
+        Route::post("/brain/ai/provider/{key}/credit", [\App\Http\Controllers\Admin\AiPanelController::class, "saveCredit"])->name("brain.ai.credit");
+        Route::post("/brain/ai/task/{key}", [\App\Http\Controllers\Admin\AiPanelController::class, "saveTask"])->name("brain.ai.task");
+        Route::post("/brain/ai/prompt/{task}/{provider}", [\App\Http\Controllers\Admin\AiPanelController::class, "savePrompt"])->name("brain.ai.prompt");
+
         Route::get("/brain/constraints", [BrainController::class, "constraints"])->name("brain.constraints");
         Route::get("/brain/daily", [BrainController::class, "daily"])->name("brain.daily");
         Route::get("/brain/spend", [BrainController::class, "spend"])->name("brain.spend");
@@ -101,6 +158,7 @@ Route::prefix("admin")->name("admin.")->group(function () {
 
         Route::get("/brain/playbook", [BrainController::class, "playbook"])->name("brain.playbook");
         Route::put("/brain/playbook/{key}", [BrainController::class, "savePlaybook"])->name("brain.playbook.save");
+        Route::delete("/brain/playbook/{key}/country", [BrainController::class, "revertPlaybook"])->name("brain.playbook.revert");
         Route::post("/brain/playbook/{key}/toggle", [BrainController::class, "togglePlaybook"])->name("brain.playbook.toggle");
 
         Route::get("/brain/briefing", [BrainController::class, "briefing"])->name("brain.briefing");
@@ -119,7 +177,28 @@ Route::prefix("admin")->name("admin.")->group(function () {
         Route::delete("/brain/bench/{id}", [BrainController::class, "removeBenchItem"])
             ->whereNumber("id")->name("brain.bench.remove");
 
+        Route::get("/brain/taxonomy", [\App\Http\Controllers\Admin\TaxonomyController::class, "index"])->name("brain.taxonomy");
+        Route::get("/community", [\App\Http\Controllers\Admin\CommunityAdminController::class, "index"])->name("community.index");
+        Route::get("/community/{id}", [\App\Http\Controllers\Admin\CommunityAdminController::class, "show"])->whereNumber("id")->name("community.show");
+        Route::get("/community/desk/appeals", [\App\Http\Controllers\Admin\CommunityAdminController::class, "appeals"])->name("community.appeals");
+        Route::post("/community/appeals/{appeal}/{decision}", [\App\Http\Controllers\Admin\CommunityAdminController::class, "resolveAppeal"])->whereNumber("appeal")->where("decision", "uphold|deny")->name("community.appeal.resolve");
+        Route::post("/community/corrections/{correction}/{decision}", [\App\Http\Controllers\Admin\CommunityAdminController::class, "resolveCorrection"])->whereNumber("correction")->where("decision", "accept|reject")->name("community.correction.resolve");
+        Route::post("/community/comments/{comment}/{decision}", [\App\Http\Controllers\Admin\CommunityAdminController::class, "moderateComment"])->whereNumber("comment")->where("decision", "hide|remove|restore")->name("community.comment.moderate");
+        Route::post("/community/moderators/{user}/{decision}", [\App\Http\Controllers\Admin\CommunityAdminController::class, "moderator"])->whereNumber("user")->where("decision", "assign|remove")->name("community.moderator");
+        Route::post("/community/moderator-actions/{action}/reverse", [\App\Http\Controllers\Admin\CommunityAdminController::class, "reverseModeratorAction"])->whereNumber("action")->name("community.moderator.reverse");
+        Route::post("/community/{id}/{action}", [\App\Http\Controllers\Admin\CommunityAdminController::class, "act"])->whereNumber("id")->name("community.act");
+        Route::get("/brain/live", [BrainController::class, "live"])->name("brain.live");
+        Route::get("/brain/live/{date}", [BrainController::class, "liveDay"])
+            ->where("date", "\\d{4}-\\d{2}-\\d{2}")->name("brain.live.day");
         Route::get("/brain/corrections", [BrainController::class, "corrections"])->name("brain.corrections");
+        Route::get("/brain/translations", [BrainController::class, "translations"])->name("brain.translations");
+
+        // Places no map could identify, held for a person to settle.
+        Route::get("/places", [PlaceReviewController::class, "index"])->name("places.index");
+        Route::post("/places/{id}/resolve", [PlaceReviewController::class, "resolve"])
+            ->whereNumber("id")->name("places.resolve");
+        Route::post("/places/{id}/dismiss", [PlaceReviewController::class, "dismiss"])
+            ->whereNumber("id")->name("places.dismiss");
         Route::post("/brain/corrections", [BrainController::class, "correct"])->name("brain.correct");
 
         // Editorial policy, in the newsroom's own words.
@@ -140,6 +219,15 @@ Route::prefix("admin")->name("admin.")->group(function () {
 
         Route::get("/sources/failing", [SourceController::class, "failing"])->name("sources.failing");
         Route::get("/sources/blocked", [SourceController::class, "blocked"])->name("sources.blocked");
+
+        // Where the news is: countries, a country's states by day, a state's sources.
+        Route::get("/countries", [CountriesReportController::class, "index"])->name("countries.index");
+        Route::get("/countries/{iso3}", [CountriesReportController::class, "country"])
+            ->where("iso3", "[A-Za-z]{3}")->name("countries.country");
+        Route::get("/countries/{iso3}/{state}", [CountriesReportController::class, "state"])
+            ->where("iso3", "[A-Za-z]{3}")->name("countries.state");
+        Route::get("/countries/{iso3}/{state}/{city}", [CountriesReportController::class, "state"])
+            ->where("iso3", "[A-Za-z]{3}")->name("countries.city");
         Route::post("/sources/blocked", [SourceController::class, "block"])->name("sources.block");
         Route::delete("/sources/blocked/{id}", [SourceController::class, "unblock"])
             ->whereNumber("id")->name("sources.unblock");

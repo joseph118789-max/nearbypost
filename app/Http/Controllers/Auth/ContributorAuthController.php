@@ -75,15 +75,46 @@ class ContributorAuthController extends Controller
         return view('pages.auth.register', $this->chrome(__('site.contributor_register')));
     }
 
+    /** Live check while the reader types: is this @username free, and if not, which are. */
+    public function checkUsername(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $wanted = \App\Services\Community\Usernames::normalise((string) $request->query('u', ''));
+        $name = (string) $request->query('name', '');
+
+        if ($wanted === '' || !\App\Services\Community\Usernames::valid($wanted) || \App\Services\Community\Usernames::isReserved($wanted)) {
+            return response()->json(['ok' => false, 'reason' => 'invalid', 'normalised' => $wanted, 'alternatives' => $wanted !== '' ? \App\Services\Community\Usernames::alternatives($wanted, $name) : []]);
+        }
+
+        if (\App\Services\Community\Usernames::taken($wanted)) {
+            return response()->json(['ok' => false, 'reason' => 'taken', 'normalised' => $wanted, 'alternatives' => \App\Services\Community\Usernames::alternatives($wanted, $name)]);
+        }
+
+        return response()->json(['ok' => true, 'normalised' => $wanted, 'alternatives' => []]);
+    }
+
     public function register(Request $request): RedirectResponse
     {
         $data = $request->validate([
             'name'     => ['required', 'string', 'min:2', 'max:120'],
+            'username' => ['nullable', 'string', 'min:3', 'max:30'],
             'email'    => ['required', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8', 'max:255', 'confirmed'],
         ]);
 
-        $user = User::create([
+        // the @username: the reader's choice, unique whatever the case; a taken one comes back with alternatives
+        $username = \App\Services\Community\Usernames::normalise((string) ($data['username'] ?? ''));
+
+        if ($username === '') {
+            $username = \App\Services\Community\Usernames::suggest($data['name']);
+        } elseif (!\App\Services\Community\Usernames::valid($username) || \App\Services\Community\Usernames::isReserved($username)) {
+            return back()->withInput()->withErrors(['username' => __('site.username_invalid')]);
+        } elseif (\App\Services\Community\Usernames::taken($username)) {
+            $alts = \App\Services\Community\Usernames::alternatives($username, $data['name']);
+
+            return back()->withInput()->withErrors(['username' => __('site.username_taken', ['alternatives' => '@' . implode(', @', $alts)])]);
+        }
+
+        $user = User::create(['username' => $username, 'display_name' => $data['name']] + [
             'name'      => $data['name'],
             'email'     => mb_strtolower($data['email']),
             'password'  => Hash::make($data['password']),

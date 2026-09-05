@@ -93,6 +93,45 @@ class GeoIp
     }
 
     /**
+     * The reader's country as ISO 3166 alpha-2, or null. Cloudflare's header
+     * answers on every request for free; only without it is the provider
+     * asked, cached by the /24 like the place lookup.
+     */
+    public function country(?string $ip, ?string $userAgent = null, ?string $cfCountry = null): ?string
+    {
+        $cf = mb_strtoupper(trim((string) $cfCountry));
+
+        if (preg_match('/^[A-Z]{2}$/', $cf) && !in_array($cf, ['XX', 'T1'], true)) {
+            return $cf;
+        }
+
+        if (!config('services.geoip.enabled') || $this->looksLikeCrawler($userAgent) || !$this->isPublic($ip)) {
+            return null;
+        }
+
+        $key = 'geoip-cc:' . substr(hash('sha256', $this->network($ip)), 0, 32);
+
+        $code = Cache::remember($key, now()->addHours(self::CACHE_HOURS), function () use ($ip) {
+            try {
+                $body = Http::timeout(self::TIMEOUT_SECONDS)->connectTimeout(self::TIMEOUT_SECONDS)->acceptJson()
+                    ->get(str_replace('{ip}', urlencode($ip), (string) config('services.geoip.url')))->json();
+
+                foreach (['country_code', 'countryCode', 'country_code2'] as $field) {
+                    if (is_array($body) && isset($body[$field]) && is_string($body[$field]) && preg_match('/^[A-Za-z]{2}$/', $body[$field])) {
+                        return mb_strtoupper($body[$field]);
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::info('GeoIP country lookup failed', ['error' => $e->getMessage()]);
+            }
+
+            return '';
+        });
+
+        return $code !== '' ? $code : null;
+    }
+
+    /**
      * Ask the configured provider, and treat every disappointment the same way.
      */
     private function lookup(string $ip): ?string

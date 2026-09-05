@@ -1,6 +1,6 @@
 @extends('layouts.admin')
 
-@section('title', 'Malaysia briefing')
+@section('title', 'Briefing')
 
 @push('styles')
 @include('admin.sources._styles')
@@ -21,8 +21,16 @@
 <div class="srcpage">
   @include('admin.brain._nav')
 
-  <h1>Malaysia briefing</h1>
+  <h1>Briefing</h1>
   <p class="lede">
+    @if($countryName)
+      Terms the model is told for {{ $countryName }}'s stories: this country's own, and the ones marked for every country.
+      Switch the country beside Overview to see another country's briefing; a term added here belongs to {{ $countryName }}.
+    @else
+      All countries at once. A term added while "All countries" is selected is told to the model for every country;
+      switch to one country to add a term that belongs to it alone.
+    @endif
+    <br>
     What an AI trained somewhere else does not know about this country. The model running today
     reads a lot of Southeast Asian text and arrives already knowing what a Menteri Besar is. A model
     trained mostly on American English will not &mdash; and it will not say so. It will file a Kedah
@@ -63,6 +71,7 @@
           @foreach($group as $t)
             <tr class="term" style="{{ $t->is_active ? '' : 'opacity:.55;' }}">
               <td><strong>{{ $t->term }}</strong>
+                @if(empty($t->country))<span class="tag" title="told to the model for every country">all countries</span>@elseif(empty($country))<span class="tag">{{ $t->country }}</span>@endif
                 @if(!$t->implication)<br><span class="pill nowhere">not sent</span>@endif
               </td>
               <td>

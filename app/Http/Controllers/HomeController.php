@@ -4,12 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\LocationAlias;
 use App\Services\FeedQuery;
+use App\Services\GeocodingService;
 use App\Services\GeoIp;
 use App\Services\LocationResolver;
 use App\Services\Seo;
 use App\Support\Loc;
 use App\Support\Slug;
 use App\Support\Taxonomy;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\View\View;
@@ -39,13 +41,14 @@ class HomeController extends Controller
     private const RADII = [5, 10, 20, 50];
 
     private const DEFAULT_PLACE  = 'Kuala Lumpur';
-    private const DEFAULT_RADIUS = 20;
+    private const DEFAULT_RADIUS = 10;   // owner, 4 Sep: 10 km and Latest by default
     private const PLACE_COOKIE   = 'nbp_place';
 
     public function __construct(
         private FeedQuery $feed,
         private LocationResolver $locations,
         private Seo $seo,
+        private GeocodingService $geocoder,
     ) {
     }
 
@@ -79,9 +82,25 @@ class HomeController extends Controller
         $category = $this->cleanCategory($request->query('category'));
         $sub      = $this->cleanSub($request->query('sub'), $category);
         $source   = $this->cleanSource($request->query('source'));
-        $stories  = $this->feed->latest($category, $days, 24, null, $sub, $source);
+        // Which country's news. Malaysia unless the reader picks another; the
+        // list offers only countries that have live stories to show.
+        $countries = $this->liveCountries();
+        $country   = strtoupper((string) $request->query('country', ''));
 
-        $name = $this->feedName($category, $sub) ?? __('site.latest_news');
+        if ($country === '') {
+            // No choice made: the reader's own country, when this site has
+            // news from it; Malaysia otherwise. Cloudflare's header says
+            // where they are on every request, so this costs nothing.
+            $iso2 = app(GeoIp::class)->country($request->ip(), $request->userAgent(), $request->headers->get('CF-IPCountry'));
+            $iso3 = $iso2 ? \App\Services\Geo\Boundaries\Iso3166::iso3($iso2) : null;
+            $country = $iso3 && isset($countries[$iso3]) ? $iso3 : 'MYS';
+        }
+
+        $country = isset($countries[$country]) ? $country : 'MYS';
+        $stories   = $this->feed->latest($category, $days, 24, null, $sub, $source, $country);
+
+        $name = $this->feedName($category, $sub)
+            ?? ($country === 'MYS' ? __('site.latest_news') : __('site.latest_news_in', ['country' => $countries[$country]]));
 
         return $this->feedView([
             'tab'         => 'interest',
@@ -92,6 +111,8 @@ class HomeController extends Controller
             'category'    => $category,
             'sub'         => $sub,
             'source'      => $source,
+            'country'     => $country,
+            'countries'   => $countries,
             'pageTitle'   => $name,
             'heading'     => $name,
             'intro'       => $this->intro($stories, null, $category, $days),
@@ -132,13 +153,84 @@ class HomeController extends Controller
         ], null, $category);
     }
 
+    /** The invitation form. Spec: the owner's ask of 5 Sep 2026. */
+    public function share(Request $request): View
+    {
+        return view('pages.share', [
+            'tab'       => '',
+            'place'     => $this->rememberedPlace($request),
+            'pageTitle' => 'Share your news with Nearbypost',
+        ]);
+    }
+
+    /**
+     * A publisher offering their site.
+     *
+     * ⛔ Nothing is switched on here. The row lands in a queue, a command
+     * probes the site, and a person decides - see SourceRequests.
+     */
+    public function shareSubmit(Request $request): \Illuminate\Http\RedirectResponse
+    {
+        $bucket = hash('sha256', (string) $request->ip() . '|' . now()->toDateString() . '|' . config('app.key'));
+
+        $result = \App\Services\Ingest\SourceRequests::submit([
+            'website_url'     => $request->input('website_url'),
+            'site_name'       => $request->input('site_name'),
+            'contact_name'    => $request->input('contact_name'),
+            'contact_email'   => $request->input('contact_email'),
+            'describes'       => $request->input('describes'),
+            'social_links'    => $request->input('social_links', []),
+            'speaks_for_site' => $request->boolean('speaks_for_site'),
+
+            // What they agreed we may show, recorded with the wording and the
+            // moment. Without a scope there is nothing to withdraw later.
+            'allow_excerpt'    => $request->boolean('allow_excerpt'),
+            'allow_ai_summary' => $request->boolean('allow_ai_summary'),
+            'allow_image'      => $request->boolean('allow_image'),
+        ], $bucket);
+
+        if (!($result['ok'] ?? false)) {
+            return back()->withInput()->withErrors(['share' => $result['why'] ?? 'That did not go through.']);
+        }
+
+        return back()->with('shared', true);
+    }
+
     public function marketplace(Request $request): View
     {
         return view('pages.marketplace', [
             'tab'        => 'marketplace',
             'place'      => $this->rememberedPlace($request),
             'categories' => $this->feed->categories(),
+            'sections'   => \App\Services\Marketplace\MarketplaceBrowse::sections(
+                \App\Services\Geo\SourceCountry::SITE
+            ),
             'pageTitle'  => 'Marketplace',
+        ]);
+    }
+
+    /**
+     * One section of the Marketplace.
+     *
+     * While the section is closed this shows made-up listings so a reader - and
+     * the person building it - can see what it will look like. Every one of
+     * them is labelled; see SampleListings for why they are not in the database.
+     */
+    public function marketplaceSection(Request $request, string $section): View
+    {
+        $country = \App\Services\Geo\SourceCountry::SITE;
+        $found   = \App\Services\Marketplace\MarketplaceBrowse::section($section, $country);
+
+        if ($found === null) {
+            throw new NotFoundHttpException('Unknown section');
+        }
+
+        return view('pages.marketplace-section', [
+            'tab'       => 'marketplace',
+            'place'     => $this->rememberedPlace($request),
+            'section'   => $found,
+            'label'     => \App\Services\Marketplace\SampleListings::LABEL,
+            'pageTitle' => $found['name'] . ' — Marketplace',
         ]);
     }
 
@@ -163,6 +255,44 @@ class HomeController extends Controller
         ]);
     }
 
+    /**
+     * Turn the browser's coordinates into an ordinary place URL.
+     *
+     * The reader allows their location; the browser gives a point. Everything
+     * downstream - the heading, the remembered place, the link they might send
+     * someone - is built around a NAME, so the point becomes a name here and
+     * the request continues as though they had typed it.
+     *
+     * A redirect rather than a render, so the address bar ends up somewhere
+     * shareable and a refresh does not ask the browser for a position again.
+     */
+    public function locate(Request $request): RedirectResponse
+    {
+        $lat = (float) $request->query('lat');
+        $lng = (float) $request->query('lng');
+
+        $sane = $lat >= -90 && $lat <= 90 && $lng >= -180 && $lng <= 180
+            && ($lat !== 0.0 || $lng !== 0.0);
+
+        $place = $sane ? $this->geocoder->reverse($lat, $lng) : null;
+
+        if ($place === null) {
+            // Nothing was found for the point, so say so rather than dropping
+            // the reader on a feed for somewhere else without explanation.
+            return redirect()->to(Loc::route('home') . '?located=no');
+        }
+
+        $query = ['place' => $place];
+
+        foreach (['radius', 'days', 'category', 'sub', 'source'] as $keep) {
+            if ($request->filled($keep)) {
+                $query[$keep] = $request->query($keep);
+            }
+        }
+
+        return redirect()->to(Loc::route('home') . '?' . http_build_query($query));
+    }
+
     // ── shared rendering ────────────────────────────────────────────────
 
     private function renderPlace(Request $request, string $place, ?string $category, bool $remember): View
@@ -172,13 +302,14 @@ class HomeController extends Controller
         $category ??= $this->cleanCategory($request->query('category'));
         $sub       = $this->cleanSub($request->query('sub'), $category);
         $source    = $this->cleanSource($request->query('source'));
+        $sort      = $request->query('sort') === 'distance' ? 'distance' : 'time';   // Latest unless the reader picks Nearest
 
         $coords  = $this->locations->resolve($place);
         $stories = [];
 
         if ($coords) {
             $stories = $this->feed->nearby(
-                $coords['lat'], $coords['lng'], (float) $radius, $days, 24, $category, null, $sub, $source
+                $coords['lat'], $coords['lng'], (float) $radius, $days, 24, $category, null, $sub, $source, $sort
             );
         }
 
@@ -205,6 +336,7 @@ class HomeController extends Controller
             'category'    => $category,
             'sub'         => $sub,
             'source'      => $source,
+            'sort'        => $sort,
             'unresolved'  => $coords === null,
             'pageTitle'   => $name,
             'heading'     => $name,
@@ -249,6 +381,29 @@ class HomeController extends Controller
                 (float) ($data['radius'] ?? self::DEFAULT_RADIUS)
             )
             : [];
+
+        // The whole tree, so opening a topic in the right column is instant
+        // rather than a page load. Same window and radius as the feed beside
+        // it, so a count of 3 returns three stories.
+        $data['topicTree'] = $this->feed->allSubCategories(
+            $data['days'] ?? FeedQuery::DEFAULT_WINDOW_DAYS,
+            $nearMe ? ($data['coords'] ?? null) : null,
+            (float) ($data['radius'] ?? self::DEFAULT_RADIUS)
+        );
+
+        // A link per sub-topic, built here because the two modes address a
+        // topic differently and a Blade template is the wrong place to know
+        // that. Near Me keeps the reader at their place; By Interest goes to
+        // the topic's own indexable page.
+        $data['subUrls'] = [];
+
+        foreach ($data['topicTree'] as $catKey => $subs) {
+            foreach ($subs as $s) {
+                $data['subUrls'][$catKey][$s['name']] = $nearMe
+                    ? request()->fullUrlWithQuery(['category' => $catKey, 'sub' => $s['name']])
+                    : Loc::route('category', ['slug' => Slug::make($catKey)]) . '?sub=' . rawurlencode($s['name']);
+            }
+        }
 
         $data['windows']    = self::WINDOWS;
         $data['radii']      = self::RADII;
@@ -375,6 +530,40 @@ class HomeController extends Controller
     /**
      * Who wrote the stories: everyone, us, or other readers.
      */
+    /**
+     * Countries with live stories in the last 30 days, Malaysia first and the
+     * rest by how much there is to read. Names from the ISO table, not the
+     * boundary files, whose level-0 names are not all tidy.
+     *
+     * @return array<string, string> iso3 => name
+     */
+    private function liveCountries(): array
+    {
+        $rows = \Illuminate\Support\Facades\Cache::remember('live-countries', 600, function () {
+            return \Illuminate\Support\Facades\DB::table('feed_ready_items')
+                ->where('is_active', true)->where('published_at', '>=', now()->subDays(30))
+                ->whereNotNull('geo_country_code')
+                ->selectRaw('geo_country_code as c, count(*) as n')->groupBy('c')->orderByDesc('n')->limit(40)->get()
+                ->map(fn ($r) => ['c' => $r->c, 'n' => (int) $r->n])->all();
+        });
+
+        $out = ['MYS' => \App\Services\Geo\Boundaries\Iso3166::name('MYS') ?? 'Malaysia'];
+
+        foreach ($rows as $r) {
+            if ($r['c'] === 'MYS' || $r['n'] < 2) {
+                continue;
+            }
+
+            $name = \App\Services\Geo\Boundaries\Iso3166::name($r['c']);
+
+            if ($name !== null) {
+                $out[$r['c']] = $name;
+            }
+        }
+
+        return $out;
+    }
+
     private function cleanSource(?string $source): ?string
     {
         $source = mb_strtolower(trim((string) $source));

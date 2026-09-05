@@ -49,6 +49,17 @@ class NewsController extends Controller
         $perPage = (int) $request->get('per_page', 15);
         $items = $query->paginate($perPage);
 
+        // The panel prints a "status" the served row has never had - there is
+        // no such column on feed_ready_items - so every story, live or not,
+        // rendered as "inactive". Read literally that said the whole site was
+        // switched off, and it sent someone looking for a fault that was not
+        // there. What the panel means is whether the story is being served.
+        $items->getCollection()->transform(function ($row) {
+            $row->status = $row->is_active ? 'active' : 'inactive';
+
+            return $row;
+        });
+
         return response()->json($items);
     }
 
@@ -67,8 +78,13 @@ class NewsController extends Controller
         if ($feedItem) {
             $newsItem = NewsItem::find($feedItem->news_item_id);
             if ($newsItem) {
+                // ⛔ click_count was removed here too. Read as an Eloquent
+                // attribute it did not throw the way the raw SQL in
+                // IntelController did - a missing attribute is simply null - so
+                // this quietly reported every story as having nought clicks,
+                // for as long as anyone has been looking at it. A number that
+                // is always zero is worse than no number: it reads as a fact.
                 return response()->json(array_merge($feedItem->toArray(), [
-                    'click_count' => $newsItem->click_count ?? 0,
                     'full_news' => $newsItem,
                 ]));
             }

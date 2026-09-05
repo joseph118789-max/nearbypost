@@ -3,10 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\FeedReadyItem;
+use App\Models\NewsItem;
 use App\Models\LocationAlias;
 use App\Services\FeedQuery;
 use App\Support\Slug;
+use App\Support\Loc;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Sitemaps, robots and llms.txt.
@@ -29,7 +32,7 @@ class SitemapController extends Controller
     /** Sitemap index. */
     public function index(): Response
     {
-        $maps = ['sitemap-core.xml', 'sitemap-places.xml', 'sitemap-topics.xml'];
+        $maps = ['sitemap-core.xml', 'sitemap-stories.xml', 'sitemap-places.xml', 'sitemap-topics.xml'];
         $now  = now()->toAtomString();
 
         $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n"
@@ -58,6 +61,75 @@ class SitemapController extends Controller
         return $this->xml($this->urlSet($urls));
     }
 
+    /**
+     * The stories themselves.
+     *
+     * They were missing entirely: the only route to a story page was a crawler
+     * following a headline out of a feed that changes hourly, so anything that
+     * scrolled off the front page before Google came back was never listed
+     * anywhere. Every headline still links here - that has not changed and is
+     * what carries the weight - but a sitemap is how the ones no longer on a
+     * feed page get found at all.
+     *
+     * Newest first, capped well under the 50,000 a sitemap may hold, and only
+     * pages that actually resolve: active, not discarded, not a duplicate of
+     * another story.
+     */
+    /**
+     * The Google News sitemap: qualifying breaking community reports (and
+     * nothing older than two days, per the News guidelines). Entries fall out
+     * of the window on their own; the story page stays.
+     */
+    public function news(): Response
+    {
+        $rows = DB::table('community_post_meta as m')->join('news_items as n', 'n.id', '=', 'm.news_item_id')
+            ->where('m.seo_eligibility', 'news')->where('m.trust_status', '<>', 'removed')
+            ->where('n.status', 'active')->where('n.published_at', '>=', now()->subHours(48))
+            ->orderByDesc('n.published_at')->limit(1000)->get(['n.id', 'n.title', 'n.published_at', 'n.source_language']);
+
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n"
+            . '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">' . "\n";
+
+        foreach ($rows as $r) {
+            $lang = in_array($r->source_language, ['en', 'ms', 'zh'], true) ? $r->source_language : 'en';
+            $xml .= "  <url>\n    <loc>" . htmlspecialchars(route('post.show', ['id' => $r->id]), ENT_XML1) . "</loc>\n"
+                . "    <news:news>\n      <news:publication>\n        <news:name>Nearbypost</news:name>\n        <news:language>{$lang}</news:language>\n      </news:publication>\n"
+                . "      <news:publication_date>" . \Carbon\Carbon::parse($r->published_at)->toAtomString() . "</news:publication_date>\n"
+                . "      <news:title>" . htmlspecialchars((string) $r->title, ENT_XML1) . "</news:title>\n    </news:news>\n  </url>\n";
+        }
+
+        return response($xml . '</urlset>', 200, ['Content-Type' => 'application/xml; charset=UTF-8']);
+    }
+
+    public function stories(): Response
+    {
+        $stories = NewsItem::query()
+            ->where('status', 'active')
+            ->where('discarded', false)
+            ->whereNull('duplicate_of')
+            ->where('ai_status', 'success')
+            ->whereNotNull('published_at')
+            ->orderByDesc('published_at')
+            ->limit(20000)
+            ->get(['id', 'published_at', 'updated_at']);
+
+        $urls = [];
+
+        foreach ($stories as $story) {
+            $age = $story->published_at?->diffInDays(now()) ?? 999;
+
+            $urls[] = [
+                Loc::route('story', ['id' => $story->id]),
+                // A news story is rewritten in its first day and then stands.
+                $age < 2 ? 'hourly' : ($age < 14 ? 'daily' : 'monthly'),
+                $age < 2 ? '0.9' : ($age < 14 ? '0.6' : '0.3'),
+                ($story->updated_at ?? $story->published_at)->toAtomString(),
+            ];
+        }
+
+        return $this->xml($this->urlSet($urls));
+    }
+
     /** Every location that has a landing page. */
     public function places(): Response
     {
@@ -69,7 +141,15 @@ class SitemapController extends Controller
         $urls = [];
 
         foreach ($places as $place) {
-            $urls[] = [route('place', ['slug' => Slug::make($place)]), 'hourly', '0.8'];
+            // ⛔ A name with no Latin letters slugs to '' and route()
+            // throws - which does not lose one URL, it loses the SITEMAP.
+            $placeSlug = Slug::make($place);
+
+            if ($placeSlug === '') {
+                continue;
+            }
+
+            $urls[] = [route('place', ['slug' => $placeSlug]), 'hourly', '0.8'];
         }
 
         return $this->xml($this->urlSet($urls));
@@ -174,9 +254,18 @@ class SitemapController extends Controller
         $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n"
              . '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
 
-        foreach ($urls as [$loc, $freq, $priority]) {
+        foreach ($urls as $url) {
+            [$loc, $freq, $priority] = $url;
+
+            // A story's lastmod is when it was published, not when the sitemap
+            // was generated. Telling a crawler that four thousand pages all
+            // changed this minute, every time it asks, teaches it that lastmod
+            // here means nothing - and then it stops using it to decide what is
+            // worth re-fetching.
+            $lastmod = $url[3] ?? $now;
+
             $xml .= '  <url><loc>' . e($loc) . '</loc>'
-                 . "<lastmod>{$now}</lastmod>"
+                 . "<lastmod>{$lastmod}</lastmod>"
                  . "<changefreq>{$freq}</changefreq>"
                  . "<priority>{$priority}</priority></url>\n";
         }

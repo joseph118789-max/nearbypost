@@ -1,11 +1,13 @@
 @extends('layouts.admin')
 
-@section('title', 'News')
+@section('title', 'Unofficial news')
 
 @push('styles')
+@include('admin.sources._styles')
+@include('admin.brain._styles')
 <style>
   body { background: #eef2f5; font-family: Inter, system-ui, sans-serif; color: #0a2a3b; }
-  .queue { max-width: 1100px; margin: 0 auto; padding: 20px 16px 60px; }
+  .queue { max-width: 1400px; margin: 0 auto; padding: 20px 16px 60px; }
   .queue h1 { font-size: 1.5rem; font-weight: 700; color: #1c5a7f; margin-bottom: 4px; }
   .queue .lede { color: #5f7f9a; font-size: 0.9rem; margin-bottom: 18px; line-height: 1.6; }
   .flash { background: #e0f5e9; color: #1f7840; padding: 12px 18px; border-radius: 14px;
@@ -65,11 +67,11 @@
 
 @section('content')
 <div class="queue">
-  <h1>News</h1>
+  @include('admin.brain._nav')
+  <h1>Unofficial news</h1>
   <p class="lede">
-    Everything on the site, by who wrote it &mdash; the same three words readers see in the
-    Source filter. <strong>Official</strong> is gathered by Nearbypost from news publishers;
-    <strong>Unofficial</strong> is sent in by readers.
+    Sent in by readers &mdash; what readers see under <strong>Community</strong> in the Source filter.
+    Official news from publishers is under Live, in the Published stage above.
   </p>
 
   @if(session('status'))
@@ -84,9 +86,7 @@
     <a class="{{ $tab === 'waiting' ? 'on' : '' }}"
        href="{{ route('admin.contributions.index') }}">Waiting for review <span class="n">{{ $counts['waiting'] }}</span></a>
     <a class="{{ $tab === 'unofficial' ? 'on' : '' }}"
-       href="{{ route('admin.contributions.index', ['tab' => 'unofficial']) }}">Unofficial <span class="n">{{ $counts['unofficial'] }}</span></a>
-    <a class="{{ $tab === 'official' ? 'on' : '' }}"
-       href="{{ route('admin.contributions.index', ['tab' => 'official']) }}">Official <span class="n">{{ number_format($counts['official']) }}</span></a>
+       href="{{ route('admin.contributions.index', ['tab' => 'unofficial']) }}">All reader posts <span class="n">{{ $counts['unofficial'] }}</span></a>
   </div>
 
   {{-- ── Waiting: a person reads a new contributor's first story ──────── --}}
@@ -221,7 +221,13 @@
             @if($live)
               <span class="badge badge-live">live</span>
             @elseif($held)
-              <span class="badge badge-no">{{ $post->review_status === 'rejected' ? 'taken down' : 'held' }}</span>
+              <span class="badge badge-no">{{ $post->review_status === 'rejected' ? 'not published' : 'held' }}</span>
+              @if(in_array($post->review_status, ['rejected', 'pending_review', 'removed'], true))
+                <form method="post" action="{{ route('admin.contributions.approve', ['id' => $post->id]) }}" style="display:inline">
+                  @csrf
+                  <button class="btn btn-primary" type="submit" title="Overrule the automatic check and put this on the site">Publish anyway</button>
+                </form>
+              @endif
             @else
               {{-- Not on the site, and not ours to change: either the pipeline
                    has not finished with it or it never passed the gates. --}}

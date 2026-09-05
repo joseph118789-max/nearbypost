@@ -37,11 +37,13 @@ class FeedReadyItem extends Model
     }
 
     protected $fillable = [
+        'geo_country_code', 'geo_state_code', 'geo_city_code',
         'news_item_id',
         'title',
         'summary',
         'source',
         'published_at',
+        'published_precision',
         'primary_category',
         'secondary_category',
         'sub_category',

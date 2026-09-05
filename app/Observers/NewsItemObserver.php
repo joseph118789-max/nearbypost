@@ -22,6 +22,38 @@ class NewsItemObserver
     public function deleted(NewsItem $newsItem): void
     {
         FeedReadyItem::where('news_item_id', $newsItem->id)->delete();
+        $this->forgetCommunity($newsItem);
+    }
+
+    /**
+     * A reader's report deleted from the admin desk (3 Sep 2026: four demo
+     * reports) left its meta, comments, reactions, versions and checks behind
+     * as orphans. They go with it. The contributor's reputation ledger stays:
+     * it is their history, not the report's.
+     */
+    private function forgetCommunity(NewsItem $newsItem): void
+    {
+        if (($newsItem->origin ?? null) !== 'user') {
+            return;
+        }
+
+        $id = $newsItem->id;
+        $commentIds = \Illuminate\Support\Facades\DB::table('community_comments')->where('news_item_id', $id)->pluck('id');
+
+        if ($commentIds->isNotEmpty()) {
+            foreach (['community_comment_translations', 'community_comment_reports'] as $t) {
+                \Illuminate\Support\Facades\DB::table($t)->whereIn('comment_id', $commentIds)->delete();
+            }
+        }
+
+        foreach (['community_comments', 'community_reactions', 'community_reports', 'community_corrections', 'community_post_versions',
+                  'community_status_history', 'community_moderation_checks', 'community_appeals', 'community_post_meta'] as $t) {
+            try {
+                \Illuminate\Support\Facades\DB::table($t)->where('news_item_id', $id)->delete();
+            } catch (\Throwable) {
+                // a table this install does not have
+            }
+        }
     }
 
     public function restored(NewsItem $newsItem): void
@@ -32,6 +64,7 @@ class NewsItemObserver
     public function forceDeleted(NewsItem $newsItem): void
     {
         FeedReadyItem::where('news_item_id', $newsItem->id)->delete();
+        $this->forgetCommunity($newsItem);
     }
 
     private function syncToFeed(NewsItem $newsItem): void
@@ -91,7 +124,7 @@ class NewsItemObserver
         FeedReadyItem::updateOrCreate(
             ['news_item_id' => $newsItem->id],
             [
-                'title' => $newsItem->title,
+                'title' => $newsItem->ai_title ?: $newsItem->title,
                 'summary' => $newsItem->summary,
                 'source' => $newsItem->source,
                 'url' => $newsItem->url,

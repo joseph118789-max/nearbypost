@@ -20,7 +20,14 @@
 <div class="srcpage">
   @include('admin.brain._nav')
 
-  <h1>Playbook</h1>
+  <h1>Playbook @if($country)<span style="font-size:.7em;color:#1c5a7f;">&mdash; {{ $countryName }}</span>@endif</h1>
+  @if($country)
+    <p class="sub" style="background:#eef6fb;border-left:3px solid #1c5a7f;padding:9px 12px;border-radius:0 8px 8px 0;">
+      You are looking at <b>{{ $countryName }}</b>. Stories from its publishers are judged by the text below.
+      A section marked <b>own text</b> is this country's; the rest is the base every country shares.
+      Saving a section here makes it this country's own; "Back to base" removes that copy.
+    </p>
+  @endif
   <p class="lede">
     How this newsroom decides. Not a list of bans &mdash; those are the
     <a href="{{ route('admin.rules.index') }}">Rules</a> &mdash; but the method: what counts as news,
@@ -38,7 +45,9 @@
     @foreach($sections as $key => $section)
       <div class="card {{ $section['is_active'] ? '' : 'off' }}" style="{{ $section['is_active'] ? '' : 'opacity:.6;' }}">
         <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;">
-          <h2 style="margin-bottom:2px;">{{ $section['title'] }}</h2>
+          <h2 style="margin-bottom:2px;">{{ $section['title'] }}
+            @if($country && !empty($section['override']))<span class="badge" style="background:#1c5a7f;color:#fff;border-radius:999px;padding:2px 9px;font-size:.7rem;vertical-align:middle;">own text</span>@elseif($country)<span class="badge" style="background:#e6edf3;color:#4a6b80;border-radius:999px;padding:2px 9px;font-size:.7rem;vertical-align:middle;">base</span>@endif
+          </h2>
           <form method="POST" action="{{ route('admin.brain.playbook.toggle', $key) }}">
             @csrf
             <button class="btn-sm {{ $section['is_active'] ? 'warn' : 'go' }}" type="submit">
@@ -57,9 +66,15 @@
           <textarea name="body" spellcheck="false">{{ $section['body'] }}</textarea>
           <div class="actions">
             <input type="text" name="note" placeholder="What are you changing, and why? (kept with the old version)">
-            <button class="btn-sm go" type="submit">Save</button>
+            <button class="btn-sm go" type="submit">{{ $country ? 'Save for ' . $countryName : 'Save' }}</button>
           </div>
         </form>
+        @if($country && !empty($section['override']))
+          <form method="POST" action="{{ route('admin.brain.playbook.revert', $key) }}" style="margin-top:6px;" onsubmit="return confirm('Remove this country\'s own text and use the base again?')">
+            @csrf @method('DELETE')
+            <button class="btn-sm warn" type="submit">Back to base</button>
+          </form>
+        @endif
       </div>
     @endforeach
   </div>

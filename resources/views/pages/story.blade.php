@@ -27,7 +27,14 @@
       @if($story->published_at)
         <time datetime="{{ \Carbon\Carbon::parse($story->published_at)->toIso8601String() }}">{{ \Carbon\Carbon::parse($story->published_at)->diffForHumans() }}</time>
       @endif
-      @if($place)
+      {{-- ⛔ A place whose name has no Latin letters slugs to an empty
+           string, and route('place', ['slug' => '']) THROWS - which took the
+           whole story page down with a 500, not just the link. Seven live
+           stories carry such a label today: நேப்பாளம், 布城, الدوحة and the
+           rest. story-card.blade.php already guarded this; these two did not,
+           and neither did the sitemap. --}}
+      @php $placeSlug = $place ? \App\Support\Slug::make($place) : ''; @endphp
+      @if($place && $placeSlug !== '')
         <a href="{{ \App\Support\Loc::route('place', ['slug' => \App\Support\Slug::make($place)]) }}">{{ $place }}</a>
       @endif
     </div>
@@ -52,8 +59,8 @@
         </a>
       @endif
 
-      @if($place)
-        <a class="btn-quiet" href="{{ \App\Support\Loc::route('place', ['slug' => \App\Support\Slug::make($place)]) }}">{{ __('site.more_near', ['place' => $place]) }}</a>
+      @if($place && $placeSlug !== '')
+        <a class="btn-quiet" href="{{ \App\Support\Loc::route('place', ['slug' => $placeSlug]) }}">{{ __('site.more_near', ['place' => $place]) }}</a>
       @endif
 
       <a class="btn-quiet" href="{{ \App\Support\Loc::route('home') }}">{{ __('site.browse_all') }}</a>

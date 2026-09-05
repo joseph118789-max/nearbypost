@@ -126,7 +126,7 @@ class SeedKnowledge extends Command
 DISCARD (d = 1) if the item is not news: pure opinion or editorial, unconfirmed
 rumour, speculation ("might", "could", "possibly"), he-said-she-said with no
 resolution, clickbait without substance, or no actual event. Set e when a listed
-code applies. When d = 1, rel and sub may be empty.
+code applies. Even when d = 1, still fill rel and sub.
 TEXT,
             ],
             [

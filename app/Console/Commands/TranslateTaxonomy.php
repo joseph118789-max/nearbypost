@@ -33,7 +33,7 @@ class TranslateTaxonomy extends Command
 
     public function handle(): int
     {
-        $apiKey = config('services.deepseek.key');
+        $apiKey = (\App\Services\Ai\AiRouter::for('taxonomy_translate')->isConfigured() ? 'via-ai-panel' : '');
 
         if (!$apiKey) {
             $this->error('DeepSeek API key not configured');
@@ -101,9 +101,7 @@ Items:
 {$json}
 PROMPT;
 
-        $response = Http::withToken($apiKey)
-            ->timeout(120)
-            ->post('https://api.deepseek.com/v1/chat/completions', [
+        $response = \App\Services\Ai\AiRouter::for('taxonomy_translate')->post(120, [
                 'model'       => self::MODEL,
                 'messages'    => [['role' => 'user', 'content' => $prompt]],
                 'temperature' => 0.2,

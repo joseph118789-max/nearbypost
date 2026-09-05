@@ -50,15 +50,46 @@ class Playbook
      * serialises stdClass can hand it back as an incomplete class, and the
      * first property read then throws - during classification, on every story.
      */
+    /** The country whose sections are read: null = the base (every country). */
+    private ?string $country = null;
+
+    /** The same playbook seen from one country: base sections, overridden by that country's own. */
+    public function forCountry(?string $iso2): static
+    {
+        $copy = clone $this;
+        $copy->country = $iso2 === null ? null : strtoupper($iso2);
+
+        return $copy;
+    }
+
+    public function country(): ?string
+    {
+        return $this->country;
+    }
+
     public function sections(): array
     {
-        return Cache::remember('playbook:' . $this->version(), self::TTL_SECONDS, function () {
-            return DB::table('playbook_sections')
+        return Cache::remember('playbook:' . ($this->country ?? 'base') . ':' . $this->version(), self::TTL_SECONDS, function () {
+            $base = DB::table('playbook_sections')
+                ->whereNull('country')
                 ->orderBy('sort_order')
                 ->get()
-                ->map(fn ($row) => (array) $row)
+                ->map(fn ($row) => (array) $row + ['override' => false])
                 ->keyBy('key')
                 ->all();
+
+            if ($this->country === null) {
+                return $base;
+            }
+
+            // the country's own text replaces the base text of the same key;
+            // a key only the country has is added at the end
+            foreach (DB::table('playbook_sections')->where('country', $this->country)->orderBy('sort_order')->get() as $row) {
+                $row = (array) $row + ['override' => true];
+                $base[$row['key']] = $row;
+            }
+
+            return $base;
         });
     }
 
@@ -97,7 +128,26 @@ class Playbook
      */
     public function save(string $key, string $body, ?string $note = null, ?int $editorId = null): void
     {
-        $existing = DB::table('playbook_sections')->where('key', $key)->first();
+        $existing = DB::table('playbook_sections')->where('key', $key)
+            ->when($this->country === null, fn ($q) => $q->whereNull('country'), fn ($q) => $q->where('country', $this->country))
+            ->first();
+
+        // the first edit for a country creates that country's own copy of the section
+        if (!$existing && $this->country !== null) {
+            $base = DB::table('playbook_sections')->where('key', $key)->whereNull('country')->first();
+
+            if (!$base) {
+                return;
+            }
+
+            DB::table('playbook_sections')->insert([
+                'key' => $key, 'country' => $this->country, 'title' => $base->title, 'body' => $body, 'why' => $base->why,
+                'sort_order' => $base->sort_order, 'is_active' => $base->is_active, 'created_at' => now(), 'updated_at' => now(),
+            ]);
+            $this->bumpVersion();
+
+            return;
+        }
 
         if (!$existing) {
             return;
@@ -113,7 +163,7 @@ class Playbook
             ]);
         }
 
-        DB::table('playbook_sections')->where('key', $key)->update([
+        DB::table('playbook_sections')->where('id', $existing->id)->update([
             'body'       => $body,
             'updated_at' => now(),
         ]);
@@ -121,13 +171,38 @@ class Playbook
         $this->bumpVersion();
     }
 
+    /** Remove a country's own version of a section, so the base applies again. */
+    public function revert(string $key): void
+    {
+        if ($this->country === null) {
+            return;
+        }
+
+        DB::table('playbook_sections')->where('key', $key)->where('country', $this->country)->delete();
+        $this->bumpVersion();
+    }
+
     public function setActive(string $key, bool $active): void
     {
-        DB::table('playbook_sections')->where('key', $key)->update([
-            'is_active'  => $active,
-            'updated_at' => now(),
-        ]);
+        $q = DB::table('playbook_sections')->where('key', $key)
+            ->when($this->country === null, fn ($q) => $q->whereNull('country'), fn ($q) => $q->where('country', $this->country));
 
+        if ($this->country !== null && !$q->exists()) {
+            // switching off for one country: that country's copy, switched off
+            $base = DB::table('playbook_sections')->where('key', $key)->whereNull('country')->first();
+
+            if ($base) {
+                DB::table('playbook_sections')->insert([
+                    'key' => $key, 'country' => $this->country, 'title' => $base->title, 'body' => $base->body, 'why' => $base->why,
+                    'sort_order' => $base->sort_order, 'is_active' => $active, 'created_at' => now(), 'updated_at' => now(),
+                ]);
+                $this->bumpVersion();
+            }
+
+            return;
+        }
+
+        $q->update(['is_active' => $active, 'updated_at' => now()]);
         $this->bumpVersion();
     }
 
@@ -136,8 +211,20 @@ class Playbook
         return (string) Cache::get('playbook:version', '1');
     }
 
+    /**
+     * Change the cache key so the next read comes from the database.
+     *
+     * NOT time(). Two saves in the same second produced the same version, so
+     * the cache written between them was served as current and the second edit
+     * was invisible until something else cleared it - which is how a rule could
+     * be saved, recorded in the revision history, and still not reach the
+     * model. Microseconds plus a counter make the key unique per call, however
+     * fast they arrive.
+     */
     public function bumpVersion(): void
     {
-        Cache::forever('playbook:version', (string) time());
+        static $counter = 0;
+
+        Cache::forever('playbook:version', sprintf('%s-%d', microtime(true), ++$counter));
     }
 }

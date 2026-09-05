@@ -26,7 +26,29 @@ h1 { font-size: 1.5rem; font-weight: 700; color: #1c5a7f; }
 .btn-danger { background: #fff3f0; color: #bc4e2c; border: 1px solid #f0cfc0; }
 .table-wrapper { overflow-x: auto; margin: 8px 20px 20px 20px; border-radius: 20px; border: 1px solid #eef2f8; background: white; }
 .news-table, .subscriber-table, .intel-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; min-width: 800px; }
-.news-table th, .news-table td, .subscriber-table th, .subscriber-table td, .intel-table th, .intel-table td { padding: 14px 10px; border-bottom: 1px solid #eff3f9; text-align: center; vertical-align: middle; }
+.news-table th, .news-table td, .subscriber-table th, .subscriber-table td, .intel-table th, .intel-table td { padding: 7px 9px; border-bottom: 1px solid #eff3f9; text-align: center; vertical-align: middle; }
+
+/* Density. Every row the same height, so the column can be scanned rather
+   than read. The full text is one click away in the panel. */
+.news-table td { font-size: 0.8rem; }
+.news-table tbody tr { cursor: pointer; transition: background 0.12s; }
+.news-table tbody tr:hover { background: #f5f9fc; }
+
+.cell-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-align: left;
+  line-height: 1.45;
+}
+
+/* Prose reads from its left edge; centring it makes that edge ragged. */
+.news-table td.summary-preview, .news-table td.headline-cell { text-align: left; vertical-align: top; }
+.news-table td.headline-cell { max-width: 300px; }
+.headline-cell strong { font-weight: 650; color: #1c3f5c; }
+
+.news-table .nodata { color: #b6c3ce; }
 .group-stats-container { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; background: #f8fafc; padding: 12px 20px; border-radius: 28px; }
 .stat-card { background: white; border-radius: 24px; padding: 10px 20px; min-width: 120px; flex: 1 0 auto; text-align: center; border: 1px solid #e2edf6; }
 .stat-card.total-card { background: #1c5a7f; }
@@ -34,13 +56,13 @@ h1 { font-size: 1.5rem; font-weight: 700; color: #1c5a7f; }
 .stat-card.total-card .count { color: white; }
 .stat-card h4 { font-size: 0.75rem; color: #5f7f9a; margin-bottom: 6px; text-transform: uppercase; }
 .stat-card .count { font-size: 1.6rem; font-weight: 800; color: #1c5a7f; }
-.summary-preview { max-width: 280px; text-align: left; }
-.category-badge, .subcat-badge, .interest-badge, .location-badge { background: #e9f0f6; padding: 4px 12px; border-radius: 30px; font-size: 0.7rem; display: inline-block; }
-.status-badge { display: inline-block; padding: 4px 12px; border-radius: 30px; font-size: 0.7rem; font-weight: 600; }
+.summary-preview { max-width: 360px; text-align: left; }
+.category-badge, .subcat-badge, .interest-badge, .location-badge { background: #e9f0f6; padding: 2px 9px; border-radius: 30px; font-size: 0.67rem; display: inline-block; white-space: nowrap; }
+.status-badge { display: inline-block; padding: 2px 9px; border-radius: 30px; font-size: 0.67rem; font-weight: 600; white-space: nowrap; }
 .status-active { background: #e0f5e9; color: #1f7840; }
 .status-inactive { background: #ffe6e2; color: #bc4e2c; }
 .click-count-badge { background: #fef5e8; padding: 4px 12px; border-radius: 30px; font-size: 0.7rem; font-weight: 700; color: #e67e22; }
-.mode-badge, .precision-badge { display: inline-block; background: #f0f4f9; color: #36566d; padding: 4px 10px; border-radius: 30px; font-size: 0.7rem; }
+.mode-badge, .precision-badge { display: inline-block; background: #f0f4f9; color: #36566d; padding: 2px 8px; border-radius: 30px; font-size: 0.66rem; white-space: nowrap; }
 .pagination-area { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; padding: 16px 24px; border-top: 1px solid #edf2f7; }
 .page-btn { background: white; border: 1px solid #d4e2ef; padding: 6px 14px; border-radius: 30px; cursor: pointer; margin: 0 3px; }
 .page-btn.active { background: #1c5a7f; color: white; }
@@ -124,20 +146,29 @@ textarea { border-radius: 18px !important; resize: vertical; }
 </style>
 @endpush
 
+@section('own-header', '1')
 @section('content')
 <div class="dashboard">
+  {{-- One row for everything: the brand and the two admin links that the
+       layout normally puts in a header of their own, then this page's tabs,
+       then the two buttons. Two stacked rows read as two different menus. --}}
   <div class="tab-navigation">
     <div class="tabs-left">
-      <button class="tab-btn active" data-tab="news">📰 News</button>
-      <button class="tab-btn" data-tab="subscriber">👥 Subscribers</button>
-      <button class="tab-btn" data-tab="intel">📊 Intel Analytics</button>
+      <a href="{{ route('admin.dashboard') }}" class="tab-brand">NearbyPost Admin</a>
+      <a href="{{ route('admin.brain.index') }}" class="tab-btn tab-go">🧠 Resource centre</a>
+      <button class="tab-btn {{ ($tab ?? 'subscriber') === 'subscriber' ? 'active' : '' }}" data-tab="subscriber">👥 Subscribers</button>
+      <button class="tab-btn {{ ($tab ?? '') === 'intel' ? 'active' : '' }}" data-tab="intel">📊 Intel Analytics</button>
     </div>
-    <button id="adminSettingsBtn" class="admin-settings-btn">⚙️ Settings</button>
-    <button id="logoutBtn" class="admin-settings-btn" style="background:#bc4e2c;">🚪 Logout</button>
+    <div class="tabs-right">
+      {{-- Settings is gone: its one useful screen (the taxonomy) is a page in
+           the resource centre now. Main page is the public site. --}}
+      <a href="{{ url('/') }}" class="admin-settings-btn" style="text-decoration:none;display:inline-flex;align-items:center;">🌐 Main page</a>
+      <button id="logoutBtn" class="admin-settings-btn" style="background:#bc4e2c;">🚪 Logout</button>
+    </div>
   </div>
 
   {{-- NEWS TAB --}}
-  <div id="newsTab" class="tab-content active">
+  <div id="newsTab" class="tab-content" hidden>
     <div class="header-section">
       <div class="title-row"><h1>📰 News Management</h1><button id="addRowBtn" class="btn btn-primary">➕ Add News</button></div>
       <div class="filter-bar">
@@ -156,7 +187,7 @@ textarea { border-radius: 18px !important; resize: vertical; }
   </div>
 
   {{-- SUBSCRIBERS TAB --}}
-  <div id="subscriberTab" class="tab-content">
+  <div id="subscriberTab" class="tab-content {{ ($tab ?? 'subscriber') === 'subscriber' ? 'active' : '' }}">
     <div class="header-section">
       <div class="title-row"><h1>👥 Subscribers</h1><button id="addSubscriberBtn" class="btn btn-primary">➕ Add</button></div>
       <div id="groupStatsContainer" class="group-stats-container"></div>
@@ -179,7 +210,7 @@ textarea { border-radius: 18px !important; resize: vertical; }
   </div>
 
   {{-- INTEL TAB --}}
-  <div id="intelTab" class="tab-content">
+  <div id="intelTab" class="tab-content {{ ($tab ?? '') === 'intel' ? 'active' : '' }}">
     <div class="intel-dashboard">
       <div class="intel-toolbar">
         <div class="intel-toolbar-left">

@@ -7,6 +7,7 @@ use App\Services\FeedQuery;
 use App\Support\Loc;
 use Illuminate\View\View;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
@@ -48,9 +49,54 @@ class PostController extends Controller
             ->where('locale', Loc::current())
             ->first();
 
-        $title = $translation->title ?? $post->title;
+        $title = $translation->title ?? $post->ai_title ?? $post->title;
+
+        // Community Reports: the report's trust state, its author, the reactions, and structured data for Search
+        $community = DB::table('community_post_meta')->where('news_item_id', $post->id)->first();
+        $author = $post->contributor_id ? DB::table('users')->where('id', $post->contributor_id)->first(['id', 'username', 'name', 'credibility']) : null;
+
+        if ($author) {
+            $author->posts = DB::table('news_items')->where('contributor_id', $author->id)->where('origin', 'user')->where('status', 'active')->count();
+        }
+        $jsonLd = null;
+
+        if ($community && $community->trust_status !== 'removed') {
+            $jsonLd = [
+                '@context' => 'https://schema.org',
+                '@type' => $community->seo_eligibility === 'news' ? 'NewsArticle' : 'Article',
+                'headline' => mb_substr($title, 0, 110),
+                'datePublished' => $post->published_at?->toIso8601String(),
+                'dateModified' => ($community->last_materially_updated_at ? \Carbon\Carbon::parse($community->last_materially_updated_at) : $post->updated_at)?->toIso8601String(),
+                'author' => $author && $author->username ? ['@type' => 'Person', 'name' => '@' . $author->username, 'url' => url('/@' . $author->username)] : ['@type' => 'Person', 'name' => $post->source],
+                'publisher' => ['@type' => 'Organization', 'name' => 'Nearbypost', 'url' => url('/')],
+                'mainEntityOfPage' => url()->current(),
+                'image' => $post->image_path ? [asset($post->image_path)] : null,
+                'contentLocation' => $post->latitude !== null ? ['@type' => 'Place', 'name' => $post->location_label ?: $post->main_place_text,
+                    'geo' => ['@type' => 'GeoCoordinates', 'latitude' => (float) $post->latitude, 'longitude' => (float) $post->longitude]] : null,
+                'description' => 'Community Report · ' . ucfirst($community->trust_status),
+            ];
+            $jsonLd = array_filter($jsonLd, fn ($v) => $v !== null);
+        }
+
+        $comments = $community ? DB::table('community_comments as c')->join('users as u', 'u.id', '=', 'c.user_id')
+            ->where('c.news_item_id', $post->id)->whereIn('c.status', ['published', 'hidden'])->orderBy('c.id')
+            ->get(['c.*', 'u.username', 'u.credibility', DB::raw("(select count(*) from news_items n where n.contributor_id = u.id and n.origin = 'user' and n.status = 'active') as posts")]) : collect();
+        $corrections = $community ? DB::table('community_corrections as c')->leftJoin('users as u', 'u.id', '=', 'c.user_id')
+            ->where('c.news_item_id', $post->id)->orderByDesc('c.id')->limit(20)->get(['c.*', 'u.username']) : collect();
+        $history = $community ? DB::table('community_status_history')->where('news_item_id', $post->id)->where('field', 'trust_status')->orderBy('id')->get() : collect();
+        $blocked = Auth::guard('web')->check() ? DB::table('user_blocks')->where('blocker_id', Auth::guard('web')->id())->pluck('kind', 'blocked_id') : collect();
 
         return view('pages.post', [
+            'community'   => $community,
+            'comments'    => $comments,
+            'corrections' => $corrections,
+            'history'     => $history,
+            'blocked'     => $blocked,
+            'isTranslated'=> $translation !== null && ($post->source_language ?? 'en') !== Loc::current(),
+            'sourceLocale'=> $post->source_language,
+            'author'      => $author,
+            'counts'      => $community ? \App\Http\Controllers\CommunityController::counts($post->id) : [],
+            'jsonLd'      => $jsonLd,
             'tab'         => null,
             'post'        => $post,
             'headline'    => $title,

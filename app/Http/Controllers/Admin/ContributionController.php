@@ -39,9 +39,8 @@ class ContributionController extends Controller
 
     public function index(Request $request): View
     {
-        $tab = in_array($request->query('tab'), ['unofficial', 'official'], true)
-            ? $request->query('tab')
-            : 'waiting';
+        // Official (publishers') news is no longer listed here - Live in the resource centre has it
+        $tab = $request->query('tab') === 'unofficial' ? 'unofficial' : 'waiting';
 
         $search = trim((string) $request->query('q', ''));
 
@@ -198,9 +197,15 @@ class ContributionController extends Controller
         $post->update([
             'review_status' => 'published',
             'status'        => 'active',
+            'ai_status'     => 'success',
+            'discarded'     => false,
+            'published_at'  => $post->published_at ?? now(),
             'approved_by'   => Auth::guard('admin')->id(),
             'approved_at'   => now(),
         ]);
+
+        // Community Reports: the report's record follows the person's decision
+        (new \App\Services\Community\CommunityPublisher())->adopt($post->fresh(), Auth::guard('admin')->id());
 
         $message = 'Published.';
 
@@ -355,7 +360,9 @@ class ContributionController extends Controller
     {
         $post = NewsItem::where('id', $id)
             ->where('origin', 'user')
-            ->where('review_status', 'pending_review')
+            // waiting for a person, OR turned down by the automatic check - a
+            // person may overrule it ("How to approve the news?")
+            ->whereIn('review_status', ['pending_review', 'rejected', 'removed'])
             ->first();
 
         if (!$post) {

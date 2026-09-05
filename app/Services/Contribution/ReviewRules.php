@@ -28,9 +28,9 @@ class ReviewRules
      * heading reads to a model as "there are no rules", which is not the same
      * as saying nothing.
      */
-    public function promptBlock(string $appliesTo): string
+    public function promptBlock(string $appliesTo, ?string $country = null): string
     {
-        $rules = $this->active($appliesTo);
+        $rules = $this->active($appliesTo, $country);
 
         if ($rules === []) {
             return '';
@@ -49,14 +49,17 @@ class ReviewRules
     }
 
     /** @return list<string> */
-    public function active(string $appliesTo): array
+    public function active(string $appliesTo, ?string $country = null): array
     {
-        $key = 'review_rules:' . $appliesTo . ':' . $this->version();
+        $country = $country === null ? null : strtoupper($country);
+        $key = 'review_rules:' . $appliesTo . ':' . ($country ?? 'base') . ':' . $this->version();
 
-        return Cache::remember($key, self::TTL_SECONDS, function () use ($appliesTo) {
+        return Cache::remember($key, self::TTL_SECONDS, function () use ($appliesTo, $country) {
+            // the base rules (no country) and, when a country is given, that country's own rules too
             return DB::table('review_rules')
                 ->where('is_active', true)
                 ->whereIn('applies_to', [$appliesTo, 'both'])
+                ->where(fn ($q) => $country === null ? $q->whereNull('country') : $q->whereNull('country')->orWhere('country', $country))
                 ->orderBy('sort_order')
                 ->orderBy('id')
                 ->pluck('rule')

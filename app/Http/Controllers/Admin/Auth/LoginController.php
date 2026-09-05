@@ -42,7 +42,7 @@ class LoginController extends Controller
             RateLimiter::clear($key);
             $request->session()->regenerate();
 
-            return redirect()->intended(route('admin.dashboard'));
+            return redirect()->intended(route('admin.brain.index'));
         }
 
         RateLimiter::hit($key, 900);

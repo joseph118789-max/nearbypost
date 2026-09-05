@@ -44,11 +44,17 @@ a { color: inherit; }
 
 .topbar {
   position: sticky; top: 0; z-index: 30;
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 10px; padding: 10px 14px;
+  padding: 10px 14px;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--line);
+}
+
+/* The row itself. Separated from .topbar so the bar can stay full-bleed while
+   its contents line up with the columns underneath. */
+.topbar-inner {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px;
 }
 
 .brand {
@@ -115,11 +121,12 @@ a { color: inherit; }
 
 .controls { max-width: 720px; margin: 10px auto 0; padding: 0 14px; }
 
-/* Place and buttons on the first line, the topic pickers on the second. Five
-   controls sharing 375px truncates all five. */
+/* Place, the sort dropdown and the three buttons (pin, search, filter) on
+   the first line. The filter used to be a fourth item in a three-column
+   row, so it dropped to a line of its own, 38px wide and alone. */
 .controls-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
   align-items: center; gap: 6px;
   background: var(--paper); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 6px;
@@ -157,6 +164,22 @@ a { color: inherit; }
 
 .adv > summary { width: 38px; height: 38px; border-radius: 10px; }
 .adv-body { right: 0; width: min(320px, calc(100vw - 28px)); padding: 14px; }
+/* Hung off a 38px button at the right edge, the panel opened half off-screen
+   on a phone. Centred, it is a small sheet the thumb can reach. */
+@media (max-width: 699px) {
+  .adv-body {
+    position: fixed; top: 50%; left: 50%; right: auto; transform: translate(-50%, -50%);
+    width: min(360px, calc(100vw - 28px)); max-height: calc(100vh - 40px); overflow-y: auto;
+    z-index: 60; box-shadow: 0 24px 60px rgba(16, 32, 26, 0.28);
+  }
+  /* dim the page behind the floating panel; a tap on it closes the panel */
+
+}
+.adv-close {
+  width: 100%; height: var(--tap); margin-top: 8px; font: inherit; font-weight: 600;
+  border: 1px solid var(--line); border-radius: 12px; background: var(--paper); color: var(--ink-soft); cursor: pointer;
+}
+@media (min-width: 700px) { .adv-close { display: none; } }
 .adv-label {
   font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em;
   text-transform: uppercase; color: var(--ink-faint); margin: 14px 0 7px;
@@ -182,6 +205,50 @@ a { color: inherit; }
 main { max-width: 720px; margin: 0 auto; padding: 14px; }
 
 .lede { color: var(--ink-soft); font-size: 0.88rem; margin-bottom: 12px; }
+/* A sentence of context is worth a line on a wide screen and not on a phone
+   or in the app's webview, where it pushes the first story down. */
+@media (max-width: 1023px) { .lede { display: none; } }
+.row-label {
+  flex: none; align-self: center; margin: 0 4px 0 2px;
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-faint);
+}
+.place-input { min-width: 90px; }
+.countrypick { font-weight: 600; color: var(--ink); }
+/* On the desktop column the country sits where the place box would */
+@media (min-width: 1024px) { .shell .controls-row > .countrypick { order: 4; grid-column: 1 / -1; } }
+/* Phones and tablets: search and filter live in the tabs row; the place row
+   is the place, the pin and the sort pills. Desktop keeps the row it had. */
+.modes-tools { display: none; }
+@media (max-width: 1023px) {
+  .modes { align-items: center; overflow: visible; gap: 4px; }
+  .modes a { flex: 1 1 auto; min-width: 0; padding: 8px 5px; font-size: 0.8rem; text-align: center; white-space: nowrap; }
+  .modes-tools { display: flex; gap: 4px; flex: none; margin-left: 4px; }
+  .modes-tools .go { width: 34px; height: 34px; }
+  .modes-tools .adv-toggle { background: var(--paper); color: var(--ink-soft); border: 1px solid var(--line); }
+  .controls-row { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .controls-row > .go[type="submit"], .adv > summary { display: none; }
+  /* The panel's <details> takes no cell of its own (its body is fixed, its
+     summary hidden), so the pills can follow the pin on the place row. */
+  .adv { position: absolute; width: 0; height: 0; overflow: visible; }
+  .adv[open]::before { content: ""; position: fixed; inset: 0; background: rgba(16, 32, 26, 0.35); z-index: 55; }
+  .controls-row > .place-input { order: 1; }
+  .controls-row > .locate { order: 2; }
+  .controls-row > .sortpick { order: 3; }
+  .controls-row > .sourcepick:not(.sortpick) { order: 4; }
+  /* the pills share the place row: two compact ones, no wrapping */
+  .sourcepick.sortpick { grid-column: auto; margin: 0; gap: 4px; }
+  .sourcepick.sortpick label { flex: none; min-width: 0; padding: 0 10px; height: 38px; display: inline-flex; align-items: center; font-size: 0.82rem; }
+}
+@media (min-width: 1024px) {
+  /* On the wide column the label sits above its pills, as before. */
+  .sourcepick { flex-wrap: wrap; }
+  .sourcepick > .row-label { flex: 0 0 100%; align-self: auto; margin: 6px 0 -2px; }
+  /* Three pills share the width of the column: one row, always. The wrap
+     above exists for the label line only. */
+  .shell .sourcepick label, .sourcepick.sourcepick label { flex: 1 1 0; min-width: 0; padding-left: 8px; padding-right: 8px; white-space: nowrap; }
+}
+.adv-body .picks { display: flex; gap: 6px; }
+.adv-body .pick { background-color: var(--ground); }
 
 .notice {
   background: var(--warn); color: var(--warn-ink);
@@ -240,11 +307,9 @@ main { max-width: 720px; margin: 0 auto; padding: 14px; }
 .peek-meta { font-size: 0.74rem; color: var(--ink-faint); margin-bottom: 8px; }
 .peek h2 { font-size: 1.1rem; line-height: 1.35; margin-bottom: 10px; text-wrap: pretty; }
 .peek p#peek-summary { font-size: 0.95rem; line-height: 1.65; color: var(--ink-soft); }
-/* Three actions do not fit across a phone. The article is what the reader
-   asked for, so it takes the full width; the page link and Close share the row
-   under it, where they are still a comfortable tap apart. */
-.peek-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
-.peek-actions #peek-link { grid-column: 1 / -1; }
+/* Two actions, one row: the article link takes two thirds, Close the rest.
+   The full-width link with Close underneath cost a line for nothing. */
+.peek-actions { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-top: 18px; }
 .peek-actions a, .peek-actions button {
   min-height: var(--tap); display: inline-flex; align-items: center; justify-content: center;
   padding: 8px 12px; text-align: center;
@@ -257,8 +322,7 @@ main { max-width: 720px; margin: 0 auto; padding: 14px; }
 .peek-actions button { background: var(--paper); color: var(--ink-soft); }
 
 @media (min-width: 560px) {
-  .peek-actions { grid-template-columns: 2fr 1fr 1fr; }
-  .peek-actions #peek-link { grid-column: auto; }
+  .peek-actions { grid-template-columns: 2fr 1fr; }
 }
 
 /* ── Page furniture ─────────────────────────────────────────────────── */
@@ -287,7 +351,8 @@ h1 { font-size: 1.35rem; line-height: 1.25; margin-bottom: 6px; text-wrap: balan
   border: 1px solid var(--line); background: var(--paper);
   font-size: 0.82rem; color: var(--ink-soft); cursor: pointer;
 }
-.sourcepick label.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.sourcepick label.on, .sourcepick label:has(input:checked) { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.sourcepick label.on:not(:has(input:checked)):has(~ label input:checked), .sourcepick label:has(input:checked) ~ label.on { background: transparent; color: inherit; font-weight: inherit; }
 .sourcepick input { position: absolute; opacity: 0; pointer-events: none; }
 .sourcepick label:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* Its own line at every width. Sharing the bar with the place field and the
@@ -331,8 +396,6 @@ h1 { font-size: 1.35rem; line-height: 1.25; margin-bottom: 6px; text-wrap: balan
 /* A little more room to breathe once there is room to breathe in. */
 @media (min-width: 700px) {
   /* Room for everything on one line again. */
-  .controls-row { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) auto auto; }
-  .picks { grid-column: auto; display: contents; }
 
   body { font-size: 16.5px; }
   .topbar { padding: 12px 20px; }
@@ -493,3 +556,521 @@ h1 { font-size: 1.35rem; line-height: 1.25; margin-bottom: 6px; text-wrap: balan
   font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
   color: var(--warn-ink); background: var(--warn); padding: 3px 8px; border-radius: 999px;
 }
+
+
+/* ── The desktop shell: controls left, feed centre, topics right ──────
+ *
+ * One centred 720px column is right on a phone and wrong on a desktop, where
+ * it left two thirds of the screen empty and hid every topic inside a
+ * dropdown. A reader with the room should be able to SEE the topics rather
+ * than open a menu to find out what they are.
+ *
+ * Below 1024px nothing here applies and the page stacks exactly as before:
+ * controls, then feed, then the topic list underneath it.
+ */
+.topic-browser .filter-chips { gap: 7px; }
+.topic-back {
+  display: inline-block; margin-bottom: 8px;
+  font-size: 0.85rem; color: var(--ink-soft); text-decoration: none;
+}
+.topic-back:hover { color: var(--accent); }
+.chip-count {
+  display: inline-block; margin-left: 6px; opacity: 0.65; font-size: 0.78em;
+}
+.chip-note { font-size: 0.85rem; color: var(--ink-soft); margin-top: 4px; }
+
+/* On a phone the right column is not shown at all. The dropdowns in the
+   controls are already the way to choose a topic there, and offering the same
+   choice twice on a 375px screen is how a reader ends up trusting neither. The
+   markup stays in the page, so every topic link is still there for a crawler. */
+.shell-right { display: none; }
+
+@media (min-width: 1024px) {
+  /* The wordmark and the account icon sit on the outer edges of the columns
+     rather than the outer edges of the window. The numbers are not repeated by
+     hand - they are the same max-width and padding as .shell below, and
+     box-sizing is border-box throughout, so both resolve to the same content
+     box. Change one and change the other. */
+  .topbar { padding-left: 0; padding-right: 0; }
+
+  .topbar-inner {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 22px;
+  }
+
+  .shell {
+    display: grid;
+    grid-template-columns: 290px minmax(0, 1fr) 280px;
+    gap: 24px;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 8px 22px 0;
+    align-items: start;
+  }
+
+  /* A page with nothing for the right column keeps the space for the feed
+     instead of leaving a hole where a column used to be. */
+  .shell.no-aside { grid-template-columns: 290px minmax(0, 1fr); }
+
+  /* Both sides follow the reader down a long feed. */
+  .shell-right { display: block; }
+  .shell-left, .shell-right { position: sticky; top: 16px; }
+
+  /* Each was a centred column of its own; inside the grid the cell IS the
+     column, so their own widths and margins have to go or they centre
+     themselves inside their own cell. */
+  .shell .controls,
+  .shell .shell-main { max-width: none; margin: 0; padding: 0; }
+
+  /* Read down the column in the order the reader decides things: WHO wrote it,
+     then WHERE, then how far and how long, then the button that applies it.
+     The markup order is the one a phone needs, so the column is arranged here
+     rather than by moving the fields and breaking the small screen. */
+  .shell .controls-row {
+    grid-template-columns: minmax(0, 1fr) var(--tap) var(--tap);
+    row-gap: 10px; column-gap: 8px;
+  }
+
+  .shell .controls-row > .sourcepick { order: 1; grid-column: 1 / -1; }
+  .shell .controls-row > .sortpick { order: 2; }
+  .shell .controls-row > label[for="place"] { order: 3; grid-column: 1 / -1; }
+  .shell .controls-row > .place-input { order: 4; grid-column: 1; }
+  .shell .controls-row > .locate { order: 5; grid-column: 2; }
+  .shell .controls-row > .go[type="submit"] { order: 6; grid-column: 3; }
+  .shell .controls-row > .adv { order: 7; grid-column: 1 / -1; }
+
+  /* The field is labelled out loud here. On a phone the placeholder does that
+     job and a label would cost a line; in a column with room, a box with no
+     heading is a box a reader has to guess at. */
+  .shell .controls-row > label[for="place"] {
+    position: static; width: auto; height: auto; margin: 0;
+    overflow: visible; clip: auto; clip-path: none; white-space: normal;
+    font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--ink-soft);
+  }
+
+  /* It applies a filter; it is not the front door. At full width and full
+     height it read as the most important thing on the page. */
+  .shell .adv-body .go.wide {
+    width: auto; min-width: 0; padding: 0 16px; height: 38px;
+    font-size: 0.88rem; margin-top: 14px;
+  }
+
+  /* The right column IS the topic picker now, and the same control twice is
+     how a reader ends up not trusting either. */
+  .shell .picks, .shell .picks-label { display: none; }
+
+  .modes { margin-bottom: 2px; }
+}
+
+
+/* ── The topic browser ────────────────────────────────────────────────
+ *
+ * One topic per row, alphabetical. Chips wrapped two and three to a line read
+ * as a cloud to be scanned; a reader opening Sports is looking for one
+ * particular sport, and a list you run your eye down beats a cloud you have to
+ * search. Opening one swaps the panel from the page - no reload, because the
+ * whole tree was sent with it.
+ */
+.topic-list { list-style: none; margin: 0; padding: 0; }
+.topic-list li + li { border-top: 1px solid var(--line); }
+
+.topic-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 11px 4px; min-height: 44px;
+  font-size: 0.9rem; color: var(--ink); text-decoration: none;
+}
+.topic-item:hover { color: var(--accent); }
+.topic-item.on { color: var(--accent); font-weight: 600; }
+.topic-caret { color: var(--ink-soft); font-size: 1.1rem; line-height: 1; }
+
+.topic-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-bottom: 10px; padding: 6px 0; min-height: 32px;
+  background: none; border: 0; cursor: pointer;
+  font: inherit; font-size: 0.85rem; color: var(--ink-soft);
+}
+.topic-back:hover { color: var(--accent); }
+.topic-browser h3 { margin-bottom: 6px; }
+
+
+/* The wordmark carries the mark that is already the browser-tab icon, so the
+   tab and the page agree about what this site is called. */
+.brand { display: inline-flex; align-items: center; gap: 9px; }
+.brand-mark { display: block; border-radius: 6px; }
+
+/* ── Desktop: the filters are simply shown ────────────────────────────
+ *
+ * Radius and period hide behind a toggle on a phone because five controls do
+ * not fit on 375px. In a 290px column with the whole height of the page there
+ * is nothing to save: a control behind a button a reader has to discover is
+ * worse than one they can see, so the popover becomes part of the column and
+ * the button that opened it goes.
+ */
+@media (min-width: 1024px) {
+  /* Three pills in a 290px column. Left to itself the row scrolls sideways
+     and "Marketplace" is cut in half by the column edge, which reads as a
+     rendering fault rather than a control. They wrap and share the width
+     instead, so all three are always whole and always readable. */
+  /* One row, always. Wrapped onto two lines the three modes stop reading as
+     one control and start reading as a list with something missing from it. */
+  .shell .modes {
+    max-width: none; margin: 0 0 12px; padding: 0;
+    display: flex; flex-wrap: nowrap; gap: 5px; overflow: visible;
+  }
+  .shell .modes a {
+    flex: 1 1 0; min-width: 0; padding: 9px 4px;
+    text-align: center; white-space: nowrap; font-size: 0.82rem;
+  }
+
+  .shell .adv > summary { display: none; }
+
+  .shell .adv > .menu-body {
+    display: block;
+    position: static; min-width: 0; padding: 0;
+    background: none; border: 0; box-shadow: none;
+  }
+
+  .shell .adv-label { margin-top: 12px; }
+  .shell .adv-label:first-child { margin-top: 4px; }
+}
+
+
+/* The pin is an alternative to typing, not a second submit: same size and
+   shape as the search button so they read as a pair, but outlined rather than
+   filled, so the primary action still looks like the primary action. */
+.go.locate {
+  background: var(--paper); color: var(--accent);
+  border: 1px solid var(--line);
+}
+.go.locate:hover { background: var(--accent-soft); }
+.go.locate svg { fill: currentColor; }
+
+#geo-ask h2 { font-size: 1.05rem; margin-bottom: 8px; }
+#geo-ask p { font-size: 0.92rem; color: var(--ink-soft); line-height: 1.6; }
+
+
+/* A topic with nothing filed under it this week: still listed, still
+   clickable, but it should not compete with the ones that have news in them. */
+.topic-item.empty { color: var(--ink-soft); opacity: 0.7; }
+.topic-item.empty:hover { opacity: 1; }
+
+
+/* Back to the list of topics on the left, out of the filter on the right. */
+.topic-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.topic-clear {
+  margin-bottom: 10px; padding: 6px 0;
+  font-size: 0.85rem; color: var(--accent); text-decoration: none; white-space: nowrap;
+}
+.topic-clear:hover { text-decoration: underline; }
+
+
+/* ── The sponsor's player ─────────────────────────────────────────────
+ *
+ * It sits under the controls in the left column and has to earn its place
+ * without taking attention from the feed: quiet card, small type, and a video
+ * that only appears once somebody asks for one.
+ */
+.music {
+  margin-top: 16px; padding: 12px;
+  background: var(--paper); border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.music-sponsor {
+  font-size: 0.7rem; font-weight: 600; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--ink-soft); margin-bottom: 10px;
+}
+.music-picks { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+.music-picks .pick { font-size: 0.8rem; padding: 7px 8px; }
+
+/* 16:9, so the box does not jump when the video replaces the button. */
+.music-stage {
+  position: relative; aspect-ratio: 16 / 9; width: 100%;
+  background: #10201a; border-radius: 10px; overflow: hidden;
+}
+.music-stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
+.music-start {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  background: none; border: 0; cursor: pointer;
+  color: #fff; font: inherit; font-size: 0.85rem;
+}
+.music-start:disabled { cursor: default; opacity: 0.8; }
+.music-play-icon { font-size: 1.6rem; line-height: 1; }
+
+.music-now {
+  margin-top: 8px; font-size: 0.8rem; color: var(--ink-soft); line-height: 1.45;
+}
+.music-bar { display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.music-btn {
+  min-width: 40px; min-height: 32px; padding: 0 8px;
+  background: var(--paper); border: 1px solid var(--line); border-radius: 8px;
+  cursor: pointer; font-size: 0.7rem; color: var(--ink-soft);
+}
+.music-btn:hover { background: var(--accent-soft); color: var(--accent); }
+
+/* The transport icons are drawn, not typed. A doubled triangle is the tape-deck
+   glyph for FAST FORWARD, so prev and next both read as "forward" and only one
+   of them was; the upright bar is the part that says "skip a track". */
+.music-btn svg { width: 14px; height: 14px; display: block; margin: 0 auto; fill: currentColor; }
+.music-btn-icon { min-width: 32px; padding: 0 6px; }
+
+.music-vol { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Narrow on purpose: it sits in a 3-column sidebar beside two other controls,
+   and a full-width slider would push the link to the songs page onto its own
+   line. */
+.music-range {
+  width: 72px; height: 4px; padding: 0; cursor: pointer;
+  appearance: none; -webkit-appearance: none;
+  background: var(--line); border-radius: 3px;
+}
+.music-range::-webkit-slider-thumb {
+  appearance: none; -webkit-appearance: none;
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--accent); border: none; cursor: pointer;
+}
+.music-range::-moz-range-thumb {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--accent); border: none; cursor: pointer;
+}
+.music-range:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.music-link { font-size: 0.75rem; color: var(--accent); text-decoration: none; margin-left: auto; }
+.music-link:hover { text-decoration: underline; }
+
+.powered-by { text-align: center; padding: 0 14px 18px; font-size: 0.78rem; }
+.powered-by a { color: var(--ink-soft); text-decoration: none; }
+.powered-by a:hover { text-decoration: underline; }
+
+/* Phones and tablets: no "News type" caption - the three pills explain
+   themselves. On By Interest they share the row with the country dropdown,
+   which has no pin or sort pills to make room for. */
+@media (max-width: 1023px) {
+  .controls-row .row-label { display: none; }
+  .controls.interest .controls-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .controls.interest .controls-row > .sourcepick { grid-column: auto; order: 2; margin: 0; gap: 4px; }
+  .controls.interest .controls-row > .sourcepick label { flex: none; min-width: 0; padding: 0 10px; height: 38px; display: inline-flex; align-items: center; font-size: 0.82rem; white-space: nowrap; }
+  .controls.interest .countrypick { min-width: 100px; padding-left: 6px; }
+}
+
+/* A page with no feed controls (write a post, sign in, a profile) is one
+   column: the form takes the width a form needs, not the 290px the filter
+   column used to leave it. Owner, 3 Sep: "why squeeze in 1 small column?" */
+@media (min-width: 900px) {
+  /* full-width pages (forms, profiles): opt in with @php($wide = true); Marketplace and the feed keep the three columns */
+  .shell.wide { grid-template-columns: minmax(0, 1fr); }
+  .shell.wide .shell-left { position: static; }
+  .shell.wide .shell-main { max-width: 860px; width: 100%; margin: 0 auto; }
+  .shell.wide .form-card, .shell.wide .prose-card, .shell.wide .info-card { max-width: none; }
+  .shell.wide .pin-map { height: 340px; }
+}
+
+/* ── Community panel inside the popup (reactions, report, comments) ──── */
+#peek-community { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+#peek-community .community-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 10px; }
+#peek-community .community-actions .inline { display: inline; }
+#peek-community .chip-btn, .chip-btn { padding: 7px 13px; border-radius: 999px; border: 1px solid #cfe0ec; background: #fff; color: #1c5a7f; font: inherit; font-weight: 600; cursor: pointer; }
+#peek-community .chip-btn b, .chip-btn b { font-weight: 700; margin-left: 4px; }
+.chip-btn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+#peek-community .report-box { flex-basis: 100%; } #peek-community .report-box summary { list-style: none; display: inline-block; }
+#peek-community .report-box form { margin-top: 8px; display: grid; gap: 6px; }
+#peek-community .comments h3 { font-size: 0.95rem; margin: 6px 0; } #peek-community .comments h3 small { color: var(--ink-faint); font-weight: 400; }
+#peek-community .comment { border-top: 1px solid var(--line); padding: 8px 0; font-size: 0.9rem; } #peek-community .comment.reply { margin-left: 22px; border-top: 1px dashed var(--line); }
+#peek-community .comment .who { font-weight: 600; margin-right: 6px; } #peek-community .comment .who a { color: inherit; text-decoration: none; }
+#peek-community .mini { font-size: 0.78rem; color: var(--ink-faint); }
+#peek-community .comment .tools { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+#peek-community .comment .tools button { background: none; border: 0; padding: 0; color: #1c5a7f; font: inherit; font-size: 0.8rem; cursor: pointer; }
+#peek-community .comment .translated { border-left: 3px solid #cfe0ec; padding-left: 10px; color: var(--ink-soft); margin-top: 4px; }
+#peek-community .comment-form { display: grid; gap: 6px; margin-top: 8px; }
+#peek-community .modal-input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; font: inherit; }
+#peek-community .desktop-action-btn { justify-self: start; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--accent); background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+#peek-community .notice { font-size: 0.85rem; color: #1d7a4a; margin: 0 0 8px; }
+
+/* ── The camera button's sheet: post news, or offer a service ─────────── */
+.icon-link.camera { color: var(--accent); }
+.post-menu { width: min(460px, calc(100vw - 28px)); }
+.post-menu h2 { margin-bottom: 4px; }
+.post-menu-intro { color: var(--ink-soft); font-size: 0.92rem; margin-bottom: 14px; }
+.post-choice { display: flex; gap: 14px; align-items: flex-start; padding: 14px; border: 1px solid var(--line); border-radius: 14px; margin-bottom: 10px; text-decoration: none; color: var(--ink); background: var(--paper); }
+.post-choice:hover { border-color: var(--accent); background: var(--accent-soft); }
+.post-choice b { display: block; font-size: 1rem; margin-bottom: 3px; }
+.post-choice small { display: block; font-size: 0.85rem; line-height: 1.5; color: var(--ink-soft); }
+.post-choice-icon { flex: 0 0 44px; height: 44px; border-radius: 12px; background: var(--accent); display: inline-flex; align-items: center; justify-content: center; }
+.post-choice-icon svg { width: 24px; height: 24px; fill: #fff; }
+.post-menu-note { font-size: 0.8rem; color: var(--ink-faint); margin-top: 4px; }
+.peek-actions.single { grid-template-columns: 1fr; }
+
+/* ── Marketplace ──────────────────────────────────────────────────────────
+   The six sections and, until each one opens, the example listings inside
+   them. Reuses the .door pattern's shape so the tab does not look like a
+   different site. */
+
+.mp-sections { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+
+.mp-section {
+  display: block; padding: 18px; border-radius: var(--radius);
+  border: 1px solid var(--line); background: var(--paper);
+  text-decoration: none; color: inherit;
+}
+.mp-section:hover { border-color: var(--accent); }
+.mp-section-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.mp-section-head h2 { font-size: 1.02rem; margin: 0; flex: 1 1 auto; }
+.mp-section-blurb { font-size: 0.9rem; color: var(--ink-soft); line-height: 1.6; margin-bottom: 8px; }
+.mp-kids { font-size: 0.78rem; color: var(--ink-faint); line-height: 1.5; margin-bottom: 10px; }
+.mp-go { font-size: 0.82rem; font-weight: 600; color: var(--accent); }
+
+.mp-pill {
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+  padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+  background: var(--ground); color: var(--ink-faint);
+}
+.mp-pill.on { background: var(--accent-soft); color: var(--accent); }
+
+.mp-crumb { font-size: 0.82rem; margin-bottom: 6px; }
+.mp-crumb a { color: var(--ink-soft); text-decoration: none; }
+.mp-crumb a:hover { color: var(--accent); }
+
+.mp-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+.mp-chip {
+  font-size: 0.72rem; padding: 4px 10px; border-radius: 999px;
+  background: var(--ground); color: var(--ink-soft); border: 1px solid var(--line);
+}
+.mp-chip.small { font-size: 0.66rem; padding: 3px 8px; }
+
+/* The one thing on this page that must not be missed. */
+.mp-notice {
+  border: 1px solid var(--line); border-left: 3px solid var(--ink-faint);
+  background: var(--ground); border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 12px 14px; margin-bottom: 14px;
+  font-size: 0.86rem; color: var(--ink-soft); line-height: 1.6;
+}
+.mp-notice strong { color: var(--ink); }
+
+.mp-card {
+  background: var(--paper); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 16px; margin-bottom: 12px;
+}
+.mp-card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.mp-example {
+  margin-left: auto; font-size: 0.62rem; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 3px;
+  background: #fdf3e6; color: #8a5a1f; border: 1px solid #f0dcc0;
+}
+.mp-card-title { font-size: 1.02rem; line-height: 1.35; margin-bottom: 3px; }
+.mp-card-provider { font-size: 0.86rem; color: var(--ink); font-weight: 600; margin-bottom: 6px; }
+.mp-card-note { font-size: 0.9rem; color: var(--ink-soft); line-height: 1.6; margin-bottom: 10px; }
+.mp-card-facts {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline;
+  font-size: 0.8rem; color: var(--ink-faint); margin-bottom: 10px;
+}
+.mp-price { font-weight: 700; color: var(--ink); font-size: 0.92rem; }
+.mp-dot { color: var(--line); }
+.mp-card-foot {
+  display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center;
+  padding-top: 10px; border-top: 1px solid var(--line);
+}
+.mp-badge {
+  font-size: 0.68rem; font-weight: 600;
+  padding: 3px 9px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent);
+}
+.mp-contact { font-size: 0.76rem; color: var(--ink-faint); }
+
+.mp-aside-note { font-size: 0.84rem; color: var(--ink-soft); line-height: 1.6; margin-top: 10px; }
+
+/* ⛔ A page with no controls still has the mode tabs in the left column, but it
+   does not need 290px to hold three of them. Without this the Marketplace and
+   the legal pages reserved a full control column for a row of tabs and pushed
+   everything else into a third of the width.
+
+   The class was already being written onto .shell and nothing styled it, which
+   is why the rule reads as new: it was declared and then never used. */
+@media (min-width: 1024px) {
+  /* max-content, not a pixel guess: the tabs are the only thing in this
+     column and they are different widths in English, Malay, Chinese and
+     Tamil. 190px then 230px both clipped "Marketplace"; sizing to the
+     content cannot clip in any language. */
+  /* ⛔ A FIXED WIDTH, NOT max-content. This column held only the three
+     mode tabs when it was content-sized, and then the "share your news"
+     card moved in - max-content measured a paragraph and the column ate
+     the page. 260px fits the tabs (measured: 247px) with room to spare,
+     and the tabs wrap rather than clip in any language. */
+  .shell.no-controls { grid-template-columns: 260px minmax(0, 1fr) 280px; }
+  .shell.no-controls.no-aside { grid-template-columns: 260px minmax(0, 1fr); }
+}
+
+/* ⛔ And the tabs must size to themselves in that column.
+   .shell .modes a is flex: 1 1 0 - three equal widths, which is right when they
+   sit above the controls in a fixed 290px column. In a max-content column a
+   zero basis measures nothing, so the column came out 239px while the tabs
+   needed 247 and the active pill lost its last letter. Natural width here, and
+   the column follows the content in any language. */
+@media (min-width: 1024px) {
+  .shell.no-controls .modes { flex-wrap: wrap; }
+  .shell.no-controls .modes a { flex: 0 0 auto; padding: 9px 14px; }
+}
+
+/* ── "Share your news" ─────────────────────────────────────────────────────
+   The invitation card in the reader's own column, and the page behind it. */
+
+.sharecard {
+  display: block; padding: 14px 16px; margin-top: 12px;
+  border: 1px solid var(--line); border-left: 3px solid var(--accent);
+  border-radius: var(--radius); background: var(--paper);
+  text-decoration: none; color: inherit;
+}
+.sharecard:hover { border-color: var(--accent); }
+.sharecard-eyebrow {
+  display: block; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ink-faint); margin-bottom: 4px;
+}
+.sharecard-title { display: block; font-size: 0.98rem; font-weight: 700; margin-bottom: 5px; }
+.sharecard-body { display: block; font-size: 0.82rem; color: var(--ink-soft); line-height: 1.55; margin-bottom: 8px; }
+.sharecard-go { display: block; font-size: 0.8rem; font-weight: 600; color: var(--accent); }
+
+.share-h2 { font-size: 1.02rem; margin-bottom: 8px; }
+.share-p { font-size: 0.92rem; color: var(--ink-soft); line-height: 1.65; margin-bottom: 10px; }
+.share-small { font-size: 0.84rem; color: var(--ink-soft); line-height: 1.6; }
+
+.share-ways { margin: 0 0 4px; padding-left: 1.1rem; }
+.share-ways li { font-size: 0.9rem; color: var(--ink-soft); line-height: 1.6; margin-bottom: 8px; }
+.share-ways b { color: var(--ink); }
+
+.share-steps { margin: 0 0 10px; padding-left: 1.2rem; }
+.share-steps li { font-size: 0.9rem; color: var(--ink-soft); line-height: 1.6; margin-bottom: 6px; }
+
+.share-form { margin-bottom: 14px; }
+.share-label {
+  display: block; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.03em;
+  text-transform: uppercase; color: var(--ink-soft); margin: 16px 0 6px;
+}
+.share-label .req { font-weight: 600; color: var(--ink-faint); text-transform: none; letter-spacing: 0; }
+.share-input {
+  width: 100%; padding: 10px 12px; font: inherit; font-size: 0.92rem;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--ground); color: var(--ink);
+}
+.share-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; background: var(--paper); }
+textarea.share-input { resize: vertical; min-height: 90px; }
+.share-input + .share-input { margin-top: 8px; }
+.share-hint { font-size: 0.78rem; color: var(--ink-faint); margin: 5px 0 0; line-height: 1.5; }
+
+.share-check { display: flex; gap: 9px; align-items: flex-start; margin: 18px 0 4px; font-size: 0.88rem; color: var(--ink-soft); }
+.share-check input { margin-top: 3px; flex: none; }
+
+.share-submit {
+  margin-top: 16px; padding: 11px 20px; font: inherit; font-size: 0.92rem; font-weight: 600;
+  background: var(--accent); color: #fff; border: 0; border-radius: 999px; cursor: pointer;
+}
+.share-submit:hover { opacity: 0.92; }
+
+/* A publisher who asked to be carried, marked apart from a newsroom we read
+   and from a neighbour who saw something. Their own name does the vouching,
+   so it is the name that carries the mark rather than a separate label. */
+.src.publisher-mark {
+  background: var(--accent-soft); color: var(--accent);
+  padding: 1px 7px; border-radius: 999px; font-weight: 600;
+}
+.src.publisher-mark::before { content: "◆ "; font-size: .7em; vertical-align: 1px; }

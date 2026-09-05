@@ -126,10 +126,10 @@ function renderNewsTable(news, pagination) {
     tbody.innerHTML = (news || allNews).map(n => `
         <tr data-news-id="${n.id}">
             <td>${esc(fmt(n.published_at))}</td>
-            <td><strong>${esc(n.title || n.headline || '')}</strong></td>
-            <td class="summary-preview">${esc(n.ai_summary || n.summary || '—')}</td>
+            <td class="headline-cell"><strong class="cell-clamp">${esc(n.title || n.headline || '')}</strong></td>
+            <td class="summary-preview"><div class="cell-clamp">${esc(n.ai_summary || n.summary || '—')}</div></td>
             <td><span class="category-badge">${esc(n.primary_category || '')}</span></td>
-            <td><span class="subcat-badge">${esc(n.secondary_category || '')}</span></td>
+            <td>${n.secondary_category ? `<span class="subcat-badge">${esc(n.secondary_category)}</span>` : '<span class="nodata">—</span>'}</td>
             <td><span class="status-badge ${n.status === 'active' ? 'status-active' : 'status-inactive'}">${esc(n.status || 'inactive')}</span></td>
             <td><span class="mode-badge">${esc(n.relevance_mode || 'hybrid')}</span></td>
             <td><span class="precision-badge">${esc(n.precision_type || 'approximate_area')}</span></td>

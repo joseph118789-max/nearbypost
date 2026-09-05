@@ -44,6 +44,23 @@
   <p class="hint">How the text is actually obtained: which feed, whether the article page must be fetched separately, what happens when it cannot be.</p>
   <textarea class="ta" id="extract-{{ $s->id }}" name="extract_note" rows="3" maxlength="4000">{{ old('extract_note', $s->extract_note) }}</textarea>
 
+  <label class="lbl" for="constraint-{{ $s->id }}">What stands in the way</label>
+  <p class="hint">
+    The limitation, in plain words. No feed. Article pages answer 403. Everything is drawn by
+    JavaScript. They forbid automated reading. Whatever the next person would otherwise spend an
+    afternoon rediscovering.
+  </p>
+  <textarea class="ta" id="constraint-{{ $s->id }}" name="constraint_note" rows="3" maxlength="4000">{{ old('constraint_note', $s->constraint_note) }}</textarea>
+
+  <label class="lbl" for="workaround-{{ $s->id }}">And how to get the news anyway</label>
+  <p class="hint">
+    ⭐ The important one. A limitation recorded without a route beside it is half an answer &mdash;
+    it tells the next person to give up. The Edge publishes no feed at all and is read through the
+    data its own pages carry; BusinessToday blocks article pages but leaves its API open. Where the
+    honest answer is &ldquo;ask them for permission&rdquo;, say that, and say who to ask.
+  </p>
+  <textarea class="ta" id="workaround-{{ $s->id }}" name="workaround_note" rows="3" maxlength="4000">{{ old('workaround_note', $s->workaround_note) }}</textarea>
+
   <label class="lbl" for="strategy-{{ $s->id }}">How the pipeline should read it</label>
   <p class="hint">
     The note above is for people; this is the part the extractor obeys. Leave it on the general
