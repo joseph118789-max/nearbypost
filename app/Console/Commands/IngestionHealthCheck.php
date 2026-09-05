@@ -88,6 +88,34 @@ class IngestionHealthCheck extends Command
         }
 
         // ── Report ───────────────────────────────────────────────────────
+        // ── 5. Is a story being served by a row we call a duplicate? ────
+        //
+        // pickKeeper used to choose a keeper without knowing whether it could
+        // actually be served, so the ONE copy that reached readers could end up
+        // marked as the duplicate. The story still shows exactly once, which is
+        // why this went unnoticed - but any future tidy-up of duplicate rows
+        // would take it off the site. Fixed forward in DedupeStories; this
+        // counts what is left so the number shrinks rather than quietly grows.
+        $misKeyed = DB::table('news_items as d')
+            ->join('news_items as s', 's.id', '=', 'd.duplicate_of')
+            ->join('feed_ready_items as f', function ($j) {
+                $j->on('f.news_item_id', '=', 'd.id')->where('f.is_active', true);
+            })
+            ->whereNotExists(function ($q) {
+                $q->selectRaw('1')->from('feed_ready_items as sf')
+                  ->whereColumn('sf.news_item_id', 's.id')->where('sf.is_active', true);
+            })
+            ->count();
+
+        $stats['served_rows_marked_duplicate'] = $misKeyed;
+
+        // Not an alarm at today's number - nothing is wrong for a reader. It
+        // becomes one if it starts climbing again, which would mean the keeper
+        // fix has been undone.
+        if ($misKeyed > 60) {
+            $problems[] = "{$misKeyed} served stories are marked as duplicates of something unserved.";
+        }
+
         if ($problems === []) {
             if (!$this->option('quiet-ok')) {
                 $this->info('Ingestion healthy. ' . json_encode($stats));
