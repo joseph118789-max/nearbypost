@@ -88,7 +88,7 @@ class IndexCrawler
             '#<a\b[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>#is',
             $html,
             $matches,
-            PREG_SET_ORDER
+            PREG_SET_ORDER | PREG_OFFSET_CAPTURE
         );
 
         $seen  = [];
@@ -99,8 +99,22 @@ class IndexCrawler
                 break;
             }
 
-            $href  = html_entity_decode(trim($match[1]), ENT_QUOTES, 'UTF-8');
-            $title = $this->cleanText($match[2]);
+            $href  = html_entity_decode(trim($match[1][0]), ENT_QUOTES, 'UTF-8');
+            $title = $this->cleanText($match[2][0]);
+
+            // ⛔ AN IMAGE-LED CARD HAS NO ANCHOR TEXT AT ALL.
+            //
+            // MyTOWN KL wraps only an <img> in the link and puts the headline
+            // in a <b> in the next block, with alt="". Every link was therefore
+            // dropped by the minimum-title rule below and the whole source read
+            // as empty. Common enough on event and promotion pages to be worth
+            // handling here rather than once per site.
+            if (mb_strlen($title) < self::MIN_TITLE_LENGTH) {
+                $title = $this->titleBeside(
+                    $html,
+                    (int) $match[0][1] + strlen((string) $match[0][0])
+                ) ?: $title;
+            }
 
             if ($href === '' || str_starts_with($href, '#') || str_starts_with($href, 'javascript:')) {
                 continue;
@@ -128,6 +142,16 @@ class IndexCrawler
                 continue;
             }
 
+            // A card's button is inside its link, so the anchor text comes
+            // back as "Westlife 25: The Anniversary World TourMore Info".
+            // Strip a trailing call to action rather than let it into a
+            // headline; there is no story whose title ends this way.
+            $title = trim((string) preg_replace(
+                '/\s*(more\s*info(rmation)?|read\s*more|learn\s*more|find\s*out\s*more|buy\s*tickets?|view\s*more|more)\s*$/i',
+                '',
+                $title
+            ));
+
             if ($this->looksLikeCode($title)) {
                 continue;
             }
@@ -142,6 +166,35 @@ class IndexCrawler
         }
 
         return $items;
+    }
+
+    /**
+     * The headline sitting beside a link that had none of its own.
+     *
+     * ⛔ BOUNDED BY THE NEXT LINK, NOT BY A CHARACTER COUNT.
+     *
+     * The obvious version - "search the next few hundred characters for a
+     * <b>" - walks into the FOLLOWING card whenever a card has no title, and
+     * then every headline on the page is attributed to the wrong item. That
+     * happened while this was being written: four MyTOWN promotions each
+     * carried their neighbour's name until the search was stopped at the next
+     * anchor. The window ends where the next <a ...> begins, which is where
+     * this card ends.
+     */
+    private function titleBeside(string $html, int $from): string
+    {
+        $next   = strpos($html, '<a ', $from);
+        $window = $next === false ? substr($html, $from, 600) : substr($html, $from, $next - $from);
+
+        if (preg_match('#<(b|strong|h[1-4])\b[^>]*>(.*?)</\1>#is', $window, $m)) {
+            $text = $this->cleanText($m[2]);
+
+            if (mb_strlen($text) >= self::MIN_TITLE_LENGTH && !$this->looksLikeCode($text)) {
+                return $text;
+            }
+        }
+
+        return '';
     }
 
     /**
