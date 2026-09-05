@@ -222,6 +222,10 @@ class IngestController extends Controller
                 'source_name' => 'nullable|string|max:100',
                 'source_domain' => 'nullable|string|max:255',
                 'published_at' => 'nullable|date',
+                'published_precision' => 'nullable|in:time,date,scraped',
+                // The publisher's own id for the item. See the unique index
+                // news_items_one_per_publisher_item.
+                'external_id' => 'nullable|string|max:200',
                 'summary' => 'nullable|string',
                 'category' => 'nullable|string|max:100',
                 'primary_category' => 'nullable|string|max:100',
@@ -295,7 +299,10 @@ class IngestController extends Controller
                 'title' => $data['title'],
                 'url' => $data['url'],
                 'source' => $data['source'],
-                'published_at' => $data['published_at'] ?? null,
+                'published_at' => $data['published_at'] ?? now(),
+                // No date from the publisher means this is when we fetched
+                // it, whatever the caller said about precision.
+                'published_precision' => isset($data['published_at']) ? ($data['published_precision'] ?? 'time') : 'scraped',
                 'summary' => $data['summary'] ?? null,
                 'primary_category' => $categories['primary_category'],
                 'secondary_category' => $categories['secondary_category'],
@@ -390,6 +397,10 @@ class IngestController extends Controller
                 'source_name' => 'nullable|string|max:100',
                 'source_domain' => 'nullable|string|max:255',
                 'published_at' => 'nullable|date',
+                'published_precision' => 'nullable|in:time,date,scraped',
+                // The publisher's own id for the item. See the unique index
+                // news_items_one_per_publisher_item.
+                'external_id' => 'nullable|string|max:200',
                 'summary' => 'nullable|string',
                 'category' => 'nullable|string|max:100',
                 'primary_category' => 'nullable|string|max:100',
@@ -426,10 +437,20 @@ class IngestController extends Controller
                 'title' => $validated['title'],
                 'url' => $validated['url'],
                 'source' => $validated['source'],
-                'published_at' => $validated['published_at'] ?? null,
+                'published_at' => $validated['published_at'] ?? now(),
+                // No date from the publisher means this is when we fetched
+                // it, whatever the caller said about precision.
+                'published_precision' => isset($validated['published_at']) ? ($validated['published_precision'] ?? 'time') : 'scraped',
                 'summary' => $validated['summary'] ?? null,
                 'primary_category' => $categories['primary_category'],
                 'secondary_category' => $categories['secondary_category'],
+
+                // ⛔ NAMED HERE OR IT IS DROPPED. This block builds the row
+                // field by field, so a column added to the table and accepted
+                // by the validator still never arrives unless it is listed
+                // here too - and nothing errors when it is not.
+                'external_id' => $validated['external_id'] ?? null,
+
                 'status' => 'pending_extraction',
             ];
 

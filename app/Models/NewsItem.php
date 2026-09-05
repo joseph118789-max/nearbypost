@@ -13,10 +13,18 @@ class NewsItem extends Model
     use HasFactory;
 
     protected $fillable = [
+        'geo_country_code', 'geo_state_code', 'geo_city_code', 'geo_claim_state', 'geo_claim_country', 'geo_note',
         "title",
         "url",
+
+        // ⛔ THE THIRD PLACE THAT HAS TO NAME IT. The column exists, the
+        // ingest validator accepts it, and without this line Eloquent
+        // still drops it on every write without a word - which is exactly
+        // how cache_hit_tokens stayed NULL on every row for weeks.
+        "external_id",
         "source",
         "published_at",
+        "published_precision",
         "summary",
         "primary_category",
         "secondary_category",
@@ -62,8 +70,12 @@ class NewsItem extends Model
         "extracted_author",
         "extracted_image_url",
         "ai_summary",
+        "ai_title",
         "ai_category",
         "main_place_text",
+        "place_roles",
+        "duplicate_of",
+        "duplicate_reason",
         "relevance_mode",
         "is_article",
         "ai_status",
